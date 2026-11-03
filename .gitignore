@@ -1,0 +1,27 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# Secrets
+*.env
+.env*
+local.settings.json
+secrets*.json
+*.keystore
+*.jks
+key.properties
+
+# .NET
+backend/**/bin/
+backend/**/obj/
+backend/**/TestResults/
+*.user
+
+# Azure
+.azure/
+infra/*.parameters.local.json
+infra/out/
