@@ -40,12 +40,12 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   @override
   void initState() {
     super.initState();
-    WakelockPlus.enable();
+    WakelockPlus.enable().catchError((_) {}); // best effort; unsupported on some devices
   }
 
   @override
   void dispose() {
-    WakelockPlus.disable();
+    WakelockPlus.disable().catchError((_) {});
     super.dispose();
   }
 

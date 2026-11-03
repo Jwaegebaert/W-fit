@@ -1,3 +1,3 @@
-# wfit
+# W-fit Flutter app
 
-A new Flutter project.
+See the [repository README](../README.md) for setup, architecture and deployment.

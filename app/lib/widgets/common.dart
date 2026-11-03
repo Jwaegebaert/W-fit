@@ -39,12 +39,19 @@ class StatTile extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (icon != null) Icon(icon, color: c, size: 22),
           if (icon != null) const SizedBox(height: 8),
-          Text(value, style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+          Text(label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ]),
       ),
     );

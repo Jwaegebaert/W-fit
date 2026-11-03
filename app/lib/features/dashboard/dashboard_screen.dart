@@ -156,13 +156,15 @@ class _HeroCard extends ConsumerWidget {
       ),
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Pill(isToday ? 'TODAY' : DateFormat('EEE d MMM').format(date).toUpperCase(),
-              color: Colors.white, icon: Icons.event),
-          const SizedBox(width: 8),
-          Pill(plan.source == 'ai' ? 'AI coach' : 'Smart plan',
-              color: Colors.white, icon: plan.source == 'ai' ? Icons.auto_awesome : Icons.rule),
-          const Spacer(),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Wrap(spacing: 8, runSpacing: 6, children: [
+              Pill(isToday ? 'TODAY' : DateFormat('EEE d MMM').format(date).toUpperCase(),
+                  color: Colors.white, icon: Icons.event),
+              Pill(plan.source == 'ai' ? 'AI coach' : 'Smart plan',
+                  color: Colors.white, icon: plan.source == 'ai' ? Icons.auto_awesome : Icons.rule),
+            ]),
+          ),
           Icon(day.icon, color: Colors.white70, size: 28),
         ]),
         const SizedBox(height: 16),
