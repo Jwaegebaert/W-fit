@@ -1,0 +1,118 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../core/theme.dart';
+import '../../domain/progression.dart';
+import '../../domain/stats.dart';
+import '../../providers.dart';
+import '../../widgets/charts.dart';
+import '../../widgets/common.dart';
+
+final _exerciseSetsProvider = FutureProvider.family<List<LoggedSet>, String>((ref, id) async {
+  await ref.watch(completedSessionsProvider.future);
+  return ref.read(repositoryProvider).loggedSets(exerciseId: id);
+});
+
+class ExerciseProgressScreen extends ConsumerWidget {
+  const ExerciseProgressScreen({super.key, required this.exerciseId});
+
+  final String exerciseId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final e = ref.watch(catalogProvider).exercise(exerciseId);
+    final data = ref.watch(_exerciseSetsProvider(exerciseId));
+    return Scaffold(
+      appBar: AppBar(title: Text(e?.name ?? 'Progress')),
+      body: AsyncView(
+        value: data,
+        builder: (sets) {
+          if (sets.isEmpty) {
+            return const EmptyState(icon: Icons.show_chart, title: 'No sets logged yet', message: 'Log this exercise in a workout to see progress.');
+          }
+          // Group per session, oldest first.
+          final sessions = <String, List<LoggedSet>>{};
+          for (final s in sets.reversed) {
+            sessions.putIfAbsent(s.sessionId, () => []).add(s);
+          }
+          final points = sessions.values.toList();
+          final labels = points.map((p) => DateFormat('d/M').format(p.first.date.toLocal())).toList();
+          final weighted = sets.any((s) => (s.weightKg ?? 0) > 0);
+          final e1rm = points
+              .map((p) => p.map((s) => estimatedOneRepMax(s.weightKg ?? 0, s.reps ?? 0)).fold<double>(0, math.max))
+              .toList();
+          final top = points.map((p) => p.map((s) => s.weightKg ?? 0).fold<double>(0, math.max)).toList();
+          final volume = points.map((p) => p.fold<double>(0, (a, s) => a + s.volume)).toList();
+          final reps = points.map((p) => p.map((s) => (s.reps ?? 0).toDouble()).fold<double>(0, math.max)).toList();
+          final best = computeBests(sets)[exerciseId];
+          final first = weighted ? e1rm.first : reps.first;
+          final last = weighted ? e1rm.last : reps.last;
+          final change = percentChange(first, last);
+          final t = Theme.of(context);
+
+          return ListView(padding: Gap.page, children: [
+            Row(children: [
+              Expanded(
+                child: StatTile(
+                  label: weighted ? 'best e1RM (kg)' : 'best reps',
+                  value: weighted ? formatKg(best?.bestE1rm) : '${best?.mostReps?.reps ?? 0}',
+                  icon: Icons.emoji_events_outlined,
+                  color: Colors.amber.shade700,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: StatTile(
+                  label: 'since first session',
+                  value: '${change >= 0 ? '+' : ''}${change.toStringAsFixed(0)}%',
+                  icon: change >= 0 ? Icons.trending_up : Icons.trending_down,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: StatTile(label: 'sessions', value: '${points.length}', icon: Icons.event_repeat)),
+            ]),
+            if (weighted) ...[
+              const SectionTitle('Estimated 1-rep max'),
+              Card(child: Padding(padding: const EdgeInsets.fromLTRB(8, 16, 16, 8), child: TrendLineChart(values: e1rm, labels: labels, unit: ' kg'))),
+              const SectionTitle('Top set weight'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
+                  child: TrendLineChart(values: top, labels: labels, unit: ' kg', color: t.colorScheme.tertiary),
+                ),
+              ),
+              const SectionTitle('Volume per session'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
+                  child: TrendLineChart(values: volume, labels: labels, unit: ' kg', color: t.colorScheme.secondary, minYZero: true),
+                ),
+              ),
+            ] else ...[
+              const SectionTitle('Best set (reps)'),
+              Card(child: Padding(padding: const EdgeInsets.fromLTRB(8, 16, 16, 8), child: TrendLineChart(values: reps, labels: labels))),
+            ],
+            const SectionTitle('Sessions'),
+            Card(
+              child: Column(children: [
+                for (final p in points.reversed.take(15))
+                  ListTile(
+                    dense: true,
+                    title: Text(DateFormat('EEE d MMM yyyy').format(p.first.date.toLocal())),
+                    subtitle: Text(p
+                        .map((s) => weighted ? '${formatKg(s.weightKg)}×${s.reps}' : '${s.reps ?? formatKgOrDash(s.durationSeconds)}')
+                        .join('  ')),
+                  ),
+              ]),
+            ),
+          ]);
+        },
+      ),
+    );
+  }
+}
+
+String formatKgOrDash(int? v) => v == null ? '–' : '${v}s';
