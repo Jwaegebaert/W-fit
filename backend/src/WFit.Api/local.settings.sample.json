@@ -1,0 +1,15 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "WFIT_API_KEY": "<local-dev-api-key>",
+    "SQL_CONNECTION_STRING": "Server=(localdb)\\mssqllocaldb;Database=wfit;Trusted_Connection=True;TrustServerCertificate=True;",
+    "AZURE_OPENAI_ENDPOINT": "https://<your-openai-account>.openai.azure.com/",
+    "AZURE_OPENAI_DEPLOYMENT": "gpt-4.1-mini",
+    "AI_ENABLED": "true",
+    "AI_DAILY_CALL_LIMIT": "25",
+    "AI_MONTHLY_TOKEN_LIMIT": "2000000",
+    "AI_MAX_OUTPUT_TOKENS": "1800"
+  }
+}

@@ -1,0 +1,154 @@
+using System.Text.Json;
+using WFit.Api.Data;
+using WFit.Api.Infrastructure;
+
+namespace WFit.Api.Sync;
+
+/// <summary>Entity ⇄ DTO conversions for synced records.</summary>
+public static class SyncMapper
+{
+    public static string Trunc(string? value, int max) =>
+        string.IsNullOrEmpty(value) ? "" : value.Length <= max ? value : value[..max];
+
+    /// <summary>Returns the canonical lower-case GUID string, or null when the value isn't a GUID.</summary>
+    public static string? NormalizeGuid(string? value) =>
+        Guid.TryParse(value, out var g) ? g.ToString("D") : null;
+
+    public static string SerializeBlocks(IEnumerable<WorkoutBlockDto> blocks) =>
+        JsonSerializer.Serialize(blocks, JsonDefaults.Options);
+
+    public static List<WorkoutBlockDto> DeserializeBlocks(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            return JsonSerializer.Deserialize<List<WorkoutBlockDto>>(json, JsonDefaults.Options) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    public static ProfileDto ToDto(this Profile e) => new()
+    {
+        Id = e.Id, Name = e.Name, Experience = e.Experience, Goals = e.Goals, TrainingDays = [.. e.TrainingDays],
+        SessionMinutes = e.SessionMinutes, IncludeCore = e.IncludeCore, HeightCm = e.HeightCm, BirthYear = e.BirthYear,
+        Injuries = e.Injuries, Notes = e.Notes, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static EquipmentStatusDto ToDto(this EquipmentStatus e) => new()
+    {
+        EquipmentId = e.EquipmentId, Available = e.Available, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static ExercisePreferenceDto ToDto(this ExercisePreference e) => new()
+    {
+        ExerciseId = e.ExerciseId, Preference = e.Preference, Note = e.Note, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static PlannedWorkoutDto ToDto(this PlannedWorkout e) => new()
+    {
+        Id = e.Id, Date = e.Date, DayType = e.DayType, Title = e.Title, Source = e.Source, Status = e.Status,
+        EstimatedMinutes = e.EstimatedMinutes, CoachNote = e.CoachNote, Blocks = DeserializeBlocks(e.BlocksJson),
+        UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static WorkoutSessionDto ToDto(this WorkoutSession e) => new()
+    {
+        Id = e.Id, PlannedWorkoutId = e.PlannedWorkoutId, DayType = e.DayType, Title = e.Title, StartedAt = e.StartedAt,
+        EndedAt = e.EndedAt, DurationSeconds = e.DurationSeconds, Rating = e.Rating, PerceivedEffort = e.PerceivedEffort,
+        Notes = e.Notes, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static SetLogDto ToDto(this SetLog e) => new()
+    {
+        Id = e.Id, SessionId = e.SessionId, ExerciseId = e.ExerciseId, Section = e.Section, ExerciseOrder = e.ExerciseOrder,
+        SetNumber = e.SetNumber, WeightKg = e.WeightKg, Reps = e.Reps, DurationSeconds = e.DurationSeconds, Rir = e.Rir,
+        Completed = e.Completed, CompletedAt = e.CompletedAt, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static BodyMetricDto ToDto(this BodyMetric e) => new()
+    {
+        Id = e.Id, Date = e.Date, WeightKg = e.WeightKg, BodyFatPct = e.BodyFatPct, WaistCm = e.WaistCm, ChestCm = e.ChestCm,
+        ArmCm = e.ArmCm, ThighCm = e.ThighCm, HipsCm = e.HipsCm, Notes = e.Notes, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static void Apply(this Profile e, ProfileDto d)
+    {
+        e.Name = Trunc(d.Name, Len.Name);
+        e.Experience = d.Experience;
+        e.Goals = Trunc(d.Goals, Len.Goals);
+        e.TrainingDays = (d.TrainingDays ?? []).Where(x => x is >= 1 and <= 7).Distinct().Order().ToList();
+        e.SessionMinutes = Math.Clamp(d.SessionMinutes, 10, 240);
+        e.IncludeCore = d.IncludeCore;
+        e.HeightCm = d.HeightCm;
+        e.BirthYear = d.BirthYear;
+        e.Injuries = Trunc(d.Injuries, Len.Text);
+        e.Notes = Trunc(d.Notes, Len.Text);
+    }
+
+    public static void Apply(this EquipmentStatus e, EquipmentStatusDto d) => e.Available = d.Available;
+
+    public static void Apply(this ExercisePreference e, ExercisePreferenceDto d)
+    {
+        e.Preference = d.Preference;
+        e.Note = Trunc(d.Note, Len.Text);
+    }
+
+    public static void Apply(this PlannedWorkout e, PlannedWorkoutDto d)
+    {
+        e.Date = d.Date;
+        e.DayType = d.DayType;
+        e.Title = Trunc(d.Title, Len.Title);
+        e.Source = d.Source;
+        e.Status = d.Status;
+        e.EstimatedMinutes = Math.Clamp(d.EstimatedMinutes, 0, 600);
+        e.CoachNote = Trunc(d.CoachNote, Len.Text);
+        e.BlocksJson = SerializeBlocks((d.Blocks ?? []).Select(b => b with
+        {
+            Items = (b.Items ?? []).Select(i => i with { Notes = i.Notes ?? "" }).ToList(),
+        }));
+    }
+
+    public static void Apply(this WorkoutSession e, WorkoutSessionDto d, string? plannedWorkoutId)
+    {
+        e.PlannedWorkoutId = plannedWorkoutId;
+        e.DayType = d.DayType;
+        e.Title = Trunc(d.Title, Len.Title);
+        e.StartedAt = d.StartedAt;
+        e.EndedAt = d.EndedAt;
+        e.DurationSeconds = d.DurationSeconds;
+        e.Rating = d.Rating;
+        e.PerceivedEffort = d.PerceivedEffort;
+        e.Notes = Trunc(d.Notes, Len.Text);
+    }
+
+    public static void Apply(this SetLog e, SetLogDto d, string sessionId)
+    {
+        e.SessionId = sessionId;
+        e.ExerciseId = d.ExerciseId;
+        e.Section = d.Section;
+        e.ExerciseOrder = d.ExerciseOrder;
+        e.SetNumber = d.SetNumber;
+        e.WeightKg = d.WeightKg;
+        e.Reps = d.Reps;
+        e.DurationSeconds = d.DurationSeconds;
+        e.Rir = d.Rir;
+        e.Completed = d.Completed;
+        e.CompletedAt = d.CompletedAt;
+    }
+
+    public static void Apply(this BodyMetric e, BodyMetricDto d)
+    {
+        e.Date = d.Date;
+        e.WeightKg = d.WeightKg;
+        e.BodyFatPct = d.BodyFatPct;
+        e.WaistCm = d.WaistCm;
+        e.ChestCm = d.ChestCm;
+        e.ArmCm = d.ArmCm;
+        e.ThighCm = d.ThighCm;
+        e.HipsCm = d.HipsCm;
+        e.Notes = Trunc(d.Notes, Len.Text);
+    }
+}
