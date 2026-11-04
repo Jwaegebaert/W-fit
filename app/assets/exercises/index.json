@@ -1,0 +1,356 @@
+{
+  "source": {
+    "name": "Free Exercise DB",
+    "url": "https://github.com/yuhonas/free-exercise-db",
+    "revision": "f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5",
+    "license": "The Unlicense (public domain)",
+    "licenseUrl": "https://unlicense.org",
+    "attribution": "Exercise photos from Free Exercise DB by yuhonas and contributors (github.com/yuhonas/free-exercise-db), based on wrkout/exercises.json; released into the public domain under The Unlicense. Resized for W-fit."
+  },
+  "exercises": {
+    "ab-wheel-rollout": {
+      "frames": 2,
+      "sourceId": "Ab_Roller"
+    },
+    "arm-circles": {
+      "frames": 2,
+      "sourceId": "Arm_Circles"
+    },
+    "band-assisted-pull-up": {
+      "frames": 2,
+      "sourceId": "Band_Assisted_Pull-Up"
+    },
+    "band-external-rotation": {
+      "frames": 2,
+      "sourceId": "External_Rotation_with_Band"
+    },
+    "band-pull-apart": {
+      "frames": 2,
+      "sourceId": "Band_Pull_Apart"
+    },
+    "barbell-back-squat": {
+      "frames": 2,
+      "sourceId": "Barbell_Squat"
+    },
+    "barbell-bench-press": {
+      "frames": 2,
+      "sourceId": "Barbell_Bench_Press_-_Medium_Grip"
+    },
+    "barbell-hip-thrust": {
+      "frames": 2,
+      "sourceId": "Barbell_Hip_Thrust"
+    },
+    "barbell-romanian-deadlift": {
+      "frames": 2,
+      "sourceId": "Romanian_Deadlift"
+    },
+    "barbell-row": {
+      "frames": 2,
+      "sourceId": "Bent_Over_Barbell_Row"
+    },
+    "bench-dip": {
+      "frames": 2,
+      "sourceId": "Bench_Dips"
+    },
+    "bike-easy": {
+      "frames": 2,
+      "sourceId": "Bicycling_Stationary"
+    },
+    "bodyweight-squat": {
+      "frames": 2,
+      "sourceId": "Bodyweight_Squat"
+    },
+    "box-jump": {
+      "frames": 2,
+      "sourceId": "Front_Box_Jump"
+    },
+    "bulgarian-split-squat": {
+      "frames": 2,
+      "sourceId": "Split_Squat_with_Dumbbells"
+    },
+    "cable-biceps-curl": {
+      "frames": 2,
+      "sourceId": "Standing_Biceps_Cable_Curl"
+    },
+    "cable-chest-fly": {
+      "frames": 2,
+      "sourceId": "Cable_Crossover"
+    },
+    "cable-external-rotation": {
+      "frames": 2,
+      "sourceId": "External_Rotation_with_Cable"
+    },
+    "cable-lateral-raise": {
+      "frames": 2,
+      "sourceId": "Standing_Low-Pulley_Deltoid_Raise"
+    },
+    "cable-overhead-triceps-extension": {
+      "frames": 2,
+      "sourceId": "Triceps_Overhead_Extension_with_Rope"
+    },
+    "cable-pull-through": {
+      "frames": 2,
+      "sourceId": "Pull_Through"
+    },
+    "cable-triceps-pushdown": {
+      "frames": 2,
+      "sourceId": "Triceps_Pushdown"
+    },
+    "cable-woodchop": {
+      "frames": 2,
+      "sourceId": "Standing_Cable_Wood_Chop"
+    },
+    "calf-wall-stretch": {
+      "frames": 2,
+      "sourceId": "Calf_Stretch_Hands_Against_Wall"
+    },
+    "captains-chair-knee-raise": {
+      "frames": 2,
+      "sourceId": "Knee_Hip_Raise_On_Parallel_Bars"
+    },
+    "cat-cow": {
+      "frames": 2,
+      "sourceId": "Cat_Stretch"
+    },
+    "chest-supported-dumbbell-row": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Incline_Row"
+    },
+    "childs-pose": {
+      "frames": 2,
+      "sourceId": "Childs_Pose"
+    },
+    "cross-body-shoulder-stretch": {
+      "frames": 2,
+      "sourceId": "Shoulder_Stretch"
+    },
+    "dead-bug": {
+      "frames": 2,
+      "sourceId": "Dead_Bug"
+    },
+    "dumbbell-bench-press": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Bench_Press"
+    },
+    "dumbbell-biceps-curl": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Bicep_Curl"
+    },
+    "dumbbell-lateral-raise": {
+      "frames": 2,
+      "sourceId": "Side_Lateral_Raise"
+    },
+    "dumbbell-reverse-lunge": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Rear_Lunge"
+    },
+    "dumbbell-romanian-deadlift": {
+      "frames": 2,
+      "sourceId": "Stiff-Legged_Dumbbell_Deadlift"
+    },
+    "dumbbell-step-up": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Step_Ups"
+    },
+    "elliptical-easy": {
+      "frames": 2,
+      "sourceId": "Elliptical_Trainer"
+    },
+    "explosive-incline-push-up": {
+      "frames": 2,
+      "sourceId": "Incline_Push-Up"
+    },
+    "ez-bar-curl": {
+      "frames": 2,
+      "sourceId": "EZ-Bar_Curl"
+    },
+    "face-pull": {
+      "frames": 2,
+      "sourceId": "Face_Pull"
+    },
+    "foam-roll-legs": {
+      "frames": 2,
+      "sourceId": "Quadriceps-SMR"
+    },
+    "foam-roll-thoracic": {
+      "frames": 2,
+      "sourceId": "Rhomboids-SMR"
+    },
+    "glute-bridge": {
+      "frames": 2,
+      "sourceId": "Butt_Lift_Bridge"
+    },
+    "half-kneeling-hip-flexor-stretch": {
+      "frames": 2,
+      "sourceId": "Kneeling_Hip_Flexor"
+    },
+    "hammer-curl": {
+      "frames": 2,
+      "sourceId": "Hammer_Curls"
+    },
+    "hamstring-stretch": {
+      "frames": 2,
+      "sourceId": "Hamstring_Stretch"
+    },
+    "hanging-knee-raise": {
+      "frames": 2,
+      "sourceId": "Hanging_Leg_Raise"
+    },
+    "hip-abduction-machine": {
+      "frames": 2,
+      "sourceId": "Thigh_Abductor"
+    },
+    "inchworm": {
+      "frames": 2,
+      "sourceId": "Inchworm"
+    },
+    "incline-dumbbell-press": {
+      "frames": 2,
+      "sourceId": "Incline_Dumbbell_Press"
+    },
+    "inverted-row": {
+      "frames": 2,
+      "sourceId": "Inverted_Row"
+    },
+    "jump-rope-easy": {
+      "frames": 2,
+      "sourceId": "Rope_Jumping"
+    },
+    "kettlebell-goblet-squat": {
+      "frames": 2,
+      "sourceId": "Goblet_Squat"
+    },
+    "landmine-rotation": {
+      "frames": 2,
+      "sourceId": "Landmine_180s"
+    },
+    "lat-pulldown": {
+      "frames": 2,
+      "sourceId": "Wide-Grip_Lat_Pulldown"
+    },
+    "leg-extension": {
+      "frames": 2,
+      "sourceId": "Leg_Extensions"
+    },
+    "leg-press": {
+      "frames": 2,
+      "sourceId": "Leg_Press"
+    },
+    "lying-leg-curl": {
+      "frames": 2,
+      "sourceId": "Lying_Leg_Curls"
+    },
+    "machine-chest-press": {
+      "frames": 2,
+      "sourceId": "Leverage_Chest_Press"
+    },
+    "machine-shoulder-press": {
+      "frames": 2,
+      "sourceId": "Machine_Shoulder_Military_Press"
+    },
+    "medicine-ball-chest-pass": {
+      "frames": 2,
+      "sourceId": "Medicine_Ball_Chest_Pass"
+    },
+    "medicine-ball-slam": {
+      "frames": 2,
+      "sourceId": "Overhead_Slam"
+    },
+    "neutral-grip-lat-pulldown": {
+      "frames": 2,
+      "sourceId": "V-Bar_Pulldown"
+    },
+    "one-arm-dumbbell-row": {
+      "frames": 2,
+      "sourceId": "One-Arm_Dumbbell_Row"
+    },
+    "overhead-dumbbell-triceps-extension": {
+      "frames": 2,
+      "sourceId": "Standing_Dumbbell_Triceps_Extension"
+    },
+    "pec-deck-fly": {
+      "frames": 2,
+      "sourceId": "Butterfly"
+    },
+    "pec-deck-rear-delt": {
+      "frames": 2,
+      "sourceId": "Reverse_Machine_Flyes"
+    },
+    "plank": {
+      "frames": 2,
+      "sourceId": "Plank"
+    },
+    "push-up": {
+      "frames": 2,
+      "sourceId": "Pushups"
+    },
+    "reverse-crunch": {
+      "frames": 2,
+      "sourceId": "Reverse_Crunch"
+    },
+    "reverse-dumbbell-fly": {
+      "frames": 2,
+      "sourceId": "Seated_Bent-Over_Rear_Delt_Raise"
+    },
+    "rowing-easy": {
+      "frames": 2,
+      "sourceId": "Rowing_Stationary"
+    },
+    "seated-cable-row": {
+      "frames": 2,
+      "sourceId": "Seated_Cable_Rows"
+    },
+    "seated-dumbbell-shoulder-press": {
+      "frames": 2,
+      "sourceId": "Seated_Dumbbell_Press"
+    },
+    "side-plank": {
+      "frames": 2,
+      "sourceId": "Side_Bridge"
+    },
+    "skater-jump": {
+      "frames": 2,
+      "sourceId": "Lateral_Bound"
+    },
+    "smith-bench-press": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Bench_Press"
+    },
+    "smith-incline-press": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Incline_Bench_Press"
+    },
+    "smith-squat": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Squat"
+    },
+    "split-stance-hip-flexor-stretch": {
+      "frames": 2,
+      "sourceId": "Standing_Hip_Flexors"
+    },
+    "standing-calf-raise": {
+      "frames": 2,
+      "sourceId": "Standing_Calf_Raises"
+    },
+    "standing-hip-circles": {
+      "frames": 2,
+      "sourceId": "Standing_Hip_Circles"
+    },
+    "straight-arm-pulldown": {
+      "frames": 2,
+      "sourceId": "Straight-Arm_Pulldown"
+    },
+    "treadmill-walk-jog": {
+      "frames": 2,
+      "sourceId": "Jogging_Treadmill"
+    },
+    "triceps-overhead-stretch": {
+      "frames": 2,
+      "sourceId": "Triceps_Stretch"
+    },
+    "worlds-greatest-stretch": {
+      "frames": 2,
+      "sourceId": "Worlds_Greatest_Stretch"
+    }
+  }
+}
