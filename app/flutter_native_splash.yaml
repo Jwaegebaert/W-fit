@@ -1,0 +1,19 @@
+# Regenerate: dart run flutter_native_splash:create --path=flutter_native_splash.yaml
+# Sources come from assets/brand/source/generate_brand.js.
+flutter_native_splash:
+  color: "#F6FAF8"
+  image: assets/brand/source/splash_light.png
+  color_dark: "#0E1513"
+  image_dark: assets/brand/source/splash_dark.png
+
+  android_12:
+    color: "#F6FAF8"
+    color_dark: "#0E1513"
+    image: assets/brand/source/splash_android12.png
+    icon_background_color: "#0E9F8A"
+    icon_background_color_dark: "#0E9F8A"
+
+  android: true
+  ios: false
+  web: false
+  fullscreen: false

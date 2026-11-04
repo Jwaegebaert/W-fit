@@ -1,0 +1,12 @@
+# Regenerate: dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+# Sources come from assets/brand/source/generate_brand.js.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: false
+  image_path: "assets/brand/source/icon_legacy.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0E9F8A"
+  adaptive_icon_foreground: "assets/brand/source/icon_foreground.png"
+  # Foreground PNG already keeps the mark inside the 66dp safe zone.
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: "assets/brand/source/icon_monochrome.png"

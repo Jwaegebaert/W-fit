@@ -1,24 +1,101 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../domain/catalog.dart';
 
-/// W-fit design system: Material 3, teal seed, generous radii, consistent spacing.
+/// W-fit brand palette: refined teal/emerald, deep ink surfaces and one warm gold accent for highlights/PRs.
+class BrandColors {
+  /// Core brand teal (logo, launcher icon background, theme seed).
+  static const teal = Color(0xFF0E9F8A);
+  /// Deeper teal: first stroke of the mark, light-mode primary (5.8:1 with white).
+  static const tealDeep = Color(0xFF0A7363);
+  /// Brighter emerald: second (rising) stroke of the mark.
+  static const tealBright = Color(0xFF14B89F);
+  /// Light teal used as primary on dark surfaces.
+  static const mint = Color(0xFF5FD6BF);
+  /// Deep graphite with a hint of green for dark surfaces.
+  static const ink = Color(0xFF0E1513);
+  /// Off-white light surface.
+  static const mist = Color(0xFFF6FAF8);
+  /// Restrained accent for highlights / personal records.
+  static const gold = Color(0xFFE8A93A);
+}
+
+/// W-fit design system: Material 3, teal brand palette, generous radii, consistent spacing.
 class AppTheme {
-  static const seed = Color(0xFF0E9F8A);
+  static const seed = BrandColors.teal;
 
   static ThemeData light() => _build(Brightness.light);
   static ThemeData dark() => _build(Brightness.dark);
 
+  static ColorScheme _scheme(Brightness brightness) {
+    final base = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+    if (brightness == Brightness.light) {
+      return base.copyWith(
+        primary: BrandColors.tealDeep,
+        onPrimary: Colors.white,
+        primaryContainer: const Color(0xFFC2EFE5),
+        onPrimaryContainer: const Color(0xFF00382F),
+        tertiary: const Color(0xFF8A5A00),
+        onTertiary: Colors.white,
+        tertiaryContainer: const Color(0xFFFFE2B0),
+        onTertiaryContainer: const Color(0xFF2C1A00),
+        surface: BrandColors.mist,
+        onSurface: const Color(0xFF141D1B),
+        surfaceContainerLowest: Colors.white,
+        surfaceContainerLow: const Color(0xFFEFF5F3),
+        surfaceContainer: const Color(0xFFE9F0EE),
+        surfaceContainerHigh: const Color(0xFFE3EBE8),
+        surfaceContainerHighest: const Color(0xFFDDE5E2),
+      );
+    }
+    return base.copyWith(
+      primary: BrandColors.mint,
+      onPrimary: const Color(0xFF00382F),
+      primaryContainer: const Color(0xFF0A5148),
+      onPrimaryContainer: const Color(0xFFC2EFE5),
+      tertiary: const Color(0xFFF2BE5C),
+      onTertiary: const Color(0xFF422C00),
+      tertiaryContainer: const Color(0xFF5E4100),
+      onTertiaryContainer: const Color(0xFFFFDDA6),
+      surface: BrandColors.ink,
+      onSurface: const Color(0xFFDCE5E2),
+      surfaceContainerLowest: const Color(0xFF09100E),
+      surfaceContainerLow: const Color(0xFF151E1B),
+      surfaceContainer: const Color(0xFF19231F),
+      surfaceContainerHigh: const Color(0xFF232E2A),
+      surfaceContainerHighest: const Color(0xFF2E3935),
+    );
+  }
+
+  static TextTheme _text(TextTheme t) => t.copyWith(
+        displaySmall: t.displaySmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+        headlineLarge: t.headlineLarge?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5),
+        headlineMedium: t.headlineMedium?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4),
+        headlineSmall: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.25),
+        titleLarge: t.titleLarge?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.2),
+        titleMedium: t.titleMedium?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0),
+        titleSmall: t.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        labelLarge: t.labelLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0.2),
+      );
+
   static ThemeData _build(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
-    final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: brightness);
+    final scheme = _scheme(brightness);
+    final isDark = brightness == Brightness.dark;
+    final raw = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: brightness);
+    final base = raw.copyWith(textTheme: _text(raw.textTheme), primaryTextTheme: _text(raw.primaryTextTheme));
     return base.copyWith(
       scaffoldBackgroundColor: scheme.surface,
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: scheme.onSurface),
+        titleTextStyle: base.textTheme.titleLarge?.copyWith(color: scheme.onSurface),
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: brightness,
+        ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -30,7 +107,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size(48, 52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+          textStyle: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -65,14 +142,22 @@ class Gap {
   static const double xl = 32;
   static const double radius = 20;
   static const page = EdgeInsets.fromLTRB(16, 8, 16, 32);
+  static const double radiusSm = 12;
+  static const double radiusMd = 16;
+  static const double tap = 48;
+  static const double item = 10;
+  static const double fabClearance = 88;
+  static const sheet = EdgeInsets.fromLTRB(20, 0, 20, 24);
+  static const bar = EdgeInsets.fromLTRB(16, 10, 16, 10);
 }
 
 extension SectionStyle on Section {
+  /// Brightness-aware accents harmonised with the brand palette (≥3:1 on surfaces).
   Color color(ColorScheme s) => switch (this) {
-        Section.warmup => const Color(0xFFF59E0B),
+        Section.warmup => _tone(s, const Color(0xFFC4660F), const Color(0xFFF5A65B)),
         Section.main => s.primary,
-        Section.core => const Color(0xFF8B5CF6),
-        Section.cooldown => const Color(0xFF3B82F6),
+        Section.core => _tone(s, const Color(0xFF7559D9), const Color(0xFFB3A1F7)),
+        Section.cooldown => _tone(s, const Color(0xFF2F7FD0), const Color(0xFF7DB6F2)),
       };
 
   IconData get icon => switch (this) {
@@ -97,8 +182,10 @@ extension DayStyle on DayType {
       };
 
   Color color(ColorScheme s) => switch (this) {
-        DayType.push => const Color(0xFFEF6C4D),
-        DayType.pull => const Color(0xFF3B82F6),
-        DayType.legs => const Color(0xFF10B981),
+        DayType.push => _tone(s, const Color(0xFFD9573A), const Color(0xFFF28B6E)),
+        DayType.pull => _tone(s, const Color(0xFF3770D6), const Color(0xFF86AEF5)),
+        DayType.legs => _tone(s, const Color(0xFF3F9447), const Color(0xFF8FD47E)),
       };
 }
+
+Color _tone(ColorScheme s, Color light, Color dark) => s.brightness == Brightness.dark ? dark : light;
