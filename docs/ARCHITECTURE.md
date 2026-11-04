@@ -21,8 +21,10 @@
    written locally first and queued for sync. The app is fully usable with no network and no AI.
 2. **AI is an enhancement, never a dependency.** A deterministic on-device rule engine generates Push/Pull/Legs workouts,
    applies double progression and proposes swaps. AI responses are constrained to catalog exercise IDs and validated.
-3. **One catalog.** `app/assets/data/catalog.json` (equipment + 100+ exercises with muscles, movement pattern, equipment,
-   default prescription, badminton relevance, instructions) is bundled in the app and embedded in the backend.
+3. **One catalog.** `app/assets/data/catalog.json` (v2: equipment with descriptions + 120+ exercises with muscles,
+   movement pattern, equipment, default prescription, badminton relevance, instructions, tip and common mistakes) is
+   bundled in the app and embedded in the backend. Equipment `mat` ("Exercise mat / floor space") marks floor work:
+   an exercise is a floor exercise ⇔ its `equipment` contains `mat`.
 4. **Cheap by construction.** Scale-to-zero compute, free SQL offer with AutoPause on exhaustion, pay-per-token AI with
    hard server-side limits, capped telemetry. See `docs/COSTS.md`.
 
@@ -50,8 +52,8 @@ experience level (beginner ⇒ difficulty ≤ 2, prefer 1).
 (default Mon/Wed/Fri).
 
 **Session template (60 min default).** Warm-up ≈ 8 min (1 cardio + 3 activation/mobility for the split),
-main block fills the remaining budget, optional core ≈ 6 min (2 exercises with different patterns), cooldown ≈ 6 min
-(4 stretches for the split). Main slots by priority:
+main block fills the remaining budget, optional core ≈ 6 min (2 exercises with different patterns), cooldown ≈ 4 min
+(3 stretches for the split). Main slots by priority:
 
 | Day | Slot order (movement patterns) |
 |---|---|
@@ -63,19 +65,33 @@ Exercise time ≈ `sets × (40 s work + rest) + 60 s setup`. Slots are added unt
 Exercise choice per slot: not already used → previously used for this slot (consistency helps beginners progress) →
 liked → lower difficulty → compound first.
 
+**Machine and floor rules.** Designed for a machine-heavy gym with limited floor space:
+- *Main lifts:* machines, cable stations and the Smith machine get a small bonus (+1), kept below the
+  recently-used bonus (+5) so an established programme (and its progression) is never reshuffled by it.
+- *Warm-up, core, cool-down:* floor exercises (`mat`) get a −3 penalty, so standing / station options win when
+  comparable, and each block holds at most 1 floor exercise. A second floor exercise is only picked when no standing /
+  station candidate is left for that slot (a floor drill beats an empty slot).
+- *Warm-up cardio:* the usable cardio machines (not unavailable, occupied or banned; best preference tier only) rotate
+  deterministically by day type (push/pull/legs → 1st/2nd/3rd machine in catalog order), so a gym with bike,
+  treadmill and elliptical gets each one once per rotation. Without machines, bodyweight cardio is used.
+- *Swaps:* warm-up / core / cool-down swaps penalise floor candidates (−2); main swaps don't.
+
 **Double progression.** Per exercise, look at the last session's working sets:
 all sets ≥ `repMax` ⇒ add `incrementKg` and target `repMin`; two consecutive sessions below `repMin` ⇒ −10 %;
 otherwise keep the weight and aim for +1 rep. New exercises start light at ~3 reps in reserve.
 
 **Swaps.** Rank eligible exercises in the same category: same movement pattern (+3), primary-muscle overlap (+2 each),
-secondary overlap (+1), same split (+1), liked (+1), disliked (−2), difficulty above level (−2).
+secondary overlap (+1), same split (+1), liked (+1), disliked (−2), difficulty above level (−2), floor exercise in a
+warm-up / core / cool-down swap (−2).
 *Occupied* excludes the equipment for the current session only. *Unavailable* marks the equipment permanently
 unavailable in settings (synced to the server and respected by AI generation).
 
 ## AI integration (server-side only)
 - Azure OpenAI chat completions with **structured outputs** (`response_format: json_schema`, strict).
-- The server builds a compact candidate list (id, name, pattern, primary muscles) filtered by equipment, preferences
-  and day type; the model may only return IDs from that list. Output is validated and clamped to beginner-safe ranges.
+- The server builds a compact candidate list (id, name, pattern, primary muscles, equipment) filtered by equipment,
+  preferences and day type; the model may only return IDs from that list. Output is validated and clamped to
+  beginner-safe ranges; the prompt asks for 2–3 cool-down stretches and standing / machine / station exercises, and the
+  validator drops floor exercises beyond one per warm-up / core / cool-down when a standing candidate exists.
 - Context is bounded: profile, equipment summary, last 6 sessions summarised as top sets per exercise.
 - Limits: daily call limit, monthly token cap, per-call `max_tokens`, insights cached per day, kill switch.
 - Authentication via the Function App's managed identity (`Cognitive Services OpenAI User`); no keys.

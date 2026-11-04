@@ -115,6 +115,27 @@ class RuleEngine {
       'Leave 2–3 reps in reserve on every working set. When you hit the top of the rep range '
       'on all sets, add the smallest weight step next time.';
 
+  /// Number of stretches / mobility drills in the cool-down.
+  static const int cooldownSize = 3;
+
+  /// Score boost for exercises used recently on this day type (keeps progression stable).
+  static const int recentBonus = 5;
+
+  /// Mild preference for machines, cables and the Smith machine in the main block.
+  /// Must stay below [recentBonus] so an established programme is never reshuffled by it.
+  static const int machineBonus = 1;
+
+  /// Penalty for floor exercises (equipment 'mat') in warm-up, core and cool-down, so standing /
+  /// station alternatives win when they are otherwise comparable (floor space is limited).
+  static const int floorPenalty = 3;
+
+  /// Maximum floor exercises per warm-up, core block and cool-down. More are only used when no
+  /// standing / station option is left for that pick (a floor drill beats an empty slot).
+  static const int maxFloorPerBlock = 1;
+
+  /// Floor penalty when ranking warm-up / core / cool-down swaps (swap scores use a smaller scale).
+  static const int swapFloorPenalty = 2;
+
   GeneratedWorkout generate({
     required DayType day,
     int sessionMinutes = 60,
@@ -136,6 +157,7 @@ class RuleEngine {
       final pick = _bestFor(
         (e) => e.pattern == pattern && e.fitsDay(day) && Section.main.categories.contains(e.category),
         used,
+        bonus: (e) => isMachine(e) ? machineBonus : 0,
       );
       if (pick == null) continue;
       final item = PlanItem.fromExercise(pick, targetWeightKg: suggestWeight?.call(pick));
@@ -162,41 +184,64 @@ class RuleEngine {
 
   List<PlanItem> _warmup(DayType day, Set<String> used) {
     final items = <PlanItem>[];
-    final cardio = _bestFor(
-      (e) => e.category == 'warmup' && e.pattern == 'cardio' && e.equipment.isNotEmpty,
-      used,
-    ) ?? _bestFor((e) => e.category == 'warmup' && e.pattern == 'cardio', used);
+    final picked = <Exercise>[];
+    final cardio = _warmupCardio(day, used);
     if (cardio != null) {
       used.add(cardio.id);
       items.add(PlanItem.fromExercise(cardio));
     }
     for (var i = 0; i < 3; i++) {
-      final pick = _bestFor(
+      final pick = _bestForBlock(
         (e) => e.category == 'warmup' && e.pattern != 'cardio' && e.fitsDay(day),
         used,
+        picked,
         bonus: (e) => (e.splits.length == 1 ? 2 : 0) + (e.badminton != null ? 1 : 0),
       );
       if (pick == null) break;
       used.add(pick.id);
+      picked.add(pick);
       items.add(PlanItem.fromExercise(pick));
     }
     return items;
   }
 
+  /// Machine cardio rotates deterministically by day type (e.g. bike / treadmill / elliptical) among the
+  /// usable machines with the best preference; falls back to bodyweight cardio when no machine is usable.
+  Exercise? _warmupCardio(DayType day, Set<String> used) {
+    final machines = ctx.catalog.exercises
+        .where((e) =>
+            e.category == 'warmup' &&
+            e.pattern == 'cardio' &&
+            e.equipment.isNotEmpty &&
+            !used.contains(e.id) &&
+            ctx.isEligible(e))
+        .toList();
+    if (machines.isEmpty) {
+      return _bestFor((e) => e.category == 'warmup' && e.pattern == 'cardio', used);
+    }
+    int rank(Exercise e) => switch (ctx.preferences[e.id]) { 'liked' => 2, 'disliked' => 0, _ => 1 };
+    final top = machines.map(rank).reduce((a, b) => a > b ? a : b);
+    final pool = machines.where((e) => rank(e) == top).toList();
+    return pool[day.index % pool.length];
+  }
+
   List<PlanItem> _core(Set<String> used) {
     final items = <PlanItem>[];
+    final picked = <Exercise>[];
     const groups = [
       {'anti_extension', 'anti_rotation'},
       {'rotation', 'anti_lateral_flexion', 'hip_flexion'},
     ];
     for (final patterns in groups) {
-      final pick = _bestFor(
+      final pick = _bestForBlock(
         (e) => e.category == 'core' && patterns.contains(e.pattern),
         used,
+        picked,
         bonus: (e) => e.badminton != null ? 1 : 0,
       );
       if (pick == null) continue;
       used.add(pick.id);
+      picked.add(pick);
       items.add(PlanItem.fromExercise(pick));
     }
     return items;
@@ -204,18 +249,39 @@ class RuleEngine {
 
   List<PlanItem> _cooldown(DayType day, Set<String> used) {
     final items = <PlanItem>[];
-    for (var i = 0; i < 4; i++) {
-      final pick = _bestFor(
+    final picked = <Exercise>[];
+    for (var i = 0; i < cooldownSize; i++) {
+      final pick = _bestForBlock(
         (e) => e.category == 'cooldown' && e.fitsDay(day),
         used,
+        picked,
         bonus: (e) => (e.splits.length == 1 ? 2 : 0) + (e.badminton != null ? 1 : 0),
       );
       if (pick == null) break;
       used.add(pick.id);
+      picked.add(pick);
       items.add(PlanItem.fromExercise(pick));
     }
     return items;
   }
+
+  /// [_bestFor] for warm-up, core and cool-down: floor exercises get [floorPenalty], and once the block
+  /// holds [maxFloorPerBlock] of them only standing / station exercises qualify — unless none is left.
+  Exercise? _bestForBlock(
+    bool Function(Exercise) filter,
+    Set<String> used,
+    List<Exercise> block, {
+    int Function(Exercise)? bonus,
+  }) {
+    int score(Exercise e) => (bonus?.call(e) ?? 0) - (e.isFloor ? floorPenalty : 0);
+    final floorFull = block.where((e) => e.isFloor).length >= maxFloorPerBlock;
+    return (floorFull ? _bestFor((e) => !e.isFloor && filter(e), used, bonus: score) : null) ??
+        _bestFor(filter, used, bonus: score);
+  }
+
+  /// Machines, cable stations and the Smith machine (stable, easy to load, little floor space).
+  bool isMachine(Exercise e) => e.equipment.any(
+      (id) => id == 'smith_machine' || ctx.catalog.equipmentById(id)?.group == 'machines');
 
   Exercise? _bestFor(
     bool Function(Exercise) filter,
@@ -237,7 +303,7 @@ class RuleEngine {
 
   int _baseScore(Exercise e) {
     var s = 0;
-    if (ctx.recentExerciseIds.contains(e.id)) s += 5;
+    if (ctx.recentExerciseIds.contains(e.id)) s += recentBonus;
     final pref = ctx.preferences[e.id];
     if (pref == 'liked') s += 2;
     if (pref == 'disliked') s -= 3;
@@ -253,9 +319,8 @@ class RuleEngine {
     DayType? day,
     int limit = 6,
   }) {
-    final cats = Section.main.categories.contains(original.category)
-        ? Section.main.categories
-        : {original.category};
+    final isMainSwap = Section.main.categories.contains(original.category);
+    final cats = isMainSwap ? Section.main.categories : {original.category};
     final results = <SwapCandidate>[];
     for (final e in ctx.catalog.exercises) {
       if (e.id == original.id || exclude.contains(e.id)) continue;
@@ -277,6 +342,8 @@ class RuleEngine {
       if (pref == 'liked') score += 1;
       if (pref == 'disliked') score -= 2;
       if (e.difficulty > (ctx.experience == 'beginner' ? 1 : 2)) score -= 2;
+      // Same floor-space rule as warm-up / core / cool-down generation.
+      if (!isMainSwap && e.isFloor) score -= swapFloorPenalty;
       if (score <= 1) continue;
       final equipment = e.equipment.isEmpty
           ? 'no equipment'

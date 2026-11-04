@@ -43,6 +43,7 @@ class Equipment {
     required this.name,
     required this.group,
     required this.alwaysAvailable,
+    this.description,
   });
 
   factory Equipment.fromJson(Map<String, dynamic> j) => Equipment(
@@ -50,12 +51,16 @@ class Equipment {
         name: j['name'] as String,
         group: j['group'] as String,
         alwaysAvailable: j['alwaysAvailable'] as bool? ?? false,
+        description: j['description'] as String?,
       );
 
   final String id;
   final String name;
   final String group;
   final bool alwaysAvailable;
+
+  /// One sentence on what it looks like / how to recognise it in a gym.
+  final String? description;
 }
 
 class Exercise {
@@ -81,6 +86,7 @@ class Exercise {
     this.badminton,
     required this.instructions,
     this.tip,
+    this.mistakes = const [],
   });
 
   factory Exercise.fromJson(Map<String, dynamic> j) => Exercise(
@@ -105,7 +111,11 @@ class Exercise {
         badminton: j['badminton'] as String?,
         instructions: (j['instructions'] as List).cast<String>(),
         tip: j['tip'] as String?,
+        mistakes: (j['mistakes'] as List?)?.cast<String>() ?? const [],
       );
+
+  /// Equipment id that marks floor work (lying, kneeling or sitting on a mat / the floor).
+  static const floorEquipmentId = 'mat';
 
   final String id;
   final String name;
@@ -131,7 +141,11 @@ class Exercise {
   final List<String> instructions;
   final String? tip;
 
+  /// Common beginner mistakes (2–3 short sentences).
+  final List<String> mistakes;
+
   bool get isWeighted => incrementKg > 0;
+  bool get isFloor => equipment.contains(floorEquipmentId);
   bool fitsDay(DayType day) => splits.contains(day.name);
 }
 

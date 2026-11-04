@@ -114,6 +114,23 @@ public class AiOutputValidatorTests
     }
 
     [Fact]
+    public void At_most_one_floor_exercise_per_non_main_block_when_standing_options_exist()
+    {
+        var output = Output(
+            Block("warmup", Item("cat-cow", 1, 8, 10, null, 0), Item("inchworm", 1, 5, 6, null, 0), Item("arm-circles", 1, null, null, 45, 0)),
+            Block("main", Item("dumbbell-bench-press"), Item("machine-shoulder-press")),
+            Block("cooldown",
+                Item("childs-pose", 1, null, null, 45, 0),
+                Item("hip-90-90", 1, 8, 10, null, 0),
+                Item("chest-doorway-stretch", 1, null, null, 60, 0)));
+
+        var result = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 60);
+
+        Assert.Equal(["cat-cow", "arm-circles"], result.Blocks.Single(b => b.Section == "warmup").Items.Select(i => i.ExerciseId));
+        Assert.Equal(["childs-pose", "chest-doorway-stretch"], result.Blocks.Single(b => b.Section == "cooldown").Items.Select(i => i.ExerciseId));
+    }
+
+    [Fact]
     public void Swap_validation_keeps_only_candidates_and_clamps()
     {
         var candidates = new[] { TestEnv.Exercise("machine-chest-press"), TestEnv.Exercise("push-up") };

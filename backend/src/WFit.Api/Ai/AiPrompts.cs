@@ -22,12 +22,22 @@ public static class AiPrompts
         - Pick exercises ONLY by id from the candidate lists: "warmup" block from candidates.warmup, "main" block from
           candidates.main (strength and power), "core" block from candidates.core, "cooldown" block from candidates.cooldown.
           Never repeat an exercise.
-        - Warm-up about 8 min: 1 easy cardio piece plus 2-3 activation / mobility drills for today's split.
+        - Warm-up about 8 min: 1 easy cardio piece (when several cardio machines are offered, vary the machine between
+          sessions) plus 2-3 activation / mobility drills for today's split.
         - Main block fills the remaining time with 4-7 exercises: power / plyometric work first while fresh (low volume,
           full recovery), then compound lifts, then isolation work.
         - Core about 6 min (2 exercises with different patterns) ONLY if includeCore is true; otherwise omit the core block.
-        - Cooldown about 6 min: 3-4 stretches for the muscles trained today.
+        - Cooldown about 4-5 min: 2-3 stretches for the muscles trained today.
         - Time estimate per exercise: sets x (40 s work + rest) + 60 s setup. Keep estimatedMinutes within sessionMinutes.
+
+        Gym and floor space:
+        - The gym is machine-heavy with limited floor space. Each candidate lists its equipment ids ([] = bodyweight).
+          Equipment "mat" means floor work (lying, kneeling or sitting on the floor).
+        - Prefer standing, machine, cable and station exercises (e.g. a cable or band drill over a floor drill). Use at
+          most ONE floor exercise in the warm-up, at most ONE in the core block and at most ONE in the cooldown, unless
+          no standing alternative is offered.
+        - For main lifts, machines / cables / Smith machine are fine and slightly preferred for this beginner, but keep
+          exercises from recentSessions when progressing well so progression stays comparable.
 
         Beginner programming:
         - Main lifts 2-4 sets, mostly 6-15 reps, 2-3 reps in reserve, never to failure. Rest 90-180 s for compounds,
@@ -48,7 +58,9 @@ public static class AiPrompts
         You are an expert, safety-conscious strength & conditioning coach for a beginner on a Push / Pull / Legs program
         who also plays badminton. Suggest up to 3 replacement exercises for the original exercise, chosen ONLY by id from
         the candidate list (already filtered for available equipment and ranked by similarity). Prefer the same movement
-        pattern and target muscles, beginner-friendly execution, and respect the reason and note. For each suggestion give
+        pattern and target muscles, beginner-friendly execution, and respect the reason and note. Floor space is limited:
+        equipment "mat" means floor work, so for warm-up, core and cooldown swaps prefer standing / station options. For
+        each suggestion give
         one short sentence "why" and a beginner prescription: sets 2-4, repMin/repMax (null for time-based exercises),
         restSeconds. Respond with JSON matching the schema only.
         """;
@@ -68,6 +80,7 @@ public static class AiPrompts
         name = e.Name,
         pattern = e.Pattern,
         primary = e.Primary,
+        equipment = e.Equipment,
         difficulty = e.Difficulty,
         measure = e.Measure,
         sets = e.Sets,

@@ -48,6 +48,55 @@ public class CatalogTests
     }
 
     [Fact]
+    public void Every_exercise_has_two_to_three_mistakes()
+    {
+        Assert.Equal("2", Catalog.Version);
+        Assert.All(Catalog.Exercises, e =>
+        {
+            Assert.NotNull(e.Mistakes);
+            Assert.InRange(e.Mistakes!.Count, 2, 3);
+            Assert.All(e.Mistakes, m => Assert.False(string.IsNullOrWhiteSpace(m), e.Id));
+        });
+    }
+
+    [Fact]
+    public void Every_equipment_has_a_description()
+    {
+        Assert.All(Catalog.Equipment, e => Assert.False(string.IsNullOrWhiteSpace(e.Description), e.Id));
+        Assert.Equal("cardio", Catalog.EquipmentById["elliptical"].Group);
+        Assert.Contains(Catalog.Exercises, e => e.Id == "elliptical-easy" && e.Equipment.SequenceEqual(["elliptical"]));
+    }
+
+    [Fact]
+    public void Floor_exercises_are_marked_with_mat()
+    {
+        Assert.True(TestEnv.Exercise("plank").IsFloor);
+        Assert.True(TestEnv.Exercise("childs-pose").IsFloor);
+        Assert.False(TestEnv.Exercise("standing-quad-stretch").IsFloor);
+        Assert.False(TestEnv.Exercise("pallof-press-cable").IsFloor);
+
+        // Every day type can fill warm-up, core and a 3-item cooldown without floor work.
+        var ctx = SelectionContext.Create(Catalog, "beginner");
+        foreach (var day in Vocab.DayTypes)
+        {
+            var candidates = ExerciseSelector.CandidatesByCategory(Catalog.Exercises, ctx, day);
+            Assert.True(candidates["cooldown"].Count(e => !e.IsFloor) >= 3, day);
+            Assert.True(candidates["core"].Count(e => !e.IsFloor) >= 2, day);
+            Assert.True(candidates["warmup"].Count(e => !e.IsFloor && e.Pattern != "cardio") >= 3, day);
+        }
+    }
+
+    [Fact]
+    public void Upper_power_work_exists_without_a_medicine_ball()
+    {
+        foreach (var day in new[] { "push", "pull" })
+        {
+            Assert.Contains(Catalog.Exercises, e =>
+                e.Pattern == "plyo_upper" && e.Splits.Contains(day) && !e.Equipment.Contains("medicine_ball"));
+        }
+    }
+
+    [Fact]
     public async Task Seeding_persists_catalog_and_reseeds_only_on_version_change()
     {
         await using var db = TestEnv.CreateDb();

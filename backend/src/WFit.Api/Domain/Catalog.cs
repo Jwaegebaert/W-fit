@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace WFit.Api.Domain;
 
-public sealed record CatalogEquipmentItem(string Id, string Name, string Group, bool AlwaysAvailable);
+public sealed record CatalogEquipmentItem(string Id, string Name, string Group, bool AlwaysAvailable, string? Description = null);
 
 public sealed record CatalogExerciseItem(
     string Id,
@@ -25,9 +25,15 @@ public sealed record CatalogExerciseItem(
     double IncrementKg,
     string? Badminton,
     IReadOnlyList<string> Instructions,
-    string? Tip)
+    string? Tip,
+    IReadOnlyList<string>? Mistakes = null)
 {
+    public const string FloorEquipmentId = "mat";
+
     public bool IsTimed => Measure == Vocab.Measure.Time;
+
+    /// <summary>Lying, kneeling or sitting on the floor (equipment "mat").</summary>
+    public bool IsFloor => Equipment.Contains(FloorEquipmentId);
 }
 
 /// <summary>Loads the exercise/equipment catalog embedded from app/assets/data/catalog.json.</summary>

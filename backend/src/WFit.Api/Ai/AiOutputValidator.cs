@@ -12,6 +12,8 @@ public static class AiOutputValidator
     public const int MaxMainItems = 7;
     public const int MinMainItems = 2;
     public const int MaxOtherItems = 6;
+    /// <summary>Floor exercises (equipment "mat") allowed per warm-up / core / cooldown block when standing options exist.</summary>
+    public const int MaxFloorItemsPerBlock = 1;
     public const int MaxNoteLength = 300;
 
     private static readonly WorkoutSection[] SectionOrder =
@@ -27,6 +29,7 @@ public static class AiOutputValidator
     {
         var used = new HashSet<string>(StringComparer.Ordinal);
         var itemsBySection = SectionOrder.ToDictionary(s => s, _ => new List<WorkoutItemDto>());
+        var floorBySection = SectionOrder.ToDictionary(s => s, _ => 0);
 
         foreach (var block in output.Blocks ?? [])
         {
@@ -36,17 +39,22 @@ public static class AiOutputValidator
             var allowed = Vocab.CategoriesFor(section);
             var target = itemsBySection[section];
             var limit = section == WorkoutSection.Main ? MaxMainItems : MaxOtherItems;
+            var sectionCandidates = allowed
+                .SelectMany(c => candidatesByCategory.TryGetValue(c, out var list) ? list : [])
+                .ToList();
+            // Extra floor work is only dropped when a standing / station alternative exists for the block.
+            var limitFloor = section != WorkoutSection.Main && sectionCandidates.Any(e => !e.IsFloor);
 
             foreach (var item in block.Items ?? [])
             {
                 if (target.Count >= limit) break;
                 if (item?.ExerciseId is not { } id || used.Contains(id)) continue;
-                var exercise = allowed
-                    .SelectMany(c => candidatesByCategory.TryGetValue(c, out var list) ? list : [])
-                    .FirstOrDefault(e => e.Id == id);
+                var exercise = sectionCandidates.FirstOrDefault(e => e.Id == id);
                 if (exercise is null) continue;
+                if (limitFloor && exercise.IsFloor && floorBySection[section] >= MaxFloorItemsPerBlock) continue;
 
                 used.Add(id);
+                if (exercise.IsFloor) floorBySection[section]++;
                 target.Add(ClampItem(item, exercise, section));
             }
         }

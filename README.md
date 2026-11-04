@@ -4,8 +4,15 @@ W-fit is a personal Android training companion built around a beginner-friendly 
 (3× per week, ~60 min including warm-up and cool-down). Goals: get leaner, stronger and more flexible, and get better at
 badminton (mobility, explosiveness, stability, injury prevention).
 
-- **Guided workouts.** Warm-up → main lifts → optional core → cool-down. Every exercise shows sets, reps, rest,
-  instructions, tips, muscles, badminton benefit and a demo-video link.
+- **Guided workouts.** Warm-up → main lifts → optional core → cool-down (3 stretches). Every exercise shows sets, reps,
+  rest, instructions, tips, common mistakes, muscles, badminton benefit and a demo-video link. Plans suit a
+  machine-heavy gym with little floor space: standing / station drills are preferred and each warm-up, core block and
+  cool-down uses at most one floor exercise; warm-up cardio rotates between the available machines.
+- **Built-in visuals.** Exercise screens show an animated start/end demo (photos for 86 exercises from the
+  public-domain [free-exercise-db](https://github.com/yuhonas/free-exercise-db)), and tapping a piece of equipment
+  shows a line drawing of it. List icons show what you train with (machine, cable, dumbbell, barbell, …).
+- **Gym equipment.** Switch off what your gym lacks, or start from a *Quick setup* preset ("Classic machine gym":
+  everything except medicine ball, foam roller, jump rope and rowing machine; or "Everything available").
 - **Live tracking.** Log weight and reps per set. Weights are pre-filled from your history (double progression).
   Rest timers and timed-exercise timers run automatically, and the screen stays awake.
 - **Instant swaps.** Choose *Occupied* (avoided for this visit only), *Not in my gym* (permanently removed from
@@ -32,7 +39,8 @@ Flutter app (Android) ──HTTPS + X-Api-Key──▶ Azure Functions (.NET 10,
 | [app/](app/) | Flutter app: `lib/domain` (catalog, rule engine, progression, stats), `lib/data` (drift DB, repository, API client, sync), `lib/features/*` (screens), `lib/services/coach_service.dart` |
 | [backend/](backend/) | Azure Functions API, EF Core migrations, xUnit tests (see [backend/README.md](backend/README.md)) |
 | [infra/](infra/) | [main.bicep](infra/main.bicep) and [deploy.ps1](infra/deploy.ps1) |
-| [app/assets/data/catalog.json](app/assets/data/catalog.json) | Single source of truth: 33 equipment types and 104 exercises (embedded in the backend at build time) |
+| [app/assets/data/catalog.json](app/assets/data/catalog.json) | Single source of truth (v2): 34 equipment types (each with a short "how to recognise it" description) and 126 exercises with instructions, tips and common mistakes (embedded in the backend at build time) |
+| `app/assets/{exercises,equipment,icons,brand}` | Demo photos + `index.json`, equipment line drawings, equipment-type icons, logo sources |
 | [docs/](docs/) | [ARCHITECTURE.md](docs/ARCHITECTURE.md), [API.md](docs/API.md), [COSTS.md](docs/COSTS.md) |
 
 Key design decisions are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md):
@@ -119,14 +127,18 @@ cd app
 flutter pub get
 dart run build_runner build      # regenerate drift code after changing lib/data/db/database.dart
 flutter analyze
-flutter test                     # unit tests + full-flow widget test (in-memory SQLite)
+flutter test                     # unit tests + full-flow widget test + layout tests at phone sizes (in-memory SQLite)
+flutter test test/screenshots_test.dart --dart-define=SCREENSHOTS=true   # optional: PNGs of every screen in %TEMP%\wfit-shots
 flutter run                      # needs an Android device/emulator
 ```
+Regenerate assets: `dart run flutter_launcher_icons -f flutter_launcher_icons.yaml` and
+`dart run flutter_native_splash:create --path=flutter_native_splash.yaml` (icon/splash, sources in `assets/brand/source/`);
+`node tool/fetch_exercise_media.mjs` (demo photos, needs `sharp`, see the script header).
 
 **Backend**
 ```powershell
 cd backend
-dotnet test WFit.sln             # 62 xUnit tests
+dotnet test WFit.sln             # 68 xUnit tests
 # Local host: copy src/WFit.Api/local.settings.sample.json to local.settings.json and fill in the settings, then:
 cd src/WFit.Api; func start      # or: npx azure-functions-core-tools@4 start
 ```

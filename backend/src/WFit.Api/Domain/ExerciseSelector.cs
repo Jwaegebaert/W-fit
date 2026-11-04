@@ -66,8 +66,12 @@ public static class ExerciseSelector
         if (pref == Vocab.Preference.Liked) score += 1;
         if (pref == Vocab.Preference.Disliked) score -= 2;
         if (candidate.Difficulty > MaxDifficulty(ctx.Experience)) score -= 2;
+        // Floor space is limited: standing / station options win for warm-up, core and cool-down swaps.
+        if (!Vocab.IsMain(original.Category) && candidate.IsFloor) score -= SwapFloorPenalty;
         return score;
     }
+
+    public const int SwapFloorPenalty = 2;
 
     /// <summary>Eligible same-category alternatives ranked by the rule score (best first).</summary>
     public static IReadOnlyList<CatalogExerciseItem> RankSwapCandidates(

@@ -136,6 +136,19 @@ public class SwapRankingTests
     }
 
     [Fact]
+    public void Floor_candidates_are_penalised_for_non_main_swaps_only()
+    {
+        var ranked = ExerciseSelector.RankSwapCandidates(TestEnv.Exercise("plank"), TestEnv.Catalog.Exercises, Ctx(), "push");
+        Assert.False(ranked[0].IsFloor, ranked[0].Id);
+
+        var original = TestEnv.Exercise("barbell-bench-press");
+        var pushUp = TestEnv.Exercise("push-up");
+        Assert.True(pushUp.IsFloor);
+        var expected = 3 + 2 + 1 + 1; // pattern, chest, secondary overlap, split - no floor penalty for main swaps
+        Assert.Equal(expected, ExerciseSelector.SwapScore(original, pushUp, Ctx(), "push"));
+    }
+
+    [Fact]
     public void Disliked_candidate_ranks_below_equal_neutral_one()
     {
         var original = TestEnv.Exercise("barbell-bench-press");

@@ -95,7 +95,8 @@ Limits: max 2,000 records per request (→ `400`). The client stores `serverTime
 Generate a planned workout with Azure OpenAI. The server reads profile, equipment, preferences and recent history
 from SQL (the client syncs first). The model may only choose from a server-filtered candidate list of exercise IDs;
 the result is validated and clamped to beginner-safe bounds (sets 1–5, reps 3–20, rest 30–240 s for main lifts,
-max 7 main exercises). The workout is saved as a `PlannedWorkout` (source `ai`) and returned.
+max 7 main exercises, at most 1 floor exercise — equipment `mat` — per warm-up / core / cooldown block when a standing
+alternative exists). The workout is saved as a `PlannedWorkout` (source `ai`) and returned.
 
 Request
 ```jsonc
