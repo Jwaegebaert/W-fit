@@ -69,7 +69,7 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
       ]),
       body: RefreshIndicator(
         onRefresh: () => _load(),
-        child: ListView(padding: Gap.page, children: [
+        child: ListView(padding: pagePadding(context), children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(

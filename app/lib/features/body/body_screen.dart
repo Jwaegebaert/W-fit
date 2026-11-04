@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/theme.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/repository.dart';
 import '../../domain/progression.dart';
@@ -39,21 +40,21 @@ class BodyScreen extends ConsumerWidget {
           final waist = list.where((b) => b.waistCm != null).toList().reversed.toList();
           final latest = weights.isEmpty ? null : weights.last;
           final first = weights.isEmpty ? null : weights.first;
-          return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 96), children: [
-            Row(children: [
-              Expanded(child: StatTile(label: 'current kg', value: formatKg(latest?.weightKg), icon: Icons.monitor_weight_outlined)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StatTile(
-                  label: 'change',
-                  value: latest == null || first == null
-                      ? '–'
-                      : '${(latest.weightKg! - first.weightKg!) >= 0 ? '+' : ''}${(latest.weightKg! - first.weightKg!).toStringAsFixed(1)} kg',
-                  icon: Icons.trending_flat,
-                ),
+          return ListView(padding: pagePadding(context, Gap.page.copyWith(bottom: Gap.fabClearance)), children: [
+            StatRow(children: [
+              StatTile(
+                label: 'current weight',
+                value: latest == null ? '–' : '${formatKg(latest.weightKg)} kg',
+                icon: Icons.monitor_weight_outlined,
               ),
-              const SizedBox(width: 10),
-              Expanded(child: StatTile(label: 'entries', value: '${list.length}', icon: Icons.list_alt)),
+              StatTile(
+                label: 'change',
+                value: latest == null || first == null
+                    ? '–'
+                    : '${(latest.weightKg! - first.weightKg!) >= 0 ? '+' : ''}${(latest.weightKg! - first.weightKg!).toStringAsFixed(1)} kg',
+                icon: Icons.trending_flat,
+              ),
+              StatTile(label: 'entries', value: '${list.length}', icon: Icons.list_alt),
             ]),
             if (weights.length >= 2) ...[
               const SectionTitle('Weight'),
@@ -115,12 +116,7 @@ class BodyScreen extends ConsumerWidget {
   }
 
   Future<void> _edit(BuildContext context, WidgetRef ref, BodyMetric? existing) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => _BodyForm(existing: existing),
-    );
+    await showAppSheet<void>(context, builder: (_) => _BodyForm(existing: existing));
   }
 }
 
@@ -182,70 +178,70 @@ class _BodyFormState extends ConsumerState<_BodyForm> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      child: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-              child: Text(widget.existing == null ? 'New entry' : 'Edit entry',
-                  style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+    return SingleChildScrollView(
+      padding: sheetPadding(context),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: Text(widget.existing == null ? 'New entry' : 'Edit entry',
+                style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          ),
+          if (widget.existing != null)
+            IconButton(
+              tooltip: 'Delete entry',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: () async {
+                await ref.read(repositoryProvider).deleteBodyMetric(widget.existing!.id);
+                if (context.mounted) Navigator.pop(context);
+              },
             ),
-            if (widget.existing != null)
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () async {
-                  await ref.read(repositoryProvider).deleteBodyMetric(widget.existing!.id);
-                  if (context.mounted) Navigator.pop(context);
-                },
-              ),
-          ]),
-          ActionChip(
-            avatar: const Icon(Icons.event, size: 18),
-            label: Text(DateFormat('EEE d MMM yyyy').format(_date)),
-            onPressed: () async {
-              final d = await showDatePicker(
-                context: context,
-                initialDate: _date,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-              );
-              if (d != null) setState(() => _date = d);
-            },
-          ),
-          const SizedBox(height: 12),
-          _field(_weight, 'Body weight', 'kg'),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () => setState(() => _more = !_more),
-            icon: Icon(_more ? Icons.expand_less : Icons.expand_more),
-            label: const Text('Measurements (optional)'),
-          ),
-          if (_more) ...[
-            Row(children: [
-              Expanded(child: _field(_waist, 'Waist', 'cm')),
-              const SizedBox(width: 8),
-              Expanded(child: _field(_fat, 'Body fat', '%')),
-            ]),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: _field(_chest, 'Chest', 'cm')),
-              const SizedBox(width: 8),
-              Expanded(child: _field(_arm, 'Arm', 'cm')),
-            ]),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: _field(_thigh, 'Thigh', 'cm')),
-              const SizedBox(width: 8),
-              Expanded(child: _field(_hips, 'Hips', 'cm')),
-            ]),
-            const SizedBox(height: 8),
-          ],
-          TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes')),
-          const SizedBox(height: 16),
-          SizedBox(width: double.infinity, child: FilledButton(onPressed: _save, child: const Text('Save'))),
         ]),
-      ),
+        const SizedBox(height: Gap.sm),
+        ActionChip(
+          avatar: const Icon(Icons.event, size: 18),
+          label: Text(DateFormat('EEE d MMM yyyy').format(_date)),
+          onPressed: () async {
+            final d = await showDatePicker(
+              context: context,
+              initialDate: _date,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+            );
+            if (d != null) setState(() => _date = d);
+          },
+        ),
+        const SizedBox(height: 12),
+        _field(_weight, 'Body weight', 'kg'),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: () => setState(() => _more = !_more),
+          icon: Icon(_more ? Icons.expand_less : Icons.expand_more),
+          label: const Text('Measurements (optional)'),
+        ),
+        if (_more) ...[
+          Row(children: [
+            Expanded(child: _field(_waist, 'Waist', 'cm')),
+            const SizedBox(width: 8),
+            Expanded(child: _field(_fat, 'Body fat', '%')),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _field(_chest, 'Chest', 'cm')),
+            const SizedBox(width: 8),
+            Expanded(child: _field(_arm, 'Arm', 'cm')),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _field(_thigh, 'Thigh', 'cm')),
+            const SizedBox(width: 8),
+            Expanded(child: _field(_hips, 'Hips', 'cm')),
+          ]),
+          const SizedBox(height: 8),
+        ],
+        TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notes')),
+        const SizedBox(height: 16),
+        SizedBox(width: double.infinity, child: FilledButton(onPressed: _save, child: const Text('Save'))),
+      ]),
     );
   }
 }

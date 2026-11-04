@@ -67,26 +67,19 @@ class StatsScreen extends ConsumerWidget {
           final maxMuscle = muscles.isEmpty ? 1 : muscles.first.value;
           final weights = body.where((b) => b.weightKg != null).toList().reversed.toList();
 
-          return ListView(padding: Gap.page, children: [
-            Row(children: [
-              Expanded(child: StatTile(label: 'workouts total', value: '${sessions.length}', icon: Icons.fitness_center)),
-              const SizedBox(width: 10),
-              Expanded(child: StatTile(label: 'this month', value: '$thisMonth', icon: Icons.calendar_month)),
+          return ListView(padding: pagePadding(context), children: [
+            StatRow(children: [
+              StatTile(label: 'workouts total', value: '${sessions.length}', icon: Icons.fitness_center),
+              StatTile(label: 'this month', value: '$thisMonth', icon: Icons.calendar_month),
             ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                child: StatTile(
-                    label: 'week streak', value: '$streak', icon: Icons.local_fire_department, color: Colors.orange.shade700),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StatTile(
-                    label: 'exercises tracked',
-                    value: '${bests.length}',
-                    icon: Icons.emoji_events_outlined,
-                    color: Colors.amber.shade700),
-              ),
+            const SizedBox(height: Gap.item),
+            StatRow(children: [
+              StatTile(label: 'week streak', value: '$streak', icon: Icons.local_fire_department, color: Colors.orange.shade700),
+              StatTile(
+                  label: 'exercises tracked',
+                  value: '${bests.length}',
+                  icon: Icons.emoji_events_outlined,
+                  color: Colors.amber.shade700),
             ]),
             SectionTitle('Consistency', trailing: Text('target $target / week', style: t.textTheme.bodySmall)),
             Card(

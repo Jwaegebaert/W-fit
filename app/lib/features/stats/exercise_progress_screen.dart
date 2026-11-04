@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme.dart';
 import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
@@ -53,26 +52,20 @@ class ExerciseProgressScreen extends ConsumerWidget {
           final change = percentChange(first, last);
           final t = Theme.of(context);
 
-          return ListView(padding: Gap.page, children: [
-            Row(children: [
-              Expanded(
-                child: StatTile(
-                  label: weighted ? 'best e1RM (kg)' : 'best reps',
-                  value: weighted ? formatKg(best?.bestE1rm) : '${best?.mostReps?.reps ?? 0}',
-                  icon: Icons.emoji_events_outlined,
-                  color: Colors.amber.shade700,
-                ),
+          return ListView(padding: pagePadding(context), children: [
+            StatRow(children: [
+              StatTile(
+                label: weighted ? 'best e1RM' : 'best reps',
+                value: weighted ? '${formatKg(best?.bestE1rm)} kg' : '${best?.mostReps?.reps ?? 0}',
+                icon: Icons.emoji_events_outlined,
+                color: Colors.amber.shade700,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: StatTile(
-                  label: 'since first session',
-                  value: '${change >= 0 ? '+' : ''}${change.toStringAsFixed(0)}%',
-                  icon: change >= 0 ? Icons.trending_up : Icons.trending_down,
-                ),
+              StatTile(
+                label: 'since first session',
+                value: '${change >= 0 ? '+' : ''}${change.toStringAsFixed(0)}%',
+                icon: change >= 0 ? Icons.trending_up : Icons.trending_down,
               ),
-              const SizedBox(width: 10),
-              Expanded(child: StatTile(label: 'sessions', value: '${points.length}', icon: Icons.event_repeat)),
+              StatTile(label: 'sessions', value: '${points.length}', icon: Icons.event_repeat),
             ]),
             if (weighted) ...[
               const SectionTitle('Estimated 1-rep max'),

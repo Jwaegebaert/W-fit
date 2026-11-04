@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme.dart';
 import '../../domain/catalog.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
@@ -53,7 +54,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         ),
         SizedBox(
-          height: 44,
+          height: Gap.tap,
           child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
             FilterChip(
               label: const Text('Available'),
@@ -75,9 +76,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           child: list.isEmpty
               ? const EmptyState(icon: Icons.search_off, title: 'No exercises match')
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  padding: pagePadding(context, const EdgeInsets.fromLTRB(Gap.md, Gap.sm, Gap.md, Gap.lg)),
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   itemCount: list.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: Gap.sm),
                   itemBuilder: (context, i) {
                     final e = list[i];
                     final pref = prefs[e.id];
@@ -88,7 +90,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         leading: ExerciseAvatar(exercise: e),
                         title: Text(e.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Text(e.primary.map(prettyMuscle).join(', ')),
-                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        trailing: Row(mainAxisSize: MainAxisSize.min, spacing: Gap.xs, children: [
                           if (e.badminton != null) const Icon(Icons.sports_tennis, size: 18),
                           if (pref == 'liked') const Icon(Icons.thumb_up, size: 18),
                           if (pref == 'banned' || pref == 'disliked') const Icon(Icons.thumb_down, size: 18),

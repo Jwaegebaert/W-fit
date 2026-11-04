@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme.dart';
 import '../../data/repositories/repository.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
@@ -23,7 +22,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(padding: Gap.page, children: [
+      body: ListView(padding: pagePadding(context), children: [
         const SectionTitle('Training'),
         Card(
           child: Column(children: [

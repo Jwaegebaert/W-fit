@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
 import '../domain/catalog.dart';
+import '../providers.dart';
+import 'exercise_visuals.dart';
 
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing, this.padding = const EdgeInsets.fromLTRB(4, 20, 4, 8)});
@@ -58,6 +60,20 @@ class StatTile extends StatelessWidget {
   }
 }
 
+/// A row of [StatTile]s (or similar cards) with equal widths, equal heights and the standard gap.
+class StatRow extends StatelessWidget {
+  const StatRow({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: Gap.item, children: [
+          for (final c in children) Expanded(child: c),
+        ]),
+      );
+}
+
 class EmptyState extends StatelessWidget {
   const EmptyState({super.key, required this.icon, required this.title, this.message, this.action});
 
@@ -70,7 +86,7 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(Gap.xl),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           CircleAvatar(
@@ -107,27 +123,36 @@ class AsyncView<T> extends StatelessWidget {
       );
 }
 
-class ExerciseAvatar extends StatelessWidget {
+/// Rounded square with the equipment-kind icon (dumbbell, machine, cable…) tinted by the exercise's section colour.
+class ExerciseAvatar extends ConsumerWidget {
   const ExerciseAvatar({super.key, required this.exercise, this.size = 44});
 
   final Exercise? exercise;
   final double size;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final s = Theme.of(context).colorScheme;
-    final (icon, color) = switch (exercise?.category) {
-      'warmup' => (Icons.local_fire_department_rounded, const Color(0xFFF59E0B)),
-      'power' => (Icons.bolt_rounded, const Color(0xFFEF4444)),
-      'core' => (Icons.adjust_rounded, const Color(0xFF8B5CF6)),
-      'cooldown' => (Icons.self_improvement_rounded, const Color(0xFF3B82F6)),
-      _ => (Icons.fitness_center_rounded, s.primary),
+    final e = exercise;
+    final section = switch (e?.category) {
+      'warmup' => Section.warmup,
+      'core' => Section.core,
+      'cooldown' => Section.cooldown,
+      _ => Section.main,
     };
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(size / 3)),
-      child: Icon(icon, color: color, size: size * 0.55),
+    final color = section.color(s);
+    final kind = e == null ? null : ExerciseKind.of(e, ref.watch(catalogProvider));
+    return Semantics(
+      label: kind?.label,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(size / 3)),
+        child: kind == null
+            ? Icon(Icons.fitness_center_rounded, color: color, size: size * 0.55)
+            : KindIcon(kind, color: color, size: size * 0.58),
+      ),
     );
   }
 }
@@ -158,4 +183,66 @@ void showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// Padding for the scrollable body of a page without sticky bottom UI: [base] (default [Gap.page]) plus the
+/// system navigation bar height, so the last item can scroll clear of Android's nav bar in edge-to-edge mode.
+/// Pages with a `bottomNavigationBar` (e.g. [BottomActionBar] or the app's tab bar) don't need the inset: use
+/// [base] directly. The keyboard is not added: the Scaffold already resizes its body for it.
+EdgeInsets pagePadding(BuildContext context, [EdgeInsets base = Gap.page]) =>
+    base.copyWith(bottom: base.bottom + MediaQuery.paddingOf(context).bottom);
+
+/// Padding for modal bottom sheet content shown with [showAppSheet]: the sheet extends behind the navigation bar
+/// and is not resized for the keyboard, so both are added.
+EdgeInsets sheetPadding(BuildContext context) => Gap.sheet.copyWith(
+    bottom: Gap.sheet.bottom + MediaQuery.paddingOf(context).bottom + MediaQuery.viewInsetsOf(context).bottom);
+
+/// Shows a modal bottom sheet with the app defaults: scroll-controlled, below the status bar, drag handle.
+/// Pad the content with [sheetPadding] so its last button stays above the navigation bar and keyboard.
+Future<T?> showAppSheet<T>(BuildContext context, {required WidgetBuilder builder}) =>
+    showModalBottomSheet<T>(context: context, isScrollControlled: true, useSafeArea: true, builder: builder);
+
+/// Sticky bottom actions (primary button, timers, …). Use it as `Scaffold.bottomNavigationBar`, never as
+/// `Scaffold.bottomSheet`: the scaffold strips the bottom inset from bottom sheets, which pushes them behind the
+/// Android navigation bar. Draws its surface behind the system bar and keeps [child] above it.
+class BottomActionBar extends StatelessWidget {
+  const BottomActionBar({super.key, required this.child, this.padding = Gap.bar});
+
+  final Widget child;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    return Material(
+      color: s.surfaceContainer,
+      shape: Border(top: BorderSide(color: s.outlineVariant.withValues(alpha: 0.6))),
+      child: SafeArea(top: false, child: Padding(padding: padding, child: child)),
+    );
+  }
+}
+
+/// App bar title with a secondary line (date, timer…). Pair with `toolbarHeight: AppBarTitle.toolbarHeight`
+/// so both lines fit at large text sizes.
+class AppBarTitle extends StatelessWidget {
+  const AppBarTitle(this.title, {super.key, required this.subtitle});
+
+  static const double toolbarHeight = 64;
+
+  final String title;
+  final Widget subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      DefaultTextStyle.merge(
+        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        child: subtitle,
+      ),
+    ]);
+  }
 }

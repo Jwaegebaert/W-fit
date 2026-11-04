@@ -80,24 +80,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (profile == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     _load(profile);
     const names = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const fullNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile & schedule'), actions: [
         TextButton(onPressed: _save, child: const Text('Save')),
       ]),
-      body: ListView(padding: Gap.page, children: [
+      body: ListView(padding: pagePadding(context), children: [
         TextField(controller: _name, decoration: const InputDecoration(labelText: 'Name')),
         const SectionTitle('Training days'),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Row(children: [
           for (var d = 1; d <= 7; d++)
-            FilterChip(
-              showCheckmark: false,
-              label: Text(names[d - 1]),
-              selected: _days.contains(d),
-              onSelected: (v) => setState(() => v ? _days.add(d) : _days.remove(d)),
+            Expanded(
+              child: _DayToggle(
+                label: names[d - 1],
+                tooltip: fullNames[d - 1],
+                selected: _days.contains(d),
+                onTap: () => setState(() => _days.contains(d) ? _days.remove(d) : _days.add(d)),
+              ),
             ),
         ]),
-        const SizedBox(height: 4),
+        const SizedBox(height: Gap.sm),
         Text('Recommended: 3 non-consecutive days (Push → Pull → Legs rotation).',
             style: Theme.of(context).textTheme.bodySmall),
         SectionTitle('Session length: ${_minutes.round()} min'),
@@ -112,11 +115,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SectionTitle('Experience'),
         SegmentedButton<String>(
           segments: const [
-            ButtonSegment(value: 'beginner', label: Text('Beginner')),
-            ButtonSegment(value: 'novice', label: Text('Novice')),
-            ButtonSegment(value: 'intermediate', label: Text('Intermediate')),
+            ButtonSegment(value: 'beginner', label: FittedBox(fit: BoxFit.scaleDown, child: Text('Beginner'))),
+            ButtonSegment(value: 'novice', label: FittedBox(fit: BoxFit.scaleDown, child: Text('Novice'))),
+            ButtonSegment(value: 'intermediate', label: FittedBox(fit: BoxFit.scaleDown, child: Text('Intermediate'))),
           ],
           selected: {_experience},
+          showSelectedIcon: false,
           onSelectionChanged: (s) => setState(() => _experience = s.first),
         ),
         const SectionTitle('About you'),
@@ -148,6 +152,50 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SizedBox(height: 24),
         FilledButton(onPressed: _save, child: const Text('Save')),
       ]),
+    );
+  }
+}
+
+/// Round weekday toggle; seven of them always fit one row, even on narrow phones with large text.
+/// The whole cell (≥ 46 × 48 dp) is tappable.
+class _DayToggle extends StatelessWidget {
+  const _DayToggle({required this.label, required this.tooltip, required this.selected, required this.onTap});
+
+  final String label;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: InkResponse(
+          onTap: onTap,
+          radius: Gap.tap / 2,
+          child: SizedBox(
+            height: Gap.tap,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? s.primary : s.surfaceContainerHighest),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(label,
+                      style: TextStyle(fontWeight: FontWeight.w700, color: selected ? s.onPrimary : s.onSurfaceVariant)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

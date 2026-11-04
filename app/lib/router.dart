@@ -75,6 +75,8 @@ class _Shell extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
         body: shell,
         bottomNavigationBar: NavigationBar(
+          // Slightly shorter than the 80dp default so more content fits on small phones in edge-to-edge mode.
+          height: 68,
           selectedIndex: shell.currentIndex,
           onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
           destinations: const [

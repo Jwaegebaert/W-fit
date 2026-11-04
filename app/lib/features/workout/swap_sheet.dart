@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
 import '../../domain/catalog.dart';
 import '../../providers.dart';
@@ -29,10 +30,8 @@ Future<bool> showSwapSheet(
   required Section section,
   required Set<String> excludeIds,
 }) async {
-  final result = await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
+  final result = await showAppSheet<bool>(
+    context,
     builder: (_) => DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.85,
@@ -173,25 +172,33 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
 
     return ListView(
       controller: widget.controller,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: sheetPadding(context),
       children: [
         Text('Swap ${original.name}', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
         Text('Targets ${original.primary.map(prettyMuscle).join(', ').toLowerCase()} · ${original.pattern.replaceAll('_', ' ')}',
             style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 16),
-        SegmentedButton<SwapReason>(
-          segments: [
-            for (final r in SwapReason.values)
-              ButtonSegment(value: r, label: Text(r.label, style: const TextStyle(fontSize: 12)), icon: Icon(r.icon, size: 18)),
-          ],
-          selected: {_reason},
-          showSelectedIcon: false,
-          onSelectionChanged: (s) {
-            setState(() => _reason = s.first);
-            _refreshRules();
-          },
-        ),
+        LayoutBuilder(builder: (context, c) {
+          // Icons only when each segment has room, so labels never break mid-word on narrow phones / large text.
+          final roomy = c.maxWidth / SwapReason.values.length >= MediaQuery.textScalerOf(context).scale(105);
+          return SegmentedButton<SwapReason>(
+            segments: [
+              for (final r in SwapReason.values)
+                ButtonSegment(
+                  value: r,
+                  label: Text(r.label, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+                  icon: roomy ? Icon(r.icon, size: 18) : null,
+                ),
+            ],
+            selected: {_reason},
+            showSelectedIcon: false,
+            onSelectionChanged: (s) {
+              setState(() => _reason = s.first);
+              _refreshRules();
+            },
+          );
+        }),
         const SizedBox(height: 12),
         if (_reason != SwapReason.preference && original.equipment.isNotEmpty) ...[
           Text(
@@ -201,7 +208,7 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
             style: t.textTheme.bodySmall,
           ),
           const SizedBox(height: 8),
-          Wrap(spacing: 8, children: [
+          Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
             for (final id in original.equipment)
               FilterChip(
                 label: Text(catalog.equipmentById(id)?.name ?? id),

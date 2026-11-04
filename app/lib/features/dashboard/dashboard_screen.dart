@@ -10,6 +10,7 @@ import '../../domain/catalog.dart';
 import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
+import '../../widgets/brand.dart';
 import '../../widgets/common.dart';
 import '../../widgets/sync_indicator.dart';
 import '../workout/workout_actions.dart';
@@ -40,12 +41,11 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('$greeting$name'),
-          Text(DateFormat('EEEE d MMMM').format(DateTime.now()),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        ]),
+        toolbarHeight: AppBarTitle.toolbarHeight,
+        leading: const Padding(padding: EdgeInsets.only(left: Gap.md), child: Center(child: BrandMark(size: 30))),
+        leadingWidth: 56,
+        titleSpacing: Gap.sm,
+        title: AppBarTitle('$greeting$name', subtitle: Text(DateFormat('EEEE d MMMM').format(DateTime.now()))),
         actions: [
           const SyncIndicator(),
           IconButton(
@@ -61,7 +61,7 @@ class DashboardScreen extends ConsumerWidget {
           ref.invalidate(nextPlanProvider);
         },
         child: ListView(
-          padding: Gap.page,
+          padding: pagePadding(context),
           children: [
             if (active != null) ...[_ResumeCard(session: active), const SizedBox(height: Gap.md)],
             const _NextWorkoutCard(),
@@ -184,37 +184,61 @@ class _HeroCard extends ConsumerWidget {
         ]),
         const SizedBox(height: 12),
         Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final i in main.take(5))
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
-              child: Text(catalog.exerciseName(i.exerciseId),
-                  style: const TextStyle(color: Colors.white, fontSize: 12)),
-            ),
+          // Capped so Start stays above the fold on small phones.
+          for (final i in main.take(3)) _HeroChip(catalog.exerciseName(i.exerciseId)),
+          if (main.length > 3) _HeroChip('+${main.length - 3} more'),
         ]),
         const SizedBox(height: 18),
-        Row(children: [
-          Expanded(
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: color),
-              onPressed: active != null
-                  ? () => context.push('/session/${active.id}')
-                  : () => startWorkout(context, ref, plan),
-              icon: Icon(active != null ? Icons.play_arrow : Icons.play_arrow_rounded),
-              label: Text(active != null ? 'Resume' : 'Start workout'),
-            ),
-          ),
-          const SizedBox(width: 10),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
+        LayoutBuilder(builder: (context, c) {
+          final start = FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: color),
+            onPressed: active != null
+                ? () => context.push('/session/${active.id}')
+                : () => startWorkout(context, ref, plan),
+            icon: Icon(active != null ? Icons.play_arrow : Icons.play_arrow_rounded),
+            label: Text(active != null ? 'Resume' : 'Start workout', maxLines: 1),
+          );
+          final view = OutlinedButton(
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
             onPressed: () => context.push('/plan/${plan.id}'),
-            child: const Text('View plan'),
-          ),
-        ]),
+            child: const Text('View plan', maxLines: 1),
+          );
+          // Side by side when both labels fit on one line, otherwise stacked (narrow phones, large text).
+          if (_labelWidth(context, 'Start workout') + _labelWidth(context, 'View plan') + 130 <= c.maxWidth) {
+            return Row(children: [Expanded(child: start), const SizedBox(width: Gap.item), view]);
+          }
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [start, const SizedBox(height: Gap.sm), view]);
+        }),
       ]),
     );
   }
+
+  static double _labelWidth(BuildContext context, String text) {
+    final painter = TextPainter(
+      text: TextSpan(
+          text: text,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+      maxLines: 1,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width;
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  const _HeroChip(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(Gap.sm)),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      );
 }
 
 class _WeekCard extends ConsumerWidget {
@@ -333,14 +357,19 @@ class _UpcomingList extends ConsumerWidget {
       child: Column(children: [
         for (final (d, dt) in entries)
           ListTile(
-              leading: CircleAvatar(
-                backgroundColor: dt.color(s).withValues(alpha: 0.15),
-                child: Icon(dt.icon, color: dt.color(s)),
-              ),
-              title: Text('${dt.label} day', style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(dt.focus),
-              trailing: Text(DateFormat('EEE d MMM').format(d)),
+            leading: CircleAvatar(
+              backgroundColor: dt.color(s).withValues(alpha: 0.15),
+              child: Icon(dt.icon, color: dt.color(s)),
             ),
+            // Date sits in the title row so the focus line can use the full width.
+            title: Row(children: [
+              Expanded(child: Text('${dt.label} day', style: const TextStyle(fontWeight: FontWeight.w600))),
+              const SizedBox(width: Gap.sm),
+              Text(DateFormat('EEE d MMM').format(d),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(color: s.onSurfaceVariant)),
+            ]),
+            subtitle: Text(dt.focus),
+          ),
       ]),
     );
   }
@@ -405,8 +434,12 @@ class _ActionTile extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Icon(icon, color: t.colorScheme.primary),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(value, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text(label, style: t.textTheme.bodySmall),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700), maxLines: 1),
+              ),
+              Text(label, style: t.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
             ]),
           ]),
         ),

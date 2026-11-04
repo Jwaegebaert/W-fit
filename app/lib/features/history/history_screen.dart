@@ -39,7 +39,7 @@ class HistoryScreen extends ConsumerWidget {
           for (final s in list) {
             groups.putIfAbsent(DateFormat('MMMM yyyy').format(s.startedAt.toLocal()), () => []).add(s);
           }
-          return ListView(padding: Gap.page, children: [
+          return ListView(padding: pagePadding(context), children: [
             for (final g in groups.entries) ...[
               SectionTitle(g.key),
               for (final s in g.value)
@@ -55,8 +55,8 @@ class HistoryScreen extends ConsumerWidget {
                       ),
                       title: Text(s.title, style: const TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: Text(
-                        '${DateFormat('EEE d MMM · HH:mm').format(s.startedAt.toLocal())}'
-                        '${s.durationSeconds != null ? ' · ${(s.durationSeconds! / 60).round()} min' : ''}\n'
+                        '${DateFormat('EEE d MMM · HH:mm').format(s.startedAt.toLocal())}\n'
+                        '${s.durationSeconds != null ? '${(s.durationSeconds! / 60).round()} min · ' : ''}'
                         '${bySession[s.id]?.$1 ?? 0} sets · ${formatKg(bySession[s.id]?.$2 ?? 0)} kg',
                       ),
                       isThreeLine: true,

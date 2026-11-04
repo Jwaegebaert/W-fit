@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -9,6 +10,8 @@ import 'router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Android 15+ always draws edge-to-edge; opt in everywhere so system bars overlay the app consistently.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await initializeDateFormatting();
   final catalog = await Catalog.load();
   runApp(ProviderScope(
@@ -56,5 +59,25 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.system,
         routerConfig: router,
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: systemBarsStyle(Theme.of(context).brightness),
+          child: child!,
+        ),
       );
+}
+
+/// Transparent status and navigation bars with icons that contrast with the app surface. App bars override the
+/// status bar part; the bottom bars (NavigationBar, BottomActionBar) draw their surface behind the system bar.
+SystemUiOverlayStyle systemBarsStyle(Brightness brightness) {
+  final icons = brightness == Brightness.dark ? Brightness.light : Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: icons,
+    statusBarBrightness: brightness,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: icons,
+    systemNavigationBarContrastEnforced: false,
+    systemStatusBarContrastEnforced: false,
+  );
 }

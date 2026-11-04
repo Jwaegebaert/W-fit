@@ -89,7 +89,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         final itemOrder = order++;
         final key = '$itemOrder:${item.exerciseId}';
         children.add(Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: Gap.item),
           child: ExerciseCard(
             key: ValueKey(key),
             sessionId: session.id,
@@ -130,10 +130,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       canPop: true,
       child: Scaffold(
         appBar: AppBar(
-          title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(session.title),
-            _ElapsedClock(startedAt: session.startedAt),
-          ]),
+          toolbarHeight: AppBarTitle.toolbarHeight,
+          title: AppBarTitle(session.title, subtitle: _ElapsedClock(startedAt: session.startedAt)),
           actions: [
             PopupMenuButton<String>(
               onSelected: (v) async {
@@ -149,12 +147,17 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             child: LinearProgressIndicator(value: totalSets == 0 ? 0 : (doneSets / totalSets).clamp(0, 1).toDouble()),
           ),
         ),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 180), children: [
-          if (plan == null)
-            const EmptyState(icon: Icons.fitness_center, title: 'Free workout', message: 'No plan attached to this session.'),
-          ...children,
-        ]),
-        bottomSheet: _BottomBar(
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(Gap.md, 0, Gap.md, Gap.lg),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          children: [
+            if (plan == null)
+              const EmptyState(icon: Icons.fitness_center, title: 'Free workout', message: 'No plan attached to this session.'),
+            ...children,
+          ],
+        ),
+        // A bottom *navigation* bar keeps the system inset, so Finish stays above Android's nav buttons.
+        bottomNavigationBar: _BottomBar(
           doneSets: doneSets,
           totalSets: totalSets,
           onFinish: () => _finish(session),
@@ -182,12 +185,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   }
 
   Future<void> _finish(WorkoutSession session) async {
-    final feedback = await showModalBottomSheet<_Feedback>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => const _FinishSheet(),
-    );
+    final feedback = await showAppSheet<_Feedback>(context, builder: (_) => const _FinishSheet());
     if (feedback == null || !mounted) return;
     final repo = ref.read(repositoryProvider);
     ref.read(workoutTimerProvider.notifier).skip();
@@ -483,14 +481,18 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
           ),
         if (!isTimed)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(children: [
-              const SizedBox(width: 36, child: Text('Set', style: TextStyle(fontWeight: FontWeight.w600))),
-              Expanded(child: Text(e?.isWeighted == false ? 'Extra kg' : 'kg', style: const TextStyle(fontWeight: FontWeight.w600))),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Reps', style: TextStyle(fontWeight: FontWeight.w600))),
-              const SizedBox(width: 56),
-            ]),
+            padding: const EdgeInsets.only(bottom: Gap.xs),
+            child: DefaultTextStyle.merge(
+              style: t.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: t.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+              child: Row(children: [
+                const SizedBox(width: 36, child: Text('Set')),
+                Expanded(child: Text(e?.isWeighted == false ? 'Extra kg' : 'kg')),
+                const SizedBox(width: Gap.sm),
+                const Expanded(child: Text('Reps')),
+                const SizedBox(width: Gap.sm + Gap.tap),
+              ]),
+            ),
           ),
         for (var n = 1; n <= _rowCount; n++) isTimed ? _timedRow(n, name) : _repsRow(n),
         Align(
@@ -610,29 +612,24 @@ class _BottomBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final timer = ref.watch(workoutTimerProvider);
     final t = Theme.of(context);
-    return Material(
-      elevation: 8,
-      color: t.colorScheme.surfaceContainer,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (timer != null) _TimerBanner(timer: timer),
-            if (timer != null) const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                child: Text('$doneSets / $totalSets sets', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-              ),
-              FilledButton.icon(
-                onPressed: onFinish,
-                icon: const Icon(Icons.flag_rounded),
-                label: const Text('Finish'),
-              ),
-            ]),
-          ]),
-        ),
-      ),
+    return BottomActionBar(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        if (timer != null) ...[_TimerBanner(timer: timer), const SizedBox(height: Gap.sm)],
+        Row(children: [
+          Expanded(
+            child: Text('$doneSets / $totalSets sets',
+                style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ),
+          const SizedBox(width: Gap.sm),
+          FilledButton.icon(
+            onPressed: onFinish,
+            icon: const Icon(Icons.flag_rounded),
+            label: const Text('Finish'),
+          ),
+        ]),
+      ]),
     );
   }
 }
@@ -668,28 +665,41 @@ class _TimerBannerState extends ConsumerState<_TimerBanner> {
     final color = timer.isWork ? const Color(0xFFEF6C4D) : t.colorScheme.primary;
     final ctrl = ref.read(workoutTimerProvider.notifier);
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16)),
+      padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(Gap.radiusMd)),
       child: Row(children: [
         SizedBox(
-          width: 52,
-          height: 52,
+          width: 44,
+          height: 44,
           child: Stack(alignment: Alignment.center, children: [
-            CircularProgressIndicator(value: timer.progress, strokeWidth: 5, color: color, backgroundColor: color.withValues(alpha: 0.2)),
-            Icon(timer.isWork ? Icons.directions_run : Icons.self_improvement, color: color),
+            SizedBox.expand(
+              child: CircularProgressIndicator(
+                  value: timer.progress, strokeWidth: 4, color: color, backgroundColor: color.withValues(alpha: 0.2)),
+            ),
+            Icon(timer.isWork ? Icons.directions_run : Icons.self_improvement, color: color, size: 22),
           ]),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: Gap.md - 4),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text(timer.label, style: t.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text(formatClock(timer.remaining),
-                style: t.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(formatClock(timer.remaining),
+                  style: t.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
+            ),
           ]),
         ),
-        IconButton(onPressed: () => ctrl.add(-15), icon: const Text('-15')),
-        IconButton(onPressed: () => ctrl.add(15), icon: const Text('+15')),
+        IconButton(
+            tooltip: 'Minus 15 seconds',
+            onPressed: () => ctrl.add(-15),
+            icon: const Text('-15', style: TextStyle(fontWeight: FontWeight.w700))),
+        IconButton(
+            tooltip: 'Plus 15 seconds',
+            onPressed: () => ctrl.add(15),
+            icon: const Text('+15', style: TextStyle(fontWeight: FontWeight.w700))),
         IconButton(onPressed: ctrl.skip, icon: const Icon(Icons.skip_next_rounded), tooltip: 'Skip'),
       ]),
     );
@@ -731,21 +741,24 @@ class _FinishSheetState extends State<_FinishSheet> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+    return SingleChildScrollView(
+      padding: sheetPadding(context),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('How did it go?', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 16),
+        const SizedBox(height: Gap.md),
         const Text('Overall feeling'),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           for (var i = 1; i <= 5; i++)
-            IconButton(
-              iconSize: 36,
-              onPressed: () => setState(() => _rating = i),
-              icon: Icon(i <= _rating ? Icons.star_rounded : Icons.star_outline_rounded, color: Colors.amber.shade600),
+            Flexible(
+              child: IconButton(
+                iconSize: 36,
+                tooltip: '$i star${i == 1 ? '' : 's'}',
+                onPressed: () => setState(() => _rating = i),
+                icon: Icon(i <= _rating ? Icons.star_rounded : Icons.star_outline_rounded, color: Colors.amber.shade600),
+              ),
             ),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: Gap.sm),
         Text('Effort: ${_effort.round()}/10 · ${_effortLabel(_effort.round())}'),
         Slider(value: _effort, min: 1, max: 10, divisions: 9, label: '${_effort.round()}', onChanged: (v) => setState(() => _effort = v)),
         TextField(
@@ -753,7 +766,7 @@ class _FinishSheetState extends State<_FinishSheet> {
           maxLines: 2,
           decoration: const InputDecoration(hintText: 'Notes (optional) – e.g. "knee felt great", "gym was busy"'),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: Gap.md),
         SizedBox(
           width: double.infinity,
           child: FilledButton(
@@ -785,17 +798,23 @@ class _SummaryDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return AlertDialog(
+      scrollable: true,
       icon: Icon(prs.isEmpty ? Icons.check_circle_rounded : Icons.emoji_events_rounded,
           size: 48, color: prs.isEmpty ? t.colorScheme.primary : Colors.amber.shade600),
       title: Text(prs.isEmpty ? 'Workout saved!' : 'New personal records!'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Row(children: [
-          Expanded(child: StatTile(label: 'minutes', value: '$minutes')),
-          const SizedBox(width: 8),
-          Expanded(child: StatTile(label: 'sets', value: '$sets')),
-          const SizedBox(width: 8),
-          Expanded(child: StatTile(label: 'kg volume', value: volume.toStringAsFixed(0))),
-        ]),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: Gap.md - 4, horizontal: Gap.xs),
+          decoration: BoxDecoration(
+            color: t.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(Gap.radiusMd),
+          ),
+          child: Row(children: [
+            Expanded(child: _SummaryStat(value: '$minutes', label: 'min')),
+            Expanded(child: _SummaryStat(value: '$sets', label: 'sets')),
+            Expanded(child: _SummaryStat(value: volume.toStringAsFixed(0), label: 'kg volume')),
+          ]),
+        ),
         if (prs.isNotEmpty) ...[
           const SizedBox(height: Gap.md),
           for (final pr in prs)
@@ -810,5 +829,27 @@ class _SummaryDialog extends StatelessWidget {
       ]),
       actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))],
     );
+  }
+}
+
+class _SummaryStat extends StatelessWidget {
+  const _SummaryStat({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(value, style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+      ),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(label, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+      ),
+    ]);
   }
 }

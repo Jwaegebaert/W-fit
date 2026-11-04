@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
@@ -80,7 +79,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     final t = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Backend connection')),
-      body: ListView(padding: Gap.page, children: [
+      body: ListView(padding: pagePadding(context), children: [
         Text(
           'W-fit works fully offline. Connect your Azure backend to back up your data and unlock the AI coach.',
           style: t.textTheme.bodyMedium,
@@ -124,22 +123,17 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         ],
         if (_usage != null) ...[
           const SectionTitle('AI usage'),
-          Row(children: [
-            Expanded(
-              child: StatTile(
-                label: 'AI calls today',
-                value: '${_usage!['callsToday'] ?? 0}/${_usage!['dailyCallLimit'] ?? '–'}',
-                icon: Icons.auto_awesome,
-              ),
+          StatRow(children: [
+            StatTile(
+              label: 'AI calls today',
+              value: '${_usage!['callsToday'] ?? 0}/${_usage!['dailyCallLimit'] ?? '–'}',
+              icon: Icons.auto_awesome,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: StatTile(
-                label: 'tokens this month',
-                value: '${(((_usage!['tokensThisMonth'] as num?) ?? 0) / 1000).toStringAsFixed(0)}k / '
-                    '${(((_usage!['monthlyTokenLimit'] as num?) ?? 0) / 1000).toStringAsFixed(0)}k',
-                icon: Icons.data_usage,
-              ),
+            StatTile(
+              label: 'tokens this month',
+              value: '${(((_usage!['tokensThisMonth'] as num?) ?? 0) / 1000).toStringAsFixed(0)}k / '
+                  '${(((_usage!['monthlyTokenLimit'] as num?) ?? 0) / 1000).toStringAsFixed(0)}k',
+              icon: Icons.data_usage,
             ),
           ]),
           if (_usage!['enabled'] == false)

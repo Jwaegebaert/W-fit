@@ -115,7 +115,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       ),
       body: Stack(children: [
         ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+          padding: Gap.page,
           children: [
             Wrap(spacing: 8, runSpacing: 8, children: [
               Pill(DateFormat('EEEE d MMM').format(parseDateKey(plan.date)), icon: Icons.event),
@@ -174,14 +174,11 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             child: const Center(child: Card(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))),
           ),
       ]),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton.icon(
-            onPressed: _busy ? null : () => _start(plan),
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Start workout'),
-          ),
+      bottomNavigationBar: BottomActionBar(
+        child: FilledButton.icon(
+          onPressed: _busy ? null : () => _start(plan),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('Start workout'),
         ),
       ),
     );
@@ -207,6 +204,9 @@ class _PlanItemTile extends ConsumerWidget {
     final rest = item.restSeconds > 0 && section != Section.cooldown ? ' · rest ${formatSeconds(item.restSeconds)}' : '';
     return ListTile(
       onTap: () => context.push('/exercise/${item.exerciseId}'),
+      // Trailing icon buttons bring their own padding; keep the title as wide as possible.
+      contentPadding: const EdgeInsetsDirectional.only(start: Gap.md - 4, end: Gap.xs),
+      horizontalTitleGap: Gap.md - 4,
       leading: ExerciseAvatar(exercise: e),
       title: Text(e?.name ?? item.exerciseId, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text('${item.targetLabel}$weight$rest${item.notes.isNotEmpty ? '\n${item.notes}' : ''}'),

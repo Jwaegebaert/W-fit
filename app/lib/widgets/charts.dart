@@ -58,11 +58,17 @@ class TrendLineChart extends StatelessWidget {
               sideTitles: SideTitles(
                 showTitles: true,
                 interval: 1,
-                reservedSize: 24,
+                reservedSize: MediaQuery.textScalerOf(context).scale(16) + 8,
                 getTitlesWidget: (v, meta) {
                   final i = v.toInt();
                   if (v != i || !labelIdx.contains(i) || i >= labels.length) return const SizedBox.shrink();
-                  return Padding(padding: const EdgeInsets.only(top: 6), child: Text(labels[i], style: t.textTheme.labelSmall));
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    // Keeps the first/last date inside the card instead of clipping at the edge.
+                    fitInside: SideTitleFitInsideData.fromTitleMeta(meta, distanceFromEdge: 0),
+                    child: Text(labels[i], style: t.textTheme.labelSmall),
+                  );
                 },
               ),
             ),
@@ -135,11 +141,16 @@ class WeeklyBarChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 22,
+                reservedSize: MediaQuery.textScalerOf(context).scale(16) + 6,
                 getTitlesWidget: (v, meta) {
                   final i = v.toInt();
                   if (i % 2 != (values.length - 1) % 2 || i >= labels.length) return const SizedBox.shrink();
-                  return Padding(padding: const EdgeInsets.only(top: 4), child: Text(labels[i], style: t.textTheme.labelSmall));
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 4,
+                    fitInside: SideTitleFitInsideData.fromTitleMeta(meta, distanceFromEdge: 0),
+                    child: Text(labels[i], style: t.textTheme.labelSmall),
+                  );
                 },
               ),
             ),

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/theme.dart';
 import '../../data/db/database.dart';
 import '../../domain/catalog.dart';
 import '../../domain/plan.dart';
@@ -64,16 +63,17 @@ class SessionDetailScreen extends ConsumerWidget {
           }
           final volume = sets.where((s) => s.completed).fold<double>(0, (a, s) => a + (s.weightKg ?? 0) * (s.reps ?? 0));
           final t = Theme.of(context);
-          return ListView(padding: Gap.page, children: [
+          return ListView(padding: pagePadding(context), children: [
             Text(session.title, style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
             Text(DateFormat('EEEE d MMMM yyyy · HH:mm').format(session.startedAt.toLocal()), style: t.textTheme.bodyMedium),
             const SizedBox(height: 16),
-            Row(children: [
-              Expanded(child: StatTile(label: 'duration', value: session.durationSeconds == null ? '–' : '${(session.durationSeconds! / 60).round()} min', icon: Icons.timer_outlined)),
-              const SizedBox(width: 8),
-              Expanded(child: StatTile(label: 'sets', value: '${sets.where((s) => s.completed).length}', icon: Icons.checklist)),
-              const SizedBox(width: 8),
-              Expanded(child: StatTile(label: 'kg volume', value: volume.toStringAsFixed(0), icon: Icons.fitness_center)),
+            StatRow(children: [
+              StatTile(
+                  label: 'duration',
+                  value: session.durationSeconds == null ? '–' : '${(session.durationSeconds! / 60).round()} min',
+                  icon: Icons.timer_outlined),
+              StatTile(label: 'sets', value: '${sets.where((s) => s.completed).length}', icon: Icons.checklist),
+              StatTile(label: 'kg volume', value: volume.toStringAsFixed(0), icon: Icons.fitness_center),
             ]),
             if (session.rating != null || session.perceivedEffort != null || session.notes.isNotEmpty) ...[
               const SizedBox(height: 12),
