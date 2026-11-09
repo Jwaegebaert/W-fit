@@ -7,12 +7,14 @@ import '../../core/theme.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/repository.dart';
 import '../../domain/catalog.dart';
+import '../../domain/muscles.dart';
 import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
 import '../../widgets/brand.dart';
 import '../../widgets/common.dart';
 import '../../widgets/sync_indicator.dart';
+import '../balance/balance_screen.dart';
 import '../workout/workout_actions.dart';
 
 /// The next planned workout (generated with the rule engine when missing).
@@ -65,8 +67,11 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             if (active != null) ...[_ResumeCard(session: active), const SizedBox(height: Gap.md)],
             const _NextWorkoutCard(),
+            const _CheckInCards(),
             const SectionTitle('This week'),
             const _WeekCard(),
+            const SizedBox(height: Gap.item),
+            const BalanceSummaryCard(),
             const SectionTitle('Coming up'),
             const _UpcomingList(),
             const SectionTitle('Quick actions'),
@@ -125,6 +130,50 @@ class _NextWorkoutCard extends ConsumerWidget {
         return _HeroCard(plan: plan);
       },
     );
+  }
+}
+
+class _CheckInCards extends ConsumerWidget {
+  const _CheckInCards();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(dueCheckInsProvider).value ?? const <FeedbackEntry>[];
+    if (due.isEmpty) return const SizedBox.shrink();
+    final t = Theme.of(context);
+    final catalog = ref.watch(catalogProvider);
+    final coach = ref.read(coachServiceProvider);
+    return Column(children: [
+      for (final f in due.take(2))
+        Card(
+          margin: const EdgeInsets.only(top: Gap.md),
+          color: t.colorScheme.tertiaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(Gap.md),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                f.region != null
+                    ? 'Is your ${prettyRegion(f.region!).toLowerCase()} still bothering you?'
+                    : 'Is ${catalog.exerciseName(f.exerciseId ?? '')} still uncomfortable?',
+                style: t.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700, color: t.colorScheme.onTertiaryContainer),
+              ),
+              const SizedBox(height: Gap.xs),
+              Text(
+                'Reported ${DateFormat('d MMM').format(f.createdAt.toLocal())}${f.note.isEmpty ? '' : ' · ${f.note}'}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onTertiaryContainer),
+              ),
+              const SizedBox(height: Gap.sm),
+              Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
+                FilledButton(onPressed: () => coach.resolveIssue(f.id), child: const Text('Resolved')),
+                OutlinedButton(onPressed: () => coach.keepIssue(f.id), child: const Text('Still hurts')),
+              ]),
+            ]),
+          ),
+        ),
+    ]);
   }
 }
 

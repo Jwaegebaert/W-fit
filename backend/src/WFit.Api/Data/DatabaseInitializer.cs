@@ -74,6 +74,7 @@ public sealed class DatabaseInitializer(CatalogService catalog, ILogger<Database
             row.Badminton = src.Badminton;
             row.Instructions = [.. src.Instructions];
             row.Tip = src.Tip;
+            row.Stress = [.. src.Stress ?? []];
         }
         db.CatalogExercises.RemoveRange(exercises.Values);
 

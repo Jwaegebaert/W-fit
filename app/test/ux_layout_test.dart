@@ -124,6 +124,7 @@ void main() {
             '/stats',
             '/progress/$weightedId',
             '/coach',
+            '/balance',
             '/body',
             '/library',
             '/exercise/$weightedId',
@@ -150,6 +151,34 @@ void main() {
           expectFullyVisible(tester, find.widgetWithText(FilledButton, 'Save'), reason: 'body form Save');
           Navigator.of(tester.element(find.byType(BottomSheet))).pop();
           await settle(tester, frames: 10);
+
+          // Report an issue: severe pain shows the safety note; saving shows the instant plan changes.
+          await go(tester, '/coach');
+          await tester.ensureVisible(find.text('Report pain / tell your coach'));
+          await tester.pump();
+          await tester.tap(find.text('Report pain / tell your coach'));
+          await settle(tester);
+          expect(tester.takeException(), isNull, reason: 'report sheet');
+          await tester.ensureVisible(find.text('Neck'));
+          await tester.pump();
+          await tester.tap(find.text('Neck'));
+          await tester.ensureVisible(find.text('Severe'));
+          await tester.pump();
+          await tester.tap(find.text('Severe'));
+          await settle(tester, frames: 5);
+          expect(find.textContaining('see a doctor'), findsOneWidget);
+          final reportScroll = find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first;
+          await expectScrollEndClear(tester, scrollable: reportScroll, reason: 'report sheet', overSheet: true);
+          await tester.scrollUntilVisible(find.text('Save report'), 200, scrollable: reportScroll);
+          await tester.pump();
+          await tester.tap(find.text('Save report'));
+          await settle(tester, frames: 30);
+          expect(tester.takeException(), isNull, reason: 'report result');
+          expect(find.text('Saved – thanks'), findsOneWidget);
+          await expectScrollEndClear(tester, scrollable: reportScroll, reason: 'report result', overSheet: true);
+          await tester.tap(find.text('Done'));
+          await settle(tester, frames: 10);
+          expect(find.text('Active limitations'), findsOneWidget);
 
           await unpumpWFit(tester);
         });

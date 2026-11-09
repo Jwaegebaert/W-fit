@@ -30,6 +30,7 @@ public sealed class SyncService(WFitDbContext db, CatalogService catalog, TimePr
         skipped += await UpsertAsync(db.WorkoutSessions, nameof(WorkoutSession.Id), changes.Sessions, e => e.Id, PrepareSession, ct);
         skipped += await UpsertAsync(db.SetLogs, nameof(SetLog.Id), changes.Sets, e => e.Id, PrepareSet, ct);
         skipped += await UpsertAsync(db.BodyMetrics, nameof(BodyMetric.Id), changes.BodyMetrics, e => e.Id, PrepareBodyMetric, ct);
+        skipped += await UpsertAsync(db.FeedbackEntries, nameof(FeedbackEntry.Id), changes.FeedbackEntries, e => e.Id, PrepareFeedback, ct);
 
         var stamp = time.GetUtcNow();
         foreach (var entry in db.ChangeTracker.Entries<SyncEntity>())
@@ -60,6 +61,7 @@ public sealed class SyncService(WFitDbContext db, CatalogService catalog, TimePr
             Sessions = (await Changed(db.WorkoutSessions).ToListAsync(ct)).Select(e => e.ToDto()).ToList(),
             Sets = (await Changed(db.SetLogs).ToListAsync(ct)).Select(e => e.ToDto()).ToList(),
             BodyMetrics = (await Changed(db.BodyMetrics).ToListAsync(ct)).Select(e => e.ToDto()).ToList(),
+            FeedbackEntries = (await Changed(db.FeedbackEntries).ToListAsync(ct)).Select(e => e.ToDto()).ToList(),
         };
     }
 
@@ -173,5 +175,26 @@ public sealed class SyncService(WFitDbContext db, CatalogService catalog, TimePr
     {
         var id = SyncMapper.NormalizeGuid(d.Id);
         return id is null ? null : new(id, () => new BodyMetric { Id = id }, e => e.Apply(d));
+    }
+
+    /// <summary>
+    /// GUID id / sessionId, kind / status / source vocabulary, region vocabulary or null, severity 1–3 or null,
+    /// known exerciseId or null; pain / discomfort need a region or an exercise (IMPROVEMENT-PLAN §4.3).
+    /// </summary>
+    private Prepared<FeedbackEntry>? PrepareFeedback(FeedbackEntryDto d)
+    {
+        var id = SyncMapper.NormalizeGuid(d.Id);
+        var sessionId = d.SessionId is null ? null : SyncMapper.NormalizeGuid(d.SessionId);
+        if (id is null
+            || (d.SessionId is not null && sessionId is null)
+            || !Vocab.FeedbackKinds.Contains(d.Kind ?? "")
+            || !Vocab.FeedbackStatuses.Contains(d.Status ?? "")
+            || !Vocab.FeedbackSources.Contains(d.Source ?? "")
+            || (d.Region is not null && !Anatomy.IsRegion(d.Region))
+            || d.Severity is < 1 or > 3
+            || (d.ExerciseId is not null && !catalog.ExercisesById.ContainsKey(d.ExerciseId))
+            || (Vocab.FeedbackKind.IsPainLike(d.Kind) && d.Region is null && d.ExerciseId is null))
+            return null;
+        return new(id, () => new FeedbackEntry { Id = id }, e => e.Apply(d, sessionId));
     }
 }

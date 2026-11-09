@@ -5,9 +5,44 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
+import '../../domain/catalog.dart';
+import '../../domain/muscles.dart';
 import '../../providers.dart';
 import '../../services/coach_service.dart';
 import '../../widgets/common.dart';
+import '../../widgets/report_issue_sheet.dart';
+
+/// Active pain / discomfort entries with a Resolve action.
+class _Limitations extends ConsumerWidget {
+  const _Limitations();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entries = (ref.watch(activeFeedbackProvider).value ?? const [])
+        .where((f) => f.kind == 'pain' || f.kind == 'discomfort')
+        .toList();
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final catalog = ref.watch(catalogProvider);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const SectionTitle('Active limitations'),
+      Card(
+        child: Column(children: [
+          for (final f in entries)
+            ListTile(
+              leading: const Icon(Icons.healing_outlined),
+              title: Text(f.region != null ? prettyRegion(f.region!) : catalog.exerciseName(f.exerciseId ?? '')),
+              subtitle: Text('${switch (f.severity) { 1 => 'Mild', 3 => 'Severe', _ => 'Moderate' }} ${f.kind} · '
+                  'since ${DateFormat('d MMM').format(f.createdAt.toLocal())}'),
+              trailing: TextButton(
+                onPressed: () => ref.read(coachServiceProvider).resolveIssue(f.id),
+                child: const Text('Resolve'),
+              ),
+            ),
+        ]),
+      ),
+    ]);
+  }
+}
 
 class CoachScreen extends ConsumerStatefulWidget {
   const CoachScreen({super.key});
@@ -39,6 +74,7 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
     if (ai && configured) {
       try {
         result = await coach.aiInsights(force: force);
+        if (mounted) ref.invalidate(cachedInsightsProvider);
       } on ApiException catch (e) {
         result = await coach.localInsights();
         _notice = '${e.message} Showing on-device insights.';
@@ -101,6 +137,13 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
               padding: const EdgeInsets.only(top: 12),
               child: Text(_notice!, style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
             ),
+          const SizedBox(height: Gap.item),
+          FilledButton.tonalIcon(
+            onPressed: () => showReportIssueSheet(context),
+            icon: const Icon(Icons.report_problem_outlined),
+            label: const Text('Report pain / tell your coach'),
+          ),
+          const _Limitations(),
           if (_loading && i == null)
             const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator())),
           if (_loading && i != null) const LinearProgressIndicator(),
@@ -133,6 +176,15 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
                   leading: Icon(Icons.flag_rounded, color: t.colorScheme.onPrimaryContainer),
                   title: Text(i.nextFocus,
                       style: TextStyle(color: t.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
+                  subtitle: i.focusMuscles.isEmpty
+                      ? null
+                      : Padding(
+                          padding: const EdgeInsets.only(top: Gap.sm),
+                          child: Wrap(spacing: 6, runSpacing: 6, children: [
+                            for (final m in i.focusMuscles)
+                              Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), color: t.colorScheme.onPrimaryContainer),
+                          ]),
+                        ),
                 ),
               ),
             ],

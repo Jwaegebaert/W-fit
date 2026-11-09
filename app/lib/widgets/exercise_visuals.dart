@@ -39,7 +39,7 @@ enum ExerciseKind {
 
   /// Pure classifier; [groupOf] maps an equipment id to its catalog group. First matching rule wins:
   /// cardio pattern → mobility/stretch (incl. all cool-downs) → plyometrics → dedicated machine (machines group
-  /// except the cable station, or Smith machine) → cable → barbell/EZ bar → dumbbells → kettlebell → band →
+  /// except the cable station, or Smith machine) → cable → barbell/EZ/trap bar → dumbbells → kettlebell → band →
   /// benches only → bodyweight.
   static ExerciseKind classify(Exercise e, String? Function(String equipmentId) groupOf) {
     final eq = e.equipment.toSet();
@@ -50,7 +50,7 @@ enum ExerciseKind {
       return machine;
     }
     if (eq.contains('cable_machine')) return cable;
-    if (eq.contains('barbell') || eq.contains('ez_bar')) return barbell;
+    if (eq.contains('barbell') || eq.contains('ez_bar') || eq.contains('trap_bar')) return barbell;
     if (eq.contains('dumbbells')) return dumbbell;
     if (eq.contains('kettlebell')) return kettlebell;
     if (eq.contains('resistance_band')) return band;

@@ -28,11 +28,15 @@ public static class ApiKeyValidator
 }
 
 /// <summary>
-/// API-key enforcement (everything except <c>health</c>), lazy database initialization and
-/// mapping of exceptions to the contract error shape.
+/// API-key enforcement (everything except <c>health</c>), lazy database initialization (only for functions that use
+/// SQL, so the stateless AI endpoints never wait for a paused database) and mapping of exceptions to the contract
+/// error shape.
 /// </summary>
 public sealed class ApiMiddleware(IConfiguration configuration, ILogger<ApiMiddleware> logger) : IFunctionsWorkerMiddleware
 {
+    /// <summary>Functions that need the database (migrations + catalog seed are applied before they run).</summary>
+    public static readonly IReadOnlySet<string> DatabaseFunctions = new HashSet<string>(StringComparer.Ordinal) { SyncFunction.Name };
+
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
         var http = context.GetHttpContext();
@@ -52,7 +56,10 @@ public sealed class ApiMiddleware(IConfiguration configuration, ILogger<ApiMiddl
                         ErrorCodes.Unauthorized, "Missing or invalid API key.");
                     return;
                 }
+            }
 
+            if (DatabaseFunctions.Contains(context.FunctionDefinition.Name))
+            {
                 var initializer = context.InstanceServices.GetRequiredService<DatabaseInitializer>();
                 var db = context.InstanceServices.GetRequiredService<WFitDbContext>();
                 await initializer.EnsureInitializedAsync(db, http.RequestAborted);

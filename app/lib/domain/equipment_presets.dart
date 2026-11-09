@@ -16,6 +16,9 @@ class EquipmentPreset {
           if (!e.alwaysAvailable) e.id: !unavailable.contains(e.id),
       };
 
+  /// A typical machine-heavy commercial gym. Catalog v3 equipment (trap bar, preacher bench, back extension bench and
+  /// machine, hack squat, chest-supported row and lateral raise machines) is standard there, so it stays switched on;
+  /// only the small functional / cardio items such gyms often lack are switched off.
   static const classicMachineGym = EquipmentPreset(
     label: 'Classic machine gym',
     description: 'Machines, cables, racks, benches and small tools. No medicine ball, foam roller, jump rope or rowing machine.',

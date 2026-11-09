@@ -50,13 +50,27 @@ public class CatalogTests
     [Fact]
     public void Every_exercise_has_two_to_three_mistakes()
     {
-        Assert.Equal("2", Catalog.Version);
+        Assert.True(int.Parse(Catalog.Version, System.Globalization.CultureInfo.InvariantCulture) >= 2, Catalog.Version);
         Assert.All(Catalog.Exercises, e =>
         {
             Assert.NotNull(e.Mistakes);
             Assert.InRange(e.Mistakes!.Count, 2, 3);
             Assert.All(e.Mistakes, m => Assert.False(string.IsNullOrWhiteSpace(m), e.Id));
         });
+    }
+
+    [Fact]
+    public void Muscles_and_stress_use_the_anatomy_vocabulary()
+    {
+        foreach (var e in Catalog.Exercises)
+        {
+            Assert.All(e.Primary.Concat(e.Secondary), m => Assert.True(Anatomy.MuscleVocabulary.Contains(m), $"{e.Id}: {m}"));
+            Assert.All(e.Stress ?? [], r => Assert.True(Anatomy.IsRegion(r), $"{e.Id}: {r}"));
+        }
+
+        // Catalog v3 makes `stress` a required field.
+        if (int.Parse(Catalog.Version, System.Globalization.CultureInfo.InvariantCulture) >= 3)
+            Assert.All(Catalog.Exercises, e => Assert.True(e.Stress is not null, $"{e.Id} has no stress"));
     }
 
     [Fact]
@@ -116,5 +130,15 @@ public class CatalogTests
         Assert.True(await DatabaseInitializer.SeedCatalogAsync(db, Catalog, default));
         Assert.Null(await db.CatalogExercises.FindAsync("removed-exercise"));
         Assert.Equal(Catalog.Exercises.Count, await db.CatalogExercises.CountAsync());
+    }
+
+    [Fact]
+    public async Task Seeding_persists_stress_tags()
+    {
+        await using var db = TestEnv.CreateDb();
+        await DatabaseInitializer.SeedCatalogAsync(db, TestEnv.StressCatalog, default);
+
+        var squat = await db.CatalogExercises.SingleAsync(e => e.Id == "barbell-back-squat");
+        Assert.Equal(["neck", "lower_back", "hip", "knee"], squat.Stress);
     }
 }

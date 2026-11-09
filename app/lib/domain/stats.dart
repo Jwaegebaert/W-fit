@@ -105,6 +105,22 @@ DateTime addDays(DateTime d, int days) => DateTime(d.year, d.month, d.day + days
 
 DateTime startOfWeek(DateTime d) => DateTime(d.year, d.month, d.day - (d.weekday - 1));
 
+/// Local calendar date of [d] (UTC values are converted to local time first).
+DateTime dateOnly(DateTime d) {
+  final l = d.isUtc ? d.toLocal() : d;
+  return DateTime(l.year, l.month, l.day);
+}
+
+/// Whole calendar days from [from] to [to] (DST-safe; negative when [to] is earlier).
+int daysBetween(DateTime from, DateTime to) =>
+    (dateOnly(to).difference(dateOnly(from)).inHours / 24).round();
+
+/// `yyyy-MM-dd` of the local calendar date.
+String isoDate(DateTime d) {
+  final l = dateOnly(d);
+  return '${l.year.toString().padLeft(4, '0')}-${l.month.toString().padLeft(2, '0')}-${l.day.toString().padLeft(2, '0')}';
+}
+
 class WeekStat {
   WeekStat(this.weekStart);
   final DateTime weekStart;

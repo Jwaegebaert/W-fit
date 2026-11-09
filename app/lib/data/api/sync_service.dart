@@ -42,6 +42,7 @@ class SyncService {
     n += await _count(db.workoutSessions, db.workoutSessions.dirty);
     n += await _count(db.setLogs, db.setLogs.dirty);
     n += await _count(db.bodyMetrics, db.bodyMetrics.dirty);
+    n += await _count(db.feedbackEntries, db.feedbackEntries.dirty);
     return n;
   }
 
@@ -62,6 +63,7 @@ class SyncService {
       final sessions = await (db.select(db.workoutSessions)..where((t) => t.dirty.equals(true))..limit(200)).get();
       final sets = await (db.select(db.setLogs)..where((t) => t.dirty.equals(true))..limit(maxBatch)).get();
       final body = await (db.select(db.bodyMetrics)..where((t) => t.dirty.equals(true))..limit(200)).get();
+      final feedback = await (db.select(db.feedbackEntries)..where((t) => t.dirty.equals(true))..limit(200)).get();
 
       final since = await db.getValue(sinceKey);
       final response = await api.sync({
@@ -74,11 +76,13 @@ class SyncService {
           'sessions': sessions.map(sessionToJson).toList(),
           'sets': sets.map(setToJson).toList(),
           'bodyMetrics': body.map(bodyToJson).toList(),
+          'feedbackEntries': feedback.map(feedbackToJson).toList(),
         },
       });
 
       final pushed = (profile == null ? 0 : 1) +
-          equipment.length + prefs.length + planned.length + sessions.length + sets.length + body.length;
+          equipment.length + prefs.length + planned.length + sessions.length + sets.length + body.length +
+          feedback.length;
 
       var pulled = 0;
       await db.transaction(() async {
@@ -112,6 +116,10 @@ class SyncService {
         for (final r in body) {
           await (db.update(db.bodyMetrics)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
               .write(const BodyMetricsCompanion(dirty: Value(false)));
+        }
+        for (final r in feedback) {
+          await (db.update(db.feedbackEntries)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
+              .write(const FeedbackEntriesCompanion(dirty: Value(false)));
         }
 
         pulled = await applyRemoteChanges(response['changes'] as Map<String, dynamic>? ?? const {});
@@ -259,6 +267,14 @@ class SyncService {
           ));
       n++;
     }
+
+    for (final r in (changes['feedbackEntries'] as List? ?? const []).cast<Map<String, dynamic>>()) {
+      final id = r['id'] as String;
+      final local = await (db.select(db.feedbackEntries)..where((t) => t.id.equals(id))).getSingleOrNull();
+      if (keepLocal(local?.dirty, local?.updatedAt, _dt(r['updatedAt']))) continue;
+      await db.into(db.feedbackEntries).insertOnConflictUpdate(feedbackFromJson(r));
+      n++;
+    }
     return n;
   }
 }
@@ -305,8 +321,16 @@ Map<String, dynamic> plannedToJson(PlannedWorkout p) => {
       'estimatedMinutes': p.estimatedMinutes,
       'coachNote': p.coachNote,
       'blocks': jsonDecode(p.blocksJson),
+      'metaJson': p.metaJson,
       'updatedAt': _iso(p.updatedAt),
       'deleted': p.deleted,
+    };
+
+/// `metaJson` travels as a JSON string; an object is tolerated and re-encoded.
+String _metaJson(dynamic v) => switch (v) {
+      final String s when s.trim().isNotEmpty => s,
+      final Map<String, dynamic> m => jsonEncode(m),
+      _ => '{}',
     };
 
 PlannedWorkoutsCompanion plannedFromJson(Map<String, dynamic> r, {bool dirty = false}) =>
@@ -320,6 +344,8 @@ PlannedWorkoutsCompanion plannedFromJson(Map<String, dynamic> r, {bool dirty = f
       estimatedMinutes: Value(_i(r['estimatedMinutes']) ?? 60),
       coachNote: Value(r['coachNote'] as String? ?? ''),
       blocksJson: jsonEncode(r['blocks'] ?? const []),
+      // Absent key (older backend) keeps the local value instead of wiping it.
+      metaJson: r.containsKey('metaJson') ? Value(_metaJson(r['metaJson'])) : const Value.absent(),
       updatedAt: r['updatedAt'] == null ? DateTime.now().toUtc() : _dt(r['updatedAt']),
       deleted: Value(r['deleted'] as bool? ?? false),
       dirty: Value(dirty),
@@ -371,3 +397,46 @@ Map<String, dynamic> bodyToJson(BodyMetric b) => {
       'updatedAt': _iso(b.updatedAt),
       'deleted': b.deleted,
     };
+
+Map<String, dynamic> feedbackToJson(FeedbackEntry f) => {
+      'id': f.id,
+      'createdAt': _iso(f.createdAt),
+      'kind': f.kind,
+      'region': f.region,
+      'severity': f.severity,
+      'exerciseId': f.exerciseId,
+      'sessionId': f.sessionId,
+      'note': f.note,
+      'status': f.status,
+      'reviewOn': f.reviewOn,
+      'resolvedAt': f.resolvedAt == null ? null : _iso(f.resolvedAt!),
+      'source': f.source,
+      'updatedAt': _iso(f.updatedAt),
+      'deleted': f.deleted,
+    };
+
+FeedbackEntriesCompanion feedbackFromJson(Map<String, dynamic> r, {bool dirty = false}) =>
+    FeedbackEntriesCompanion.insert(
+      id: r['id'] as String,
+      createdAt: r['createdAt'] == null ? _dt(r['updatedAt']) : _dt(r['createdAt']),
+      kind: r['kind'] as String? ?? 'note',
+      region: Value(r['region'] as String?),
+      severity: Value(_i(r['severity'])),
+      exerciseId: Value(r['exerciseId'] as String?),
+      sessionId: Value(r['sessionId'] as String?),
+      note: Value(r['note'] as String? ?? ''),
+      status: Value(r['status'] as String? ?? 'active'),
+      reviewOn: Value(_dateOnly(r['reviewOn'])),
+      resolvedAt: Value(_dtn(r['resolvedAt'])),
+      source: Value(r['source'] as String? ?? 'user'),
+      updatedAt: _dt(r['updatedAt']),
+      deleted: Value(r['deleted'] as bool? ?? false),
+      dirty: Value(dirty),
+    );
+
+/// Normalises a date (`yyyy-MM-dd`, possibly sent with a time part) to `yyyy-MM-dd`.
+String? _dateOnly(dynamic v) {
+  final s = v as String?;
+  if (s == null || s.isEmpty) return null;
+  return s.length > 10 ? s.substring(0, 10) : s;
+}

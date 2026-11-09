@@ -12,6 +12,7 @@ public static class Len
     public const int Title = 200;
     public const int Text = 2000;
     public const int Goals = 500;
+    public const int Meta = 8000;
 }
 
 public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbContext(options)
@@ -23,11 +24,10 @@ public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbC
     public DbSet<WorkoutSession> WorkoutSessions => Set<WorkoutSession>();
     public DbSet<SetLog> SetLogs => Set<SetLog>();
     public DbSet<BodyMetric> BodyMetrics => Set<BodyMetric>();
+    public DbSet<FeedbackEntry> FeedbackEntries => Set<FeedbackEntry>();
     public DbSet<CatalogExercise> CatalogExercises => Set<CatalogExercise>();
     public DbSet<CatalogEquipment> CatalogEquipment => Set<CatalogEquipment>();
     public DbSet<AppMeta> AppMeta => Set<AppMeta>();
-    public DbSet<AiUsage> AiUsage => Set<AiUsage>();
-    public DbSet<InsightsCache> InsightsCache => Set<InsightsCache>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -69,6 +69,7 @@ public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbC
             e.Property(x => x.Status).HasMaxLength(Len.Code);
             e.Property(x => x.CoachNote).HasMaxLength(Len.Text);
             e.Property(x => x.BlocksJson).HasColumnName("Blocks");
+            e.Property(x => x.MetaJson).HasColumnName("Meta").HasMaxLength(Len.Meta).HasDefaultValue("{}");
             e.HasIndex(x => x.Date);
             Sync(e);
         });
@@ -106,6 +107,20 @@ public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbC
             Sync(e);
         });
 
+        b.Entity<FeedbackEntry>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasMaxLength(Len.Guid);
+            e.Property(x => x.Kind).HasMaxLength(Len.Code);
+            e.Property(x => x.Region).HasMaxLength(Len.Code);
+            e.Property(x => x.ExerciseId).HasMaxLength(Len.CatalogId);
+            e.Property(x => x.SessionId).HasMaxLength(Len.Guid);
+            e.Property(x => x.Note).HasMaxLength(Len.Text);
+            e.Property(x => x.Status).HasMaxLength(Len.Code);
+            e.Property(x => x.Source).HasMaxLength(Len.Code);
+            Sync(e);
+        });
+
         b.Entity<CatalogExercise>(e =>
         {
             e.HasKey(x => x.Id);
@@ -131,10 +146,6 @@ public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbC
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasMaxLength(Len.Name);
         });
-
-        b.Entity<AiUsage>(e => e.HasKey(x => x.Day));
-
-        b.Entity<InsightsCache>(e => e.HasKey(x => x.Day));
     }
 
     private static void Sync<T>(EntityTypeBuilder<T> e) where T : SyncEntity

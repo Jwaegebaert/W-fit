@@ -51,7 +51,14 @@ public static class SyncMapper
     {
         Id = e.Id, Date = e.Date, DayType = e.DayType, Title = e.Title, Source = e.Source, Status = e.Status,
         EstimatedMinutes = e.EstimatedMinutes, CoachNote = e.CoachNote, Blocks = DeserializeBlocks(e.BlocksJson),
-        UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+        MetaJson = string.IsNullOrWhiteSpace(e.MetaJson) ? EmptyMeta : e.MetaJson, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+    };
+
+    public static FeedbackEntryDto ToDto(this FeedbackEntry e) => new()
+    {
+        Id = e.Id, CreatedAt = e.CreatedAt, Kind = e.Kind, Region = e.Region, Severity = e.Severity, ExerciseId = e.ExerciseId,
+        SessionId = e.SessionId, Note = e.Note, Status = e.Status, ReviewOn = e.ReviewOn, ResolvedAt = e.ResolvedAt,
+        Source = e.Source, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
     };
 
     public static WorkoutSessionDto ToDto(this WorkoutSession e) => new()
@@ -109,6 +116,39 @@ public static class SyncMapper
         {
             Items = (b.Items ?? []).Select(i => i with { Notes = i.Notes ?? "" }).ToList(),
         }));
+        e.MetaJson = NormalizeMetaJson(d.MetaJson);
+    }
+
+    public const string EmptyMeta = "{}";
+
+    /// <summary>A JSON object of at most <see cref="Len.Meta"/> chars; anything else (null, invalid, too long) becomes <c>{}</c>.</summary>
+    public static string NormalizeMetaJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > Len.Meta) return EmptyMeta;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Object ? json : EmptyMeta;
+        }
+        catch (JsonException)
+        {
+            return EmptyMeta;
+        }
+    }
+
+    public static void Apply(this FeedbackEntry e, FeedbackEntryDto d, string? sessionId)
+    {
+        e.CreatedAt = d.CreatedAt ?? d.UpdatedAt;
+        e.Kind = d.Kind;
+        e.Region = d.Region;
+        e.Severity = d.Severity;
+        e.ExerciseId = d.ExerciseId;
+        e.SessionId = sessionId;
+        e.Note = Trunc(d.Note, Len.Text);
+        e.Status = d.Status;
+        e.ReviewOn = d.ReviewOn;
+        e.ResolvedAt = d.ResolvedAt;
+        e.Source = d.Source;
     }
 
     public static void Apply(this WorkoutSession e, WorkoutSessionDto d, string? plannedWorkoutId)

@@ -5,12 +5,12 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
 import '../../data/repositories/repository.dart';
-import '../../domain/catalog.dart';
 import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
 import '../../widgets/charts.dart';
 import '../../widgets/common.dart';
+import '../balance/balance_screen.dart';
 
 class StatsScreen extends ConsumerWidget {
   const StatsScreen({super.key});
@@ -54,17 +54,6 @@ class StatsScreen extends ConsumerWidget {
             final now = DateTime.now();
             return d.year == now.year && d.month == now.month;
           }).length;
-          final recentSets = sets.where((s) => s.date.isAfter(DateTime.now().subtract(const Duration(days: 28))));
-          final muscleSets = <String, int>{};
-          for (final s in recentSets) {
-            final e = catalog.exercise(s.exerciseId);
-            if (e == null || !(e.category == 'strength' || e.category == 'power')) continue;
-            for (final m in e.primary) {
-              muscleSets[m] = (muscleSets[m] ?? 0) + 1;
-            }
-          }
-          final muscles = muscleSets.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-          final maxMuscle = muscles.isEmpty ? 1 : muscles.first.value;
           final weights = body.where((b) => b.weightKg != null).toList().reversed.toList();
 
           return ListView(padding: pagePadding(context), children: [
@@ -114,30 +103,8 @@ class StatsScreen extends ConsumerWidget {
                   ),
               ]),
             ),
-            if (muscles.isNotEmpty) ...[
-              const SectionTitle('Muscle focus (last 4 weeks, sets)'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(children: [
-                    for (final m in muscles.take(10))
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(children: [
-                          SizedBox(width: 100, child: Text(prettyMuscle(m.key), style: t.textTheme.bodySmall)),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: LinearProgressIndicator(value: m.value / maxMuscle, minHeight: 10),
-                            ),
-                          ),
-                          SizedBox(width: 32, child: Text('${m.value}', textAlign: TextAlign.end, style: t.textTheme.bodySmall)),
-                        ]),
-                      ),
-                  ]),
-                ),
-              ),
-            ],
+            const SizedBox(height: Gap.md),
+            const BalanceSummaryCard(),
             SectionTitle('Body weight',
                 trailing: TextButton(onPressed: () => context.push('/body'), child: const Text('Open'))),
             Card(

@@ -56,6 +56,9 @@ class PlannedWorkouts extends Table with SyncColumns {
   TextColumn get coachNote => text().withDefault(const Constant(''))();
   TextColumn get blocksJson => text()();
 
+  /// Plan metadata (program position, variant, focus, rationale, changes) as a JSON object; added in schema v2.
+  TextColumn get metaJson => text().withDefault(const Constant('{}'))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -110,6 +113,36 @@ class BodyMetrics extends Table with SyncColumns {
   Set<Column> get primaryKey => {id};
 }
 
+/// Feedback memory (pain, discomfort, exercise feedback, check-ins); see docs/IMPROVEMENT-PLAN.md §4.3.
+@DataClassName('FeedbackEntry')
+class FeedbackEntries extends Table with SyncColumns {
+  TextColumn get id => text()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  /// pain | discomfort | too_easy | too_hard | unavailable | dislike | like | note
+  TextColumn get kind => text()();
+  TextColumn get region => text().nullable()();
+
+  /// 1 mild, 2 moderate, 3 severe (pain/discomfort only).
+  IntColumn get severity => integer().nullable()();
+  TextColumn get exerciseId => text().nullable()();
+  TextColumn get sessionId => text().nullable()();
+  TextColumn get note => text().withDefault(const Constant(''))();
+
+  /// active | resolved
+  TextColumn get status => text().withDefault(const Constant('active'))();
+
+  /// yyyy-MM-dd; when the app asks "still an issue?".
+  TextColumn get reviewOn => text().nullable()();
+  DateTimeColumn get resolvedAt => dateTime().nullable()();
+
+  /// user | coach
+  TextColumn get source => text().withDefault(const Constant('user'))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class KeyValues extends Table {
   TextColumn get key => text()();
   TextColumn get value => text()();
@@ -126,6 +159,7 @@ class KeyValues extends Table {
   WorkoutSessions,
   SetLogs,
   BodyMetrics,
+  FeedbackEntries,
   KeyValues,
 ])
 class AppDatabase extends _$AppDatabase {
@@ -133,8 +167,12 @@ class AppDatabase extends _$AppDatabase {
 
   static QueryExecutor _open() => driftDatabase(name: 'wfit');
 
+  /// v1: initial schema. v2: `feedback_entries` table and `planned_workouts.meta_json`.
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  static final _feedbackStatusIndex = Index('idx_feedback_status',
+      'CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback_entries (status, deleted)');
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -143,6 +181,14 @@ class AppDatabase extends _$AppDatabase {
           await m.createIndex(Index('idx_sets_session', 'CREATE INDEX idx_sets_session ON set_logs (session_id)'));
           await m.createIndex(Index('idx_sets_exercise', 'CREATE INDEX idx_sets_exercise ON set_logs (exercise_id)'));
           await m.createIndex(Index('idx_planned_date', 'CREATE INDEX idx_planned_date ON planned_workouts (date)'));
+          await m.createIndex(_feedbackStatusIndex);
+        },
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(feedbackEntries);
+            await m.createIndex(_feedbackStatusIndex);
+            await m.addColumn(plannedWorkouts, plannedWorkouts.metaJson);
+          }
         },
       );
 

@@ -26,7 +26,8 @@ public sealed record CatalogExerciseItem(
     string? Badminton,
     IReadOnlyList<string> Instructions,
     string? Tip,
-    IReadOnlyList<string>? Mistakes = null)
+    IReadOnlyList<string>? Mistakes = null,
+    IReadOnlyList<string>? Stress = null)
 {
     public const string FloorEquipmentId = "mat";
 
@@ -44,7 +45,7 @@ public sealed class CatalogService
 
     private static readonly JsonSerializerOptions ReadOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public CatalogService() : this(LoadEmbedded()) { }
+    public CatalogService() : this(EmbeddedJson()) { }
 
     public CatalogService(string json)
     {
@@ -69,7 +70,7 @@ public sealed class CatalogService
     public bool IsAlwaysAvailable(string equipmentId) =>
         equipmentId == BodyweightId || (EquipmentById.TryGetValue(equipmentId, out var eq) && eq.AlwaysAvailable);
 
-    private static string LoadEmbedded()
+    internal static string EmbeddedJson()
     {
         using var stream = typeof(CatalogService).Assembly.GetManifestResourceStream(ResourceName)
             ?? throw new InvalidOperationException($"Embedded resource '{ResourceName}' not found.");

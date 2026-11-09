@@ -15,6 +15,7 @@ import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/report_issue_sheet.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'swap_sheet.dart';
 import 'workout_timer.dart';
@@ -77,6 +78,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       }
     }
     final openKey = _expandedKey ?? firstOpen;
+    final currentExerciseId = openKey?.substring(openKey.indexOf(':') + 1);
 
     final children = <Widget>[];
     order = 0;
@@ -136,8 +138,15 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             PopupMenuButton<String>(
               onSelected: (v) async {
                 if (v == 'discard') await _discard(session);
+                if (v == 'report' && context.mounted) {
+                  await showReportIssueSheet(context,
+                      exerciseId: currentExerciseId, plannedId: plan?.id, sessionId: session.id);
+                }
               },
               itemBuilder: (_) => const [
+                PopupMenuItem(
+                    value: 'report',
+                    child: ListTile(leading: Icon(Icons.report_problem_outlined), title: Text('Report an issue'))),
                 PopupMenuItem(value: 'discard', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Discard workout'))),
               ],
             ),
@@ -200,6 +209,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
 
     ref.read(occupiedEquipmentProvider.notifier).clear();
     unawaited(ref.read(syncControllerProvider.notifier).syncNow());
+    unawaited(ref.read(coachServiceProvider).pregenerateNext());
     if (!mounted) return;
     await showDialog<void>(
       context: context,

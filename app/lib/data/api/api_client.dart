@@ -118,14 +118,19 @@ class ApiClient {
   Future<Map<String, dynamic>> sync(Map<String, dynamic> request) =>
       post('sync', request, timeout: const Duration(seconds: 120));
 
+  // AI endpoints are stateless (the coach brief travels in the request); the server allows a fallback attempt.
+  static const aiTimeout = Duration(seconds: 130);
+
   Future<Map<String, dynamic>> generateWorkout(Map<String, dynamic> request) =>
-      post('ai/workout', request, timeout: const Duration(seconds: 120));
+      post('ai/workout', request, timeout: aiTimeout);
+
+  Future<Map<String, dynamic>> adjust(Map<String, dynamic> request) => post('ai/adjust', request, timeout: aiTimeout);
 
   Future<Map<String, dynamic>> swap(Map<String, dynamic> request) =>
       post('ai/swap', request, timeout: const Duration(seconds: 90));
 
-  Future<Map<String, dynamic>> insights({bool force = false}) =>
-      post('ai/insights', {'force': force}, timeout: const Duration(seconds: 120));
+  Future<Map<String, dynamic>> insights(Map<String, dynamic> brief) =>
+      post('ai/insights', {'brief': brief}, timeout: aiTimeout);
 
   Future<Map<String, dynamic>> usage() => get('ai/usage', timeout: const Duration(seconds: 90));
 }

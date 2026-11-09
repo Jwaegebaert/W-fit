@@ -125,6 +125,7 @@ class Repository {
     required String coachNote,
     required List<PlanBlock> blocks,
     int? estimatedMinutes,
+    String? metaJson,
   }) async {
     final pid = id ?? newId();
     // Only one open plan per date: supersede any other planned workout on the same day.
@@ -141,16 +142,26 @@ class Repository {
           coachNote: Value(coachNote),
           estimatedMinutes: Value(estimatedMinutes ?? estimateMinutes(blocks)),
           blocksJson: jsonEncode(blocks.map((b) => b.toJson()).toList()),
+          // Null keeps the stored meta when re-saving an existing id ('{}' for a new row).
+          metaJson: metaJson == null ? const Value.absent() : Value(metaJson),
           updatedAt: _now,
           dirty: const Value(true),
         ));
     return pid;
   }
 
-  Future<void> updatePlannedBlocks(String id, List<PlanBlock> blocks) =>
+  Future<void> updatePlannedBlocks(String id, List<PlanBlock> blocks, {String? metaJson}) =>
       (db.update(db.plannedWorkouts)..where((t) => t.id.equals(id))).write(PlannedWorkoutsCompanion(
         blocksJson: Value(jsonEncode(blocks.map((b) => b.toJson()).toList())),
         estimatedMinutes: Value(estimateMinutes(blocks)),
+        metaJson: metaJson == null ? const Value.absent() : Value(metaJson),
+        updatedAt: Value(_now),
+        dirty: const Value(true),
+      ));
+
+  Future<void> updatePlannedMeta(String id, String metaJson) =>
+      (db.update(db.plannedWorkouts)..where((t) => t.id.equals(id))).write(PlannedWorkoutsCompanion(
+        metaJson: Value(metaJson),
         updatedAt: Value(_now),
         dirty: const Value(true),
       ));
@@ -164,6 +175,24 @@ class Repository {
 
   static List<PlanBlock> decodeBlocks(String json) =>
       (jsonDecode(json) as List).map((e) => PlanBlock.fromJson(e as Map<String, dynamic>)).toList();
+
+  /// Non-deleted planned workouts of any status (planned, completed, …) dated within [from]..[to] (inclusive),
+  /// newest first. Superseded plans are soft-deleted and therefore excluded.
+  Future<List<PlannedWorkout>> plannedHistory({DateTime? from, DateTime? to, bool completedOnly = false, int? limit}) {
+    final q = db.select(db.plannedWorkouts)..where((t) => t.deleted.equals(false));
+    if (from != null) q.where((t) => t.date.isBiggerOrEqualValue(dateKey(from)));
+    if (to != null) q.where((t) => t.date.isSmallerOrEqualValue(dateKey(to)));
+    if (completedOnly) q.where((t) => t.status.equals('completed'));
+    q.orderBy([(t) => OrderingTerm.desc(t.date), (t) => OrderingTerm.desc(t.updatedAt)]);
+    if (limit != null) q.limit(limit);
+    return q.get();
+  }
+
+  /// Planned workouts of the last [days] days up to and including today ([now]), newest first.
+  Future<List<PlannedWorkout>> recentPlanned({int days = 84, DateTime? now, bool completedOnly = false}) {
+    final today = now ?? DateTime.now();
+    return plannedHistory(from: today.subtract(Duration(days: days)), to: today, completedOnly: completedOnly);
+  }
 
   // ---------------- sessions ----------------
   Future<String> startSession({String? plannedWorkoutId, required DayType day, required String title}) async {
@@ -284,7 +313,11 @@ class Repository {
     if (exerciseId != null) q.where(db.setLogs.exerciseId.equals(exerciseId));
     if (since != null) q.where(db.workoutSessions.startedAt.isBiggerOrEqualValue(since));
     if (excludeSessionId != null) q.where(db.setLogs.sessionId.equals(excludeSessionId).not());
-    q.orderBy([OrderingTerm.desc(db.workoutSessions.startedAt), OrderingTerm.asc(db.setLogs.setNumber)]);
+    q.orderBy([
+      OrderingTerm.desc(db.workoutSessions.startedAt),
+      OrderingTerm.asc(db.setLogs.exerciseOrder),
+      OrderingTerm.asc(db.setLogs.setNumber),
+    ]);
     final rows = await q.get();
     return rows.map((r) {
       final s = r.readTable(db.setLogs);
@@ -297,6 +330,8 @@ class Repository {
         reps: s.reps,
         durationSeconds: s.durationSeconds,
         completed: s.completed,
+        section: s.section,
+        rir: s.rir,
       );
     }).toList();
   }
@@ -328,4 +363,143 @@ class Repository {
 
   Future<void> deleteBodyMetric(String id) => (db.update(db.bodyMetrics)..where((t) => t.id.equals(id))).write(
       BodyMetricsCompanion(deleted: const Value(true), updatedAt: Value(_now), dirty: const Value(true)));
+
+  /// Most recent recorded body weight (kg), or null when none was logged.
+  Future<double?> latestBodyWeight() async {
+    final row = await (db.select(db.bodyMetrics)
+          ..where((t) => t.deleted.equals(false) & t.weightKg.isNotNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.date), (t) => OrderingTerm.desc(t.updatedAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    return row?.weightKg;
+  }
+
+  // ---------------- feedback memory (docs/IMPROVEMENT-PLAN.md §4.3) ----------------
+  static const feedbackActive = 'active';
+  static const feedbackResolved = 'resolved';
+
+  /// Kinds that describe a limitation and get periodic check-ins.
+  static const checkInKinds = {'pain', 'discomfort'};
+  static const maxFeedbackNote = 2000;
+
+  /// Default check-in delay in days: pain 7, discomfort 14, otherwise none.
+  static int? defaultReviewDays(String kind) => switch (kind) {
+        'pain' => 7,
+        'discomfort' => 14,
+        _ => null,
+      };
+
+  static String _clampNote(String note) => note.length > maxFeedbackNote ? note.substring(0, maxFeedbackNote) : note;
+
+  /// Records feedback and returns its id. Without [reviewOn], pain/discomfort get the default check-in date.
+  Future<String> addFeedback({
+    String? id,
+    required String kind,
+    String? region,
+    int? severity,
+    String? exerciseId,
+    String? sessionId,
+    String note = '',
+    DateTime? reviewOn,
+    String source = 'user',
+    DateTime? createdAt,
+  }) async {
+    final fid = id ?? newId();
+    final now = _now;
+    final days = defaultReviewDays(kind);
+    final review = reviewOn ?? (days == null ? null : DateTime.now().add(Duration(days: days)));
+    await db.into(db.feedbackEntries).insertOnConflictUpdate(FeedbackEntriesCompanion.insert(
+          id: fid,
+          createdAt: (createdAt ?? now).toUtc(),
+          kind: kind,
+          region: Value(region),
+          severity: Value(severity),
+          exerciseId: Value(exerciseId),
+          sessionId: Value(sessionId),
+          note: Value(_clampNote(note)),
+          status: const Value(feedbackActive),
+          reviewOn: Value(review == null ? null : dateKey(review)),
+          resolvedAt: const Value(null),
+          source: Value(source),
+          updatedAt: now,
+          deleted: const Value(false),
+          dirty: const Value(true),
+        ));
+    return fid;
+  }
+
+  /// Applies the present fields of [changes] to entry [id] (the id itself is never changed).
+  Future<void> updateFeedback(String id, FeedbackEntriesCompanion changes) =>
+      (db.update(db.feedbackEntries)..where((t) => t.id.equals(id))).write(changes.copyWith(
+        id: const Value.absent(),
+        note: changes.note.present ? Value(_clampNote(changes.note.value)) : const Value.absent(),
+        updatedAt: Value(_now),
+        dirty: const Value(true),
+      ));
+
+  Future<void> resolveFeedback(String id, {DateTime? at}) => updateFeedback(
+      id,
+      FeedbackEntriesCompanion(
+        status: const Value(feedbackResolved),
+        resolvedAt: Value((at ?? _now).toUtc()),
+      ));
+
+  /// "Still an issue": keeps the entry active and asks again on [until] (default: the kind's delay, else 7 days).
+  Future<void> postponeCheckIn(String id, {DateTime? until}) async {
+    final entry = await feedbackById(id);
+    if (entry == null) return;
+    final next = until ?? DateTime.now().add(Duration(days: defaultReviewDays(entry.kind) ?? 7));
+    await updateFeedback(
+        id,
+        FeedbackEntriesCompanion(
+          status: const Value(feedbackActive),
+          resolvedAt: const Value(null),
+          reviewOn: Value(dateKey(next)),
+        ));
+  }
+
+  Future<void> deleteFeedback(String id) => (db.update(db.feedbackEntries)..where((t) => t.id.equals(id))).write(
+      FeedbackEntriesCompanion(deleted: const Value(true), updatedAt: Value(_now), dirty: const Value(true)));
+
+  Future<FeedbackEntry?> feedbackById(String id) =>
+      (db.select(db.feedbackEntries)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  SimpleSelectStatement<$FeedbackEntriesTable, FeedbackEntry> _activeFeedbackQuery() => db.select(db.feedbackEntries)
+    ..where((t) => t.deleted.equals(false) & t.status.equals(feedbackActive))
+    ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
+
+  /// Active (unresolved) entries of every kind, newest first.
+  Stream<List<FeedbackEntry>> watchActiveFeedback() => _activeFeedbackQuery().watch();
+
+  Future<List<FeedbackEntry>> activeFeedback() => _activeFeedbackQuery().get();
+
+  /// Entries of every kind and status created at or after [since], newest first.
+  Future<List<FeedbackEntry>> feedbackSince(DateTime since) => (db.select(db.feedbackEntries)
+        ..where((t) => t.deleted.equals(false) & t.createdAt.isBiggerOrEqualValue(since))
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      .get();
+
+  /// Entries (any status unless [activeOnly]) about one exercise, newest first.
+  Future<List<FeedbackEntry>> feedbackForExercise(String exerciseId, {bool activeOnly = false}) {
+    final q = db.select(db.feedbackEntries)
+      ..where((t) => t.deleted.equals(false) & t.exerciseId.equals(exerciseId))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
+    if (activeOnly) q.where((t) => t.status.equals(feedbackActive));
+    return q.get();
+  }
+
+  SimpleSelectStatement<$FeedbackEntriesTable, FeedbackEntry> _dueCheckInsQuery(DateTime today) =>
+      db.select(db.feedbackEntries)
+        ..where((t) =>
+            t.deleted.equals(false) &
+            t.status.equals(feedbackActive) &
+            t.kind.isIn(checkInKinds) &
+            t.reviewOn.isNotNull() &
+            t.reviewOn.isSmallerOrEqualValue(dateKey(today)))
+        ..orderBy([(t) => OrderingTerm.asc(t.reviewOn), (t) => OrderingTerm.asc(t.createdAt)]);
+
+  /// Active pain/discomfort entries whose check-in date is on or before [today] (local date).
+  Future<List<FeedbackEntry>> dueCheckIns(DateTime today) => _dueCheckInsQuery(today).get();
+
+  Stream<List<FeedbackEntry>> watchDueCheckIns(DateTime today) => _dueCheckInsQuery(today).watch();
 }

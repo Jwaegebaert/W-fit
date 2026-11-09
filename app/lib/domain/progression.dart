@@ -12,6 +12,8 @@ class LoggedSet {
     this.reps,
     this.durationSeconds,
     this.completed = true,
+    this.section,
+    this.rir,
   });
 
   final String sessionId;
@@ -21,6 +23,13 @@ class LoggedSet {
   final int? reps;
   final int? durationSeconds;
   final bool completed;
+
+  /// Plan section name (`warmup` | `main` | `core` | `cooldown`) when known. Warm-up and cool-down sets never
+  /// count as working sets.
+  final String? section;
+
+  /// Reps in reserve reported for the set, when captured.
+  final int? rir;
 
   double get volume => (weightKg ?? 0) * (reps ?? 0);
 }
@@ -47,10 +56,68 @@ class ProgressionAdvice {
   final String? lastSummary;
 }
 
+/// Human label for a target RIR, e.g. "2 reps in reserve".
+String rirPhrase(int rir) => rir == 1 ? '1–2 reps in reserve' : '$rir reps in reserve';
+
 /// Double progression for beginners.
 ///
 /// [history] contains completed sets for one exercise, grouped per session, most recent session first.
-ProgressionAdvice adviseProgression(Exercise e, List<List<LoggedSet>> history, {int? repMin, int? repMax}) {
+/// [repMin]/[repMax] override the catalog range (use the plan's prescription).
+///
+/// Optional v3 adjustments:
+/// * [deload] – deload week: ~90 % of the normal working weight, bottom of the rep range.
+/// * [incrementSteps] – feedback adjustment in weight increments (`too_hard` → −1, `too_easy` → +1).
+/// * [targetRir] – adds reps-in-reserve guidance to the message.
+/// * [holdOnStruggle] – keep the weight instead of the ~10 % reset after two sessions below the range (used for
+///   anchor lifts inside a block, where the deload / next block handles resets).
+ProgressionAdvice adviseProgression(
+  Exercise e,
+  List<List<LoggedSet>> history, {
+  int? repMin,
+  int? repMax,
+  bool deload = false,
+  int incrementSteps = 0,
+  int? targetRir,
+  bool holdOnStruggle = false,
+}) {
+  final base = _baseAdvice(e, history, repMin: repMin, repMax: repMax, holdOnStruggle: holdOnStruggle);
+  final lo = repMin ?? e.repMin ?? 8;
+  var weight = base.weightKg;
+  var reps = base.targetReps;
+  var message = base.message;
+
+  if (incrementSteps != 0 && weight != null && e.isWeighted) {
+    final adjusted = roundToStep(weight + incrementSteps * e.incrementKg, e.incrementKg);
+    weight = adjusted > 0 ? adjusted : weight;
+    message = incrementSteps < 0
+        ? 'Last time felt too hard – one step lighter (${_fmt(weight)} kg).'
+        : 'Last time felt too easy – one extra step (${_fmt(weight)} kg).';
+  } else if (incrementSteps != 0 && !e.isWeighted && history.isNotEmpty) {
+    message = incrementSteps < 0
+        ? 'Last time felt too hard – slow down and stop 3 reps short.'
+        : 'Last time felt too easy – add reps or slow the tempo.';
+  }
+
+  if (deload) {
+    if (weight != null && e.isWeighted) weight = roundToStep(weight * 0.9, e.incrementKg);
+    reps = history.isEmpty ? reps : lo;
+    message = weight != null
+        ? 'Deload: ~90 % load (${_fmt(weight)} kg), one set fewer, stop 3–4 reps short.'
+        : 'Deload: keep it light, one set fewer, stop 3–4 reps short.';
+  } else if (targetRir != null && history.isNotEmpty) {
+    message = '$message Stop with ~${rirPhrase(targetRir)}.';
+  }
+
+  return ProgressionAdvice(weightKg: weight, targetReps: reps, message: message, lastSummary: base.lastSummary);
+}
+
+ProgressionAdvice _baseAdvice(
+  Exercise e,
+  List<List<LoggedSet>> history, {
+  int? repMin,
+  int? repMax,
+  bool holdOnStruggle = false,
+}) {
   final lo = repMin ?? e.repMin ?? 8;
   final hi = repMax ?? e.repMax ?? 12;
   final sessions = history.where((s) => s.any((x) => x.completed && (x.reps ?? 0) > 0)).toList();
@@ -90,6 +157,18 @@ ProgressionAdvice adviseProgression(Exercise e, List<List<LoggedSet>> history, {
     );
   }
 
+  // Reported reps in reserve: every working set inside the range with ≥ 4 RIR means the load is too light.
+  final easy = working.length >= math.min(e.sets, 2) &&
+      working.every((x) => x.rir != null && x.rir! >= 4 && (x.reps ?? 0) >= lo);
+  if (easy) {
+    return ProgressionAdvice(
+      weightKg: roundToStep(topWeight + e.incrementKg, e.incrementKg),
+      targetReps: lo,
+      message: 'Last sets felt easy (4+ reps in reserve) – add ${_fmt(e.incrementKg)} kg.',
+      lastSummary: summary,
+    );
+  }
+
   bool struggled(List<LoggedSet> s) {
     final done = s.where((x) => x.completed && (x.reps ?? 0) > 0).toList();
     if (done.isEmpty) return false;
@@ -98,6 +177,14 @@ ProgressionAdvice adviseProgression(Exercise e, List<List<LoggedSet>> history, {
   }
 
   if (sessions.length >= 2 && struggled(sessions[0]) && struggled(sessions[1])) {
+    if (holdOnStruggle) {
+      return ProgressionAdvice(
+        weightKg: topWeight,
+        targetReps: lo,
+        message: 'Below $lo reps twice – keep ${_fmt(topWeight)} kg and own every rep; the deload resets the load.',
+        lastSummary: summary,
+      );
+    }
     return ProgressionAdvice(
       weightKg: roundToStep(topWeight * 0.9, e.incrementKg),
       targetReps: lo,

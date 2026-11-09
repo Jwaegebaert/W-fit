@@ -186,8 +186,131 @@ public class SyncServiceTests
         Assert.Equal("2026-11-03T19:00:00Z", doc.RootElement.GetProperty("serverTime").GetString());
         var changes = doc.RootElement.GetProperty("changes");
         Assert.Equal(JsonValueKind.Null, changes.GetProperty("profile").ValueKind);
-        foreach (var name in new[] { "equipment", "exercisePreferences", "plannedWorkouts", "sessions", "sets", "bodyMetrics" })
+        foreach (var name in new[] { "equipment", "exercisePreferences", "plannedWorkouts", "sessions", "sets", "bodyMetrics", "feedbackEntries" })
             Assert.Equal(JsonValueKind.Array, changes.GetProperty(name).ValueKind);
+    }
+
+    private static FeedbackEntryDto Feedback(string kind = "pain", string? region = "neck", int? severity = 2, string? exerciseId = null) => new()
+    {
+        Id = NewId(), CreatedAt = TestEnv.Now.AddHours(-1), Kind = kind, Region = region, Severity = severity, ExerciseId = exerciseId,
+        SessionId = NewId(), Note = "Neck stiff after shrugs", Status = "active", ReviewOn = new DateOnly(2026, 11, 16),
+        Source = "user", UpdatedAt = TestEnv.Now,
+    };
+
+    [Fact]
+    public async Task Feedback_entries_round_trip()
+    {
+        var entry = Feedback();
+        var resolved = Feedback("discomfort", "knee", 1, "leg-extension") with
+        {
+            Status = "resolved", ResolvedAt = TestEnv.Now, SessionId = null, Source = "coach", Note = new string('n', 2500),
+        };
+
+        var response = await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { FeedbackEntries = [entry, resolved] } }, default);
+
+        var pulled = response.Changes.FeedbackEntries.ToDictionary(f => f.Id);
+        Assert.Equal(2, pulled.Count);
+        var neck = pulled[entry.Id];
+        Assert.Equal(("pain", "neck", 2), (neck.Kind, neck.Region, neck.Severity!.Value));
+        Assert.Equal(entry.SessionId, neck.SessionId);
+        Assert.Equal(new DateOnly(2026, 11, 16), neck.ReviewOn);
+        Assert.Equal(TestEnv.Now.AddHours(-1), neck.CreatedAt);
+        Assert.Equal("Neck stiff after shrugs", neck.Note);
+        var knee = pulled[resolved.Id];
+        Assert.Equal(("resolved", "coach", "leg-extension"), (knee.Status, knee.Source, knee.ExerciseId));
+        Assert.Equal(TestEnv.Now, knee.ResolvedAt);
+        Assert.Null(knee.SessionId);
+        Assert.Equal(2000, knee.Note!.Length);
+    }
+
+    [Fact]
+    public async Task Invalid_feedback_entries_are_skipped()
+    {
+        var good = Feedback();
+        var noCreatedAt = Feedback("too_easy", null, null, "push-up") with { CreatedAt = null };
+        var response = await Service().SyncAsync(new SyncRequest
+        {
+            Changes = new SyncChanges
+            {
+                FeedbackEntries =
+                [
+                    good,
+                    noCreatedAt,
+                    Feedback() with { Id = "not-a-guid" },
+                    Feedback() with { SessionId = "not-a-guid" },
+                    Feedback("hungry"),
+                    Feedback() with { Status = "open" },
+                    Feedback() with { Source = "doctor" },
+                    Feedback(region: "toe"),
+                    Feedback(severity: 4),
+                    Feedback(severity: 0),
+                    Feedback(exerciseId: "push-up-9000"),
+                    Feedback("pain", region: null, severity: 2, exerciseId: null),
+                ],
+            },
+        }, default);
+
+        Assert.Equal(new[] { good.Id, noCreatedAt.Id }.Order(), response.Changes.FeedbackEntries.Select(f => f.Id).Order());
+        Assert.Equal(TestEnv.Now, response.Changes.FeedbackEntries.Single(f => f.Id == noCreatedAt.Id).CreatedAt); // defaults to updatedAt
+    }
+
+    [Fact]
+    public async Task Feedback_entries_use_last_write_wins_and_since()
+    {
+        var entry = Feedback();
+        var first = await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { FeedbackEntries = [entry] } }, default);
+
+        _time.Advance(TimeSpan.FromMinutes(5));
+        var resolved = entry with { Status = "resolved", ResolvedAt = _time.Now, UpdatedAt = _time.Now };
+        var stale = entry with { Note = "stale", UpdatedAt = TestEnv.Now.AddMinutes(-1) };
+        await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { FeedbackEntries = [resolved] } }, default);
+        await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { FeedbackEntries = [stale] } }, default);
+
+        var pull = await Service().SyncAsync(new SyncRequest { Since = first.ServerTime }, default);
+        var pulled = Assert.Single(pull.Changes.FeedbackEntries);
+        Assert.Equal("resolved", pulled.Status);
+        Assert.Equal("Neck stiff after shrugs", pulled.Note);
+    }
+
+    [Fact]
+    public async Task Planned_workout_meta_json_round_trips_and_invalid_meta_becomes_empty_object()
+    {
+        const string meta = """{"program":"Block 2 · Week 3 · Push B","variant":"B","deload":false,"focus":["biceps"],"rationale":["Biceps 3.5 of 4-10 sets"],"changes":[]}""";
+        PlannedWorkoutDto Plan(string? metaJson) => new()
+        {
+            Id = NewId(), Date = new DateOnly(2026, 11, 9), DayType = "push", Title = "Push B", Source = "ai", Status = "planned",
+            EstimatedMinutes = 58, UpdatedAt = TestEnv.Now, MetaJson = metaJson,
+            Blocks = [new WorkoutBlockDto { Section = "main", Items = [new WorkoutItemDto { ExerciseId = "machine-chest-press", Sets = 3 }] }],
+        };
+        var good = Plan(meta);
+        var missing = Plan(null);
+        var array = Plan("[1,2]");
+        var broken = Plan("{not json");
+        var tooLong = Plan($$"""{"rationale":["{{new string('x', 8000)}}"]}""");
+
+        var response = await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { PlannedWorkouts = [good, missing, array, broken, tooLong] } }, default);
+
+        var byId = response.Changes.PlannedWorkouts.ToDictionary(p => p.Id, p => p.MetaJson);
+        Assert.Equal(5, byId.Count);
+        Assert.Equal(meta, byId[good.Id]);
+        Assert.All(new[] { missing, array, broken, tooLong }, p => Assert.Equal("{}", byId[p.Id]));
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(response.Changes.PlannedWorkouts[0], JsonDefaults.Options));
+        Assert.Equal(JsonValueKind.String, doc.RootElement.GetProperty("metaJson").ValueKind);
+    }
+
+    [Fact]
+    public void Feedback_request_json_from_contract_deserializes()
+    {
+        const string json = """
+            { "since": null, "changes": { "feedbackEntries": [ { "id": "4c9a3f0e-55e4-4ab4-9a59-3b8c2f4f7d10", "createdAt": "2026-11-07T18:00:00Z",
+              "kind": "pain", "region": "neck", "severity": 2, "exerciseId": null, "sessionId": null, "note": "stiff", "status": "active",
+              "reviewOn": "2026-11-14", "resolvedAt": null, "source": "user", "updatedAt": "2026-11-07T18:00:00Z", "deleted": false } ] } }
+            """;
+        var request = JsonSerializer.Deserialize<SyncRequest>(json, JsonDefaults.Options)!;
+        var entry = request.Changes!.FeedbackEntries.Single();
+        Assert.Equal(new DateOnly(2026, 11, 14), entry.ReviewOn);
+        Assert.Equal(2, entry.Severity);
     }
 
     [Fact]

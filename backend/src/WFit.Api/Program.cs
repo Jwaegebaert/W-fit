@@ -1,3 +1,6 @@
+using Azure.Core;
+using Azure.Data.Tables;
+using Azure.Identity;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -50,13 +53,31 @@ builder.Services.AddDbContext<WFitDbContext>((sp, options) =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CatalogService>();
 builder.Services.AddSingleton<DatabaseInitializer>();
+var isLocal = builder.Environment.IsDevelopment(); // Core Tools sets AZURE_FUNCTIONS_ENVIRONMENT=Development
+builder.Services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential(new DefaultAzureCredentialOptions
+{
+    // Managed identity only exists in Azure; probing IMDS on a workstation can hang until the AI timeout.
+    ExcludeManagedIdentityCredential = isLocal,
+}));
 builder.Services.AddSingleton(sp => AiSettings.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<IAiClient, AzureOpenAiClient>();
+builder.Services.AddSingleton<IAiUsageStore>(sp =>
+{
+    var endpoint = AiUsageStoreConfig.ResolveTableEndpoint(sp.GetRequiredService<IConfiguration>());
+    if (endpoint is null)
+    {
+        sp.GetRequiredService<ILoggerFactory>().CreateLogger("WFit.Api.Ai.Usage")
+            .LogWarning("No AI usage table configured ({Setting}); using an in-memory usage store.", AiUsageStoreConfig.EndpointSetting);
+        return new InMemoryAiUsageStore();
+    }
+    var table = new TableClient(new Uri(endpoint), TableAiUsageStore.TableName, sp.GetRequiredService<TokenCredential>());
+    return new TableAiUsageStore(table, sp.GetRequiredService<ILogger<TableAiUsageStore>>());
+});
 
 builder.Services.AddScoped<SyncService>();
-builder.Services.AddScoped<TrainingDataReader>();
-builder.Services.AddScoped<AiUsageService>();
+builder.Services.AddScoped<AiGateway>();
 builder.Services.AddScoped<WorkoutAiService>();
+builder.Services.AddScoped<AdjustAiService>();
 builder.Services.AddScoped<SwapAiService>();
 builder.Services.AddScoped<InsightsService>();
 

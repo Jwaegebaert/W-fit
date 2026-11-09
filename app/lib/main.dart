@@ -32,9 +32,11 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Sync once the API config has loaded.
-    ref.read(apiConfigProvider.future).then((_) {
-      if (mounted) ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
+    // Warm the Function host and sync once the API config has loaded.
+    ref.read(apiConfigProvider.future).then((config) {
+      if (!mounted) return;
+      if (config.isConfigured) ref.read(apiClientProvider).health().ignore();
+      ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
     });
   }
 

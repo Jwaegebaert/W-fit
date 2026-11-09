@@ -69,6 +69,27 @@ public sealed record PlannedWorkoutDto : ISyncDto
     public int EstimatedMinutes { get; init; }
     public string CoachNote { get; init; } = "";
     public List<WorkoutBlockDto> Blocks { get; init; } = [];
+
+    /// <summary>Plan meta as a JSON object string (≤ 8000 chars), e.g. <c>{"program":"Block 2 · Week 3 · Push B",...}</c>.</summary>
+    public string? MetaJson { get; init; } = "{}";
+    public DateTimeOffset UpdatedAt { get; init; }
+    public bool Deleted { get; init; }
+}
+
+public sealed record FeedbackEntryDto : ISyncDto
+{
+    public string Id { get; init; } = "";
+    public DateTimeOffset? CreatedAt { get; init; }
+    public string Kind { get; init; } = "";
+    public string? Region { get; init; }
+    public int? Severity { get; init; }
+    public string? ExerciseId { get; init; }
+    public string? SessionId { get; init; }
+    public string? Note { get; init; } = "";
+    public string Status { get; init; } = "active";
+    public DateOnly? ReviewOn { get; init; }
+    public DateTimeOffset? ResolvedAt { get; init; }
+    public string Source { get; init; } = "user";
     public DateTimeOffset UpdatedAt { get; init; }
     public bool Deleted { get; init; }
 }
@@ -132,10 +153,11 @@ public sealed record SyncChanges
     public List<WorkoutSessionDto> Sessions { get; init; } = [];
     public List<SetLogDto> Sets { get; init; } = [];
     public List<BodyMetricDto> BodyMetrics { get; init; } = [];
+    public List<FeedbackEntryDto> FeedbackEntries { get; init; } = [];
 
     public int CountRecords() =>
         (Profile is null ? 0 : 1) + (Equipment?.Count ?? 0) + (ExercisePreferences?.Count ?? 0) + (PlannedWorkouts?.Count ?? 0)
-        + (Sessions?.Count ?? 0) + (Sets?.Count ?? 0) + (BodyMetrics?.Count ?? 0);
+        + (Sessions?.Count ?? 0) + (Sets?.Count ?? 0) + (BodyMetrics?.Count ?? 0) + (FeedbackEntries?.Count ?? 0);
 }
 
 public sealed record SyncRequest

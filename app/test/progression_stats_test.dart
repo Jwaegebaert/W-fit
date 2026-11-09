@@ -46,6 +46,58 @@ void main() {
       expect(roundToStep(41.3, 2.5), 42.5);
       expect(roundToStep(17.2, 2), 17);
     });
+
+    test('deload: ~90 % of the working weight, bottom of the range', () {
+      final a = adviseProgression(goblet, [
+        [s('a', 20, 10), s('a', 20, 10)],
+      ], deload: true);
+      expect(a.weightKg, 18);
+      expect(a.targetReps, 8);
+      expect(a.message, startsWith('Deload'));
+    });
+
+    test('too_hard / too_easy move the target by one increment', () {
+      final history = [
+        [s('a', 16, 10), s('a', 16, 10), s('a', 16, 9)],
+      ];
+      expect(adviseProgression(goblet, history, incrementSteps: -1).weightKg, 14);
+      expect(adviseProgression(goblet, history, incrementSteps: 1).weightKg, 18);
+      expect(adviseProgression(goblet, history, incrementSteps: -1).message, contains('too hard'));
+    });
+
+    test('anchors hold the weight instead of resetting inside a block', () {
+      final history = [
+        [s('b', 20, 7), s('b', 20, 6)],
+        [s('a', 20, 7), s('a', 20, 6)],
+      ];
+      expect(adviseProgression(goblet, history, holdOnStruggle: true).weightKg, 20);
+      expect(adviseProgression(goblet, history).weightKg, 18);
+    });
+
+    test('reported RIR: every set with 4+ reps in reserve adds weight; target RIR in the message', () {
+      final easy = adviseProgression(goblet, [
+        [
+          LoggedSet(sessionId: 'a', exerciseId: 'goblet-squat', date: DateTime(2026, 11, 1), weightKg: 16, reps: 9, rir: 4),
+          LoggedSet(sessionId: 'a', exerciseId: 'goblet-squat', date: DateTime(2026, 11, 1), weightKg: 16, reps: 9, rir: 5),
+        ],
+      ]);
+      expect(easy.weightKg, 18);
+      final rir = adviseProgression(goblet, [
+        [s('a', 16, 10), s('a', 16, 10)],
+      ], targetRir: 2);
+      expect(rir.message, endsWith('Stop with ~2 reps in reserve.'));
+      expect(rirPhrase(1), '1–2 reps in reserve');
+    });
+  });
+
+  group('dates', () {
+    test('dateOnly, daysBetween (DST-safe) and isoDate', () {
+      expect(dateOnly(DateTime(2026, 3, 29, 23, 30)), DateTime(2026, 3, 29));
+      expect(daysBetween(DateTime(2026, 3, 28, 20), DateTime(2026, 3, 30, 1)), 2);
+      expect(daysBetween(DateTime(2026, 10, 24), DateTime(2026, 10, 26)), 2);
+      expect(daysBetween(DateTime(2026, 11, 9), DateTime(2026, 11, 2)), -7);
+      expect(isoDate(DateTime(2026, 1, 5, 18)), '2026-01-05');
+    });
   });
 
   group('stats', () {

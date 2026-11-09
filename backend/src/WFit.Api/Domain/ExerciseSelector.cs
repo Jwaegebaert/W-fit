@@ -8,18 +8,25 @@ public sealed record SelectionContext(
     IReadOnlyDictionary<string, string> Preferences,
     IReadOnlySet<string> AlwaysAvailableEquipment)
 {
+    /// <summary>Active pain / discomfort reports; excluded exercises are never offered, penalised ones rank last.</summary>
+    public LimitationFilter Limitations { get; init; } = LimitationFilter.None;
+
     public static SelectionContext Create(
         CatalogService catalog,
         string? experience,
         IReadOnlyDictionary<string, bool>? equipmentAvailability = null,
         IEnumerable<string>? occupiedEquipment = null,
-        IReadOnlyDictionary<string, string>? preferences = null) =>
+        IReadOnlyDictionary<string, string>? preferences = null,
+        LimitationFilter? limitations = null) =>
         new(
             string.IsNullOrWhiteSpace(experience) ? Vocab.Experience.Beginner : experience,
             equipmentAvailability ?? new Dictionary<string, bool>(),
             new HashSet<string>(occupiedEquipment ?? [], StringComparer.Ordinal),
             preferences ?? new Dictionary<string, string>(),
-            new HashSet<string>(catalog.Equipment.Where(e => e.AlwaysAvailable).Select(e => e.Id).Append(CatalogService.BodyweightId), StringComparer.Ordinal));
+            new HashSet<string>(catalog.Equipment.Where(e => e.AlwaysAvailable).Select(e => e.Id).Append(CatalogService.BodyweightId), StringComparer.Ordinal))
+        {
+            Limitations = limitations ?? LimitationFilter.None,
+        };
 
     public string PreferenceOf(string exerciseId) =>
         Preferences.TryGetValue(exerciseId, out var p) ? p : Vocab.Preference.Neutral;
@@ -38,11 +45,12 @@ public static class ExerciseSelector
         return !ctx.EquipmentAvailability.TryGetValue(equipmentId, out var available) || available;
     }
 
-    /// <summary>Equipment, occupation, ban and difficulty checks (independent of the day type).</summary>
+    /// <summary>Equipment, occupation, ban, difficulty and limitation checks (independent of the day type).</summary>
     public static bool IsEligible(CatalogExerciseItem exercise, SelectionContext ctx) =>
         exercise.Equipment.All(eq => IsEquipmentUsable(eq, ctx))
         && ctx.PreferenceOf(exercise.Id) != Vocab.Preference.Banned
-        && exercise.Difficulty <= MaxDifficulty(ctx.Experience);
+        && exercise.Difficulty <= MaxDifficulty(ctx.Experience)
+        && !ctx.Limitations.Excludes(exercise);
 
     public static bool IsEligibleForDay(CatalogExerciseItem exercise, SelectionContext ctx, string dayType) =>
         exercise.Splits.Contains(dayType) && IsEligible(exercise, ctx);
@@ -68,6 +76,8 @@ public static class ExerciseSelector
         if (candidate.Difficulty > MaxDifficulty(ctx.Experience)) score -= 2;
         // Floor space is limited: standing / station options win for warm-up, core and cool-down swaps.
         if (!Vocab.IsMain(original.Category) && candidate.IsFloor) score -= SwapFloorPenalty;
+        // Mild pain / old discomfort: allowed only when nothing else fits.
+        score -= ctx.Limitations.Penalty(candidate);
         return score;
     }
 

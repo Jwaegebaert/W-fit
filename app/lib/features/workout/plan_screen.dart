@@ -8,10 +8,12 @@ import '../../data/api/api_client.dart';
 import '../../data/db/database.dart';
 import '../../data/repositories/repository.dart';
 import '../../domain/catalog.dart';
+import '../../domain/muscles.dart';
 import '../../domain/plan.dart';
 import '../../domain/progression.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
+import '../../widgets/report_issue_sheet.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'swap_sheet.dart';
 import 'workout_actions.dart';
@@ -100,12 +102,16 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             onSelected: (v) => switch (v) {
               'ai' => _regenerate(ai: true),
               'rules' => _regenerate(ai: false),
+              'report' => showReportIssueSheet(context, plannedId: plan.id),
               final d => _regenerate(ai: false, day: DayType.parse(d)),
             },
             itemBuilder: (_) => [
               if (aiConfigured)
                 const PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('Ask AI coach'))),
               const PopupMenuItem(value: 'rules', child: ListTile(leading: Icon(Icons.refresh), title: Text('Rebuild plan'))),
+              const PopupMenuItem(
+                  value: 'report',
+                  child: ListTile(leading: Icon(Icons.report_problem_outlined), title: Text('Report an issue'))),
               const PopupMenuDivider(),
               for (final d in DayType.values.where((d) => d != day))
                 PopupMenuItem(value: d.name, child: ListTile(leading: Icon(d.icon), title: Text('Switch to ${d.label} day'))),
@@ -137,6 +143,24 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                 ),
               ),
             ],
+            if (ref.watch(coachPreparingProvider) == plan.date)
+              Padding(
+                padding: const EdgeInsets.only(top: Gap.item),
+                child: Row(children: [
+                  const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: Gap.sm),
+                  Expanded(child: Text('Coach is preparing a refined plan…', style: t.textTheme.bodySmall)),
+                ]),
+              ),
+            _WhyCard(meta: PlanMeta.decode(plan.metaJson)),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => showReportIssueSheet(context, plannedId: plan.id),
+                icon: const Icon(Icons.report_problem_outlined),
+                label: const Text('Report an issue'),
+              ),
+            ),
             for (var b = 0; b < blocks.length; b++) ...[
               SectionTitle(
                 blocks[b].section.label,
@@ -162,6 +186,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                       onRemove: blocks[b].items.length > 1
                           ? () => ref.read(coachServiceProvider).removeItem(plan.id, b, i)
                           : null,
+                      onReport: () =>
+                          showReportIssueSheet(context, exerciseId: blocks[b].items[i].exerciseId, plannedId: plan.id),
                     ),
                 ]),
               ),
@@ -190,11 +216,13 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 }
 
 class _PlanItemTile extends ConsumerWidget {
-  const _PlanItemTile({required this.item, required this.section, required this.onSwap, this.onRemove});
+  const _PlanItemTile(
+      {required this.item, required this.section, required this.onSwap, required this.onReport, this.onRemove});
 
   final PlanItem item;
   final Section section;
   final VoidCallback onSwap;
+  final VoidCallback onReport;
   final VoidCallback? onRemove;
 
   @override
@@ -213,12 +241,52 @@ class _PlanItemTile extends ConsumerWidget {
       isThreeLine: item.notes.isNotEmpty,
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
         IconButton(tooltip: 'Swap', icon: const Icon(Icons.swap_horiz), onPressed: onSwap),
-        if (onRemove != null)
-          PopupMenuButton<String>(
-            onSelected: (_) => onRemove!(),
-            itemBuilder: (_) => const [PopupMenuItem(value: 'remove', child: Text('Remove from today'))],
-          ),
+        PopupMenuButton<String>(
+          onSelected: (v) => v == 'remove' ? onRemove!() : onReport(),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'report', child: Text('Report an issue')),
+            if (onRemove != null) const PopupMenuItem(value: 'remove', child: Text('Remove from today')),
+          ],
+        ),
       ]),
+    );
+  }
+}
+
+/// "Why this plan": program position, deload, focus muscles, rationale and changes from the plan meta.
+class _WhyCard extends ConsumerWidget {
+  const _WhyCard({required this.meta});
+
+  final PlanMeta meta;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (meta.isEmpty) return const SizedBox.shrink();
+    final t = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(top: Gap.item),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Why this plan', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: Gap.sm),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            if (meta.program.isNotEmpty) Pill(meta.program, icon: Icons.timeline),
+            if (meta.deload) Pill('Deload week', icon: Icons.battery_charging_full, color: t.colorScheme.tertiary),
+            for (final m in meta.focus)
+              Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), icon: Icons.center_focus_strong, color: Colors.amber.shade800),
+          ]),
+          for (final r in meta.rationale)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('•  '),
+                Expanded(child: Text(r, style: t.textTheme.bodyMedium)),
+              ]),
+            ),
+          for (final c in meta.changes) ChangeLine(change: c),
+        ]),
+      ),
     );
   }
 }

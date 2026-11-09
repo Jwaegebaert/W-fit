@@ -77,6 +77,14 @@ void main() {
     await settle(tester);
     expect(find.text('workouts total'), findsOneWidget);
 
+    debugPrint('STEP balance');
+    await tester.scrollUntilVisible(find.text('Muscle balance'), 300, scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('Muscle balance'));
+    await settle(tester);
+    expect(find.text('8-week balance'), findsOneWidget);
+    await tester.pageBack();
+    await settle(tester);
+
     debugPrint('STEP coach');
     await tester.tap(find.text('Coach'));
     await settle(tester);

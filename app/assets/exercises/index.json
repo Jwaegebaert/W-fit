@@ -16,6 +16,10 @@
       "frames": 2,
       "sourceId": "Arm_Circles"
     },
+    "back-extension-45": {
+      "frames": 2,
+      "sourceId": "Hyperextensions_Back_Extensions"
+    },
     "band-assisted-pull-up": {
       "frames": 2,
       "sourceId": "Band_Assisted_Pull-Up"
@@ -24,9 +28,17 @@
       "frames": 2,
       "sourceId": "External_Rotation_with_Band"
     },
+    "band-glute-kickback": {
+      "frames": 2,
+      "sourceId": "Hip_Extension_with_Bands"
+    },
     "band-pull-apart": {
       "frames": 2,
       "sourceId": "Band_Pull_Apart"
+    },
+    "bar-dip": {
+      "frames": 2,
+      "sourceId": "Dips_-_Triceps_Version"
     },
     "barbell-back-squat": {
       "frames": 2,
@@ -36,9 +48,17 @@
       "frames": 2,
       "sourceId": "Barbell_Bench_Press_-_Medium_Grip"
     },
+    "barbell-curl": {
+      "frames": 2,
+      "sourceId": "Barbell_Curl"
+    },
     "barbell-hip-thrust": {
       "frames": 2,
       "sourceId": "Barbell_Hip_Thrust"
+    },
+    "barbell-pullover": {
+      "frames": 2,
+      "sourceId": "Bent-Arm_Barbell_Pullover"
     },
     "barbell-romanian-deadlift": {
       "frames": 2,
@@ -48,9 +68,21 @@
       "frames": 2,
       "sourceId": "Bent_Over_Barbell_Row"
     },
+    "barbell-shrug": {
+      "frames": 2,
+      "sourceId": "Barbell_Shrug"
+    },
     "bench-dip": {
       "frames": 2,
       "sourceId": "Bench_Dips"
+    },
+    "bench-hamstring-stretch": {
+      "frames": 2,
+      "sourceId": "Standing_Gastrocnemius_Calf_Stretch"
+    },
+    "bent-over-dumbbell-row": {
+      "frames": 2,
+      "sourceId": "Bent_Over_Two-Dumbbell_Row"
     },
     "bike-easy": {
       "frames": 2,
@@ -68,6 +100,10 @@
       "frames": 2,
       "sourceId": "Split_Squat_with_Dumbbells"
     },
+    "butterfly-stretch": {
+      "frames": 2,
+      "sourceId": "Groin_and_Back_Stretch"
+    },
     "cable-biceps-curl": {
       "frames": 2,
       "sourceId": "Standing_Biceps_Cable_Curl"
@@ -76,9 +112,21 @@
       "frames": 2,
       "sourceId": "Cable_Crossover"
     },
+    "cable-crunch": {
+      "frames": 2,
+      "sourceId": "Cable_Crunch"
+    },
     "cable-external-rotation": {
       "frames": 2,
       "sourceId": "External_Rotation_with_Cable"
+    },
+    "cable-glute-kickback": {
+      "frames": 2,
+      "sourceId": "One-Legged_Cable_Kickback"
+    },
+    "cable-hip-adduction": {
+      "frames": 2,
+      "sourceId": "Cable_Hip_Adduction"
     },
     "cable-lateral-raise": {
       "frames": 2,
@@ -92,13 +140,33 @@
       "frames": 2,
       "sourceId": "Pull_Through"
     },
+    "cable-reverse-curl": {
+      "frames": 2,
+      "sourceId": "Reverse_Cable_Curl"
+    },
+    "cable-rope-hammer-curl": {
+      "frames": 2,
+      "sourceId": "Cable_Hammer_Curls_-_Rope_Attachment"
+    },
+    "cable-shrug": {
+      "frames": 2,
+      "sourceId": "Cable_Shrugs"
+    },
     "cable-triceps-pushdown": {
       "frames": 2,
       "sourceId": "Triceps_Pushdown"
     },
+    "cable-upright-row": {
+      "frames": 2,
+      "sourceId": "Upright_Cable_Row"
+    },
     "cable-woodchop": {
       "frames": 2,
       "sourceId": "Standing_Cable_Wood_Chop"
+    },
+    "cable-wrist-curl": {
+      "frames": 2,
+      "sourceId": "Seated_Two-Arm_Palms-Up_Low-Pulley_Wrist_Curl"
     },
     "calf-wall-stretch": {
       "frames": 2,
@@ -116,9 +184,37 @@
       "frames": 2,
       "sourceId": "Dumbbell_Incline_Row"
     },
+    "chest-supported-machine-row": {
+      "frames": 2,
+      "sourceId": "Leverage_Iso_Row"
+    },
+    "chest-supported-rear-delt-raise": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Lying_Rear_Lateral_Raise"
+    },
     "childs-pose": {
       "frames": 2,
       "sourceId": "Childs_Pose"
+    },
+    "chin-up": {
+      "frames": 2,
+      "sourceId": "Chin-Up"
+    },
+    "close-grip-bench-press": {
+      "frames": 2,
+      "sourceId": "Close-Grip_Barbell_Bench_Press"
+    },
+    "close-grip-lat-pulldown": {
+      "frames": 2,
+      "sourceId": "Close-Grip_Front_Lat_Pulldown"
+    },
+    "concentration-curl": {
+      "frames": 2,
+      "sourceId": "Concentration_Curls"
+    },
+    "conventional-deadlift": {
+      "frames": 2,
+      "sourceId": "Barbell_Deadlift"
     },
     "cross-body-shoulder-stretch": {
       "frames": 2,
@@ -128,6 +224,10 @@
       "frames": 2,
       "sourceId": "Dead_Bug"
     },
+    "donkey-kick": {
+      "frames": 2,
+      "sourceId": "Glute_Kickback"
+    },
     "dumbbell-bench-press": {
       "frames": 2,
       "sourceId": "Dumbbell_Bench_Press"
@@ -136,9 +236,21 @@
       "frames": 2,
       "sourceId": "Dumbbell_Bicep_Curl"
     },
+    "dumbbell-chest-fly": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Flyes"
+    },
     "dumbbell-lateral-raise": {
       "frames": 2,
       "sourceId": "Side_Lateral_Raise"
+    },
+    "dumbbell-preacher-curl": {
+      "frames": 2,
+      "sourceId": "One_Arm_Dumbbell_Preacher_Curl"
+    },
+    "dumbbell-pullover": {
+      "frames": 2,
+      "sourceId": "Straight-Arm_Dumbbell_Pullover"
     },
     "dumbbell-reverse-lunge": {
       "frames": 2,
@@ -148,9 +260,33 @@
       "frames": 2,
       "sourceId": "Stiff-Legged_Dumbbell_Deadlift"
     },
+    "dumbbell-scaption-raise": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Scaption"
+    },
+    "dumbbell-shrug": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Shrug"
+    },
     "dumbbell-step-up": {
       "frames": 2,
       "sourceId": "Dumbbell_Step_Ups"
+    },
+    "dumbbell-sumo-squat": {
+      "frames": 2,
+      "sourceId": "Plie_Dumbbell_Squat"
+    },
+    "dumbbell-triceps-kickback": {
+      "frames": 2,
+      "sourceId": "Tricep_Dumbbell_Kickback"
+    },
+    "dumbbell-walking-lunge": {
+      "frames": 2,
+      "sourceId": "Dumbbell_Lunges"
+    },
+    "dynamic-chest-opener": {
+      "frames": 2,
+      "sourceId": "Dynamic_Chest_Stretch"
     },
     "elliptical-easy": {
       "frames": 2,
@@ -164,6 +300,14 @@
       "frames": 2,
       "sourceId": "EZ-Bar_Curl"
     },
+    "ez-bar-preacher-curl": {
+      "frames": 2,
+      "sourceId": "Preacher_Curl"
+    },
+    "ez-bar-skull-crusher": {
+      "frames": 2,
+      "sourceId": "EZ-Bar_Skullcrusher"
+    },
     "face-pull": {
       "frames": 2,
       "sourceId": "Face_Pull"
@@ -176,9 +320,21 @@
       "frames": 2,
       "sourceId": "Rhomboids-SMR"
     },
+    "front-squat": {
+      "frames": 2,
+      "sourceId": "Front_Barbell_Squat"
+    },
     "glute-bridge": {
       "frames": 2,
       "sourceId": "Butt_Lift_Bridge"
+    },
+    "good-morning": {
+      "frames": 2,
+      "sourceId": "Good_Morning"
+    },
+    "hack-squat": {
+      "frames": 2,
+      "sourceId": "Hack_Squat"
     },
     "half-kneeling-hip-flexor-stretch": {
       "frames": 2,
@@ -196,17 +352,37 @@
       "frames": 2,
       "sourceId": "Hanging_Leg_Raise"
     },
+    "high-to-low-cable-fly": {
+      "frames": 2,
+      "sourceId": "Cable_Crossover"
+    },
     "hip-abduction-machine": {
       "frames": 2,
       "sourceId": "Thigh_Abductor"
+    },
+    "hip-adduction-machine": {
+      "frames": 2,
+      "sourceId": "Thigh_Adductor"
     },
     "inchworm": {
       "frames": 2,
       "sourceId": "Inchworm"
     },
+    "incline-barbell-bench-press": {
+      "frames": 2,
+      "sourceId": "Barbell_Incline_Bench_Press_-_Medium_Grip"
+    },
+    "incline-dumbbell-curl": {
+      "frames": 2,
+      "sourceId": "Incline_Dumbbell_Curl"
+    },
     "incline-dumbbell-press": {
       "frames": 2,
       "sourceId": "Incline_Dumbbell_Press"
+    },
+    "incline-push-up": {
+      "frames": 2,
+      "sourceId": "Incline_Push-Up"
     },
     "inverted-row": {
       "frames": 2,
@@ -219,6 +395,14 @@
     "kettlebell-goblet-squat": {
       "frames": 2,
       "sourceId": "Goblet_Squat"
+    },
+    "knee-to-chest-stretch": {
+      "frames": 2,
+      "sourceId": "One_Knee_To_Chest"
+    },
+    "kneeling-cable-oblique-crunch": {
+      "frames": 2,
+      "sourceId": "Kneeling_Cable_Crunch_With_Alternating_Oblique_Twists"
     },
     "landmine-rotation": {
       "frames": 2,
@@ -236,6 +420,14 @@
       "frames": 2,
       "sourceId": "Leg_Press"
     },
+    "leg-press-calf-raise": {
+      "frames": 2,
+      "sourceId": "Calf_Press_On_The_Leg_Press_Machine"
+    },
+    "leg-swings": {
+      "frames": 2,
+      "sourceId": "Front_Leg_Raises"
+    },
     "lying-leg-curl": {
       "frames": 2,
       "sourceId": "Lying_Leg_Curls"
@@ -243,6 +435,14 @@
     "machine-chest-press": {
       "frames": 2,
       "sourceId": "Leverage_Chest_Press"
+    },
+    "machine-decline-chest-press": {
+      "frames": 2,
+      "sourceId": "Leverage_Decline_Chest_Press"
+    },
+    "machine-incline-chest-press": {
+      "frames": 2,
+      "sourceId": "Leverage_Incline_Chest_Press"
     },
     "machine-shoulder-press": {
       "frames": 2,
@@ -260,6 +460,10 @@
       "frames": 2,
       "sourceId": "V-Bar_Pulldown"
     },
+    "nordic-curl": {
+      "frames": 2,
+      "sourceId": "Floor_Glute-Ham_Raise"
+    },
     "one-arm-dumbbell-row": {
       "frames": 2,
       "sourceId": "One-Arm_Dumbbell_Row"
@@ -267,6 +471,10 @@
     "overhead-dumbbell-triceps-extension": {
       "frames": 2,
       "sourceId": "Standing_Dumbbell_Triceps_Extension"
+    },
+    "pallof-press-cable": {
+      "frames": 2,
+      "sourceId": "Pallof_Press_With_Rotation"
     },
     "pec-deck-fly": {
       "frames": 2,
@@ -280,9 +488,21 @@
       "frames": 2,
       "sourceId": "Plank"
     },
+    "pull-up": {
+      "frames": 2,
+      "sourceId": "Pullups"
+    },
     "push-up": {
       "frames": 2,
       "sourceId": "Pushups"
+    },
+    "rear-delt-cable-fly": {
+      "frames": 2,
+      "sourceId": "Cable_Rear_Delt_Fly"
+    },
+    "reverse-barbell-curl": {
+      "frames": 2,
+      "sourceId": "Reverse_Barbell_Curl"
     },
     "reverse-crunch": {
       "frames": 2,
@@ -292,33 +512,101 @@
       "frames": 2,
       "sourceId": "Seated_Bent-Over_Rear_Delt_Raise"
     },
+    "rope-triceps-pushdown": {
+      "frames": 2,
+      "sourceId": "Triceps_Pushdown_-_Rope_Attachment"
+    },
     "rowing-easy": {
       "frames": 2,
       "sourceId": "Rowing_Stationary"
+    },
+    "scapular-pull-up": {
+      "frames": 2,
+      "sourceId": "Scapular_Pull-Up"
+    },
+    "seated-arnold-press": {
+      "frames": 2,
+      "sourceId": "Arnold_Dumbbell_Press"
     },
     "seated-cable-row": {
       "frames": 2,
       "sourceId": "Seated_Cable_Rows"
     },
+    "seated-calf-raise": {
+      "frames": 2,
+      "sourceId": "Seated_Calf_Raise"
+    },
     "seated-dumbbell-shoulder-press": {
       "frames": 2,
       "sourceId": "Seated_Dumbbell_Press"
+    },
+    "seated-dumbbell-wrist-curl": {
+      "frames": 2,
+      "sourceId": "Seated_Dumbbell_Palms-Up_Wrist_Curl"
+    },
+    "seated-leg-curl": {
+      "frames": 2,
+      "sourceId": "Seated_Leg_Curl"
+    },
+    "seated-reverse-wrist-curl": {
+      "frames": 2,
+      "sourceId": "Seated_Dumbbell_Palms-Down_Wrist_Curl"
+    },
+    "seated-thoracic-rotation": {
+      "frames": 2,
+      "sourceId": "Spinal_Stretch"
     },
     "side-plank": {
       "frames": 2,
       "sourceId": "Side_Bridge"
     },
+    "single-arm-cable-pushdown": {
+      "frames": 2,
+      "sourceId": "Cable_One_Arm_Tricep_Extension"
+    },
+    "single-arm-lat-pulldown": {
+      "frames": 2,
+      "sourceId": "One_Arm_Lat_Pulldown"
+    },
+    "single-leg-leg-extension": {
+      "frames": 2,
+      "sourceId": "Single-Leg_Leg_Extension"
+    },
     "skater-jump": {
       "frames": 2,
       "sourceId": "Lateral_Bound"
+    },
+    "smith-behind-back-shrug": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Behind_the_Back_Shrug"
     },
     "smith-bench-press": {
       "frames": 2,
       "sourceId": "Smith_Machine_Bench_Press"
     },
+    "smith-bent-over-row": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Bent_Over_Row"
+    },
+    "smith-calf-raise": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Calf_Raise"
+    },
+    "smith-close-grip-bench-press": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Close-Grip_Bench_Press"
+    },
     "smith-incline-press": {
       "frames": 2,
       "sourceId": "Smith_Machine_Incline_Bench_Press"
+    },
+    "smith-romanian-deadlift": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Stiff-Legged_Deadlift"
+    },
+    "smith-shoulder-press": {
+      "frames": 2,
+      "sourceId": "Smith_Machine_Overhead_Shoulder_Press"
     },
     "smith-squat": {
       "frames": 2,
@@ -328,17 +616,65 @@
       "frames": 2,
       "sourceId": "Standing_Hip_Flexors"
     },
+    "standing-barbell-overhead-press": {
+      "frames": 2,
+      "sourceId": "Standing_Military_Press"
+    },
+    "standing-biceps-stretch": {
+      "frames": 2,
+      "sourceId": "Standing_Biceps_Stretch"
+    },
+    "standing-cable-crunch": {
+      "frames": 2,
+      "sourceId": "Standing_Rope_Crunch"
+    },
     "standing-calf-raise": {
       "frames": 2,
       "sourceId": "Standing_Calf_Raises"
+    },
+    "standing-forward-fold": {
+      "frames": 2,
+      "sourceId": "Runners_Stretch"
     },
     "standing-hip-circles": {
       "frames": 2,
       "sourceId": "Standing_Hip_Circles"
     },
+    "standing-side-reach": {
+      "frames": 2,
+      "sourceId": "Standing_Lateral_Stretch"
+    },
+    "standing-thoracic-rotation": {
+      "frames": 2,
+      "sourceId": "Middle_Back_Stretch"
+    },
+    "standing-upper-back-stretch": {
+      "frames": 2,
+      "sourceId": "Upper_Back_Stretch"
+    },
     "straight-arm-pulldown": {
       "frames": 2,
       "sourceId": "Straight-Arm_Pulldown"
+    },
+    "sumo-deadlift": {
+      "frames": 2,
+      "sourceId": "Sumo_Deadlift"
+    },
+    "superman-raise": {
+      "frames": 2,
+      "sourceId": "Superman"
+    },
+    "supine-figure-four-stretch": {
+      "frames": 2,
+      "sourceId": "Ankle_On_The_Knee"
+    },
+    "t-bar-row": {
+      "frames": 2,
+      "sourceId": "T-Bar_Row_with_Handle"
+    },
+    "trap-bar-deadlift": {
+      "frames": 2,
+      "sourceId": "Trap_Bar_Deadlift"
     },
     "treadmill-walk-jog": {
       "frames": 2,
@@ -347,6 +683,14 @@
     "triceps-overhead-stretch": {
       "frames": 2,
       "sourceId": "Triceps_Stretch"
+    },
+    "underhand-lat-pulldown": {
+      "frames": 2,
+      "sourceId": "Underhand_Cable_Pulldowns"
+    },
+    "upper-trap-stretch": {
+      "frames": 2,
+      "sourceId": "Side_Neck_Stretch"
     },
     "worlds-greatest-stretch": {
       "frames": 2,

@@ -155,4 +155,82 @@ public class AiOutputValidatorTests
         Assert.Equal(240, result[1].RestSeconds);
         Assert.False(string.IsNullOrWhiteSpace(result[1].Why));
     }
+
+    [Fact]
+    public void Deload_caps_every_item_at_three_sets()
+    {
+        var output = Output(
+            Block("warmup", Item("rowing-easy", sets: 4, repMin: null, repMax: null, duration: 300, rest: 0)),
+            Block("main", Item("dumbbell-bench-press", sets: 5), Item("machine-shoulder-press", sets: 2)));
+
+        var normal = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 60);
+        Assert.Equal(5, normal.Blocks.Single(b => b.Section == "main").Items[0].Sets);
+
+        var deload = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 60, deload: true);
+        Assert.All(deload.Blocks.SelectMany(b => b.Items), i => Assert.InRange(i.Sets, 1, AiOutputValidator.MaxDeloadSets));
+        Assert.Equal(2, deload.Blocks.Single(b => b.Section == "main").Items[1].Sets);
+    }
+
+    [Fact]
+    public void Meta_is_validated_against_vocabulary_plan_and_limits()
+    {
+        var limits = new LimitationFilter([new Limitation("pain", "elbow", 3, null)], TestEnv.Today);
+        var longLine = new string('x', 400);
+        var meta = AiOutputValidator.ValidateMeta(
+            focus: ["biceps", "side_delts", "chest", "chest", "neck", "rotator_cuff", "quads", "glutes", "calves"],
+            rationale: ["a", " ", longLine, "b", "c", "d", "e", "f", "g"],
+            changes:
+            [
+                new PlanChangeDto { From = "barbell-bench-press", To = "machine-chest-press", Reason = "shoulder" },
+                new PlanChangeDto { From = "barbell-bench-press", To = "machine-chest-press", Reason = "dup" },
+                new PlanChangeDto { From = "made-up", To = "machine-chest-press", Reason = "x" },
+                new PlanChangeDto { From = "push-up", To = "push-up", Reason = "same" },
+                new PlanChangeDto { From = "push-up", To = "lat-pulldown", Reason = "not in plan" },
+                null!,
+            ],
+            planIds: ["machine-chest-press", "dumbbell-lateral-raise"],
+            TestEnv.Catalog,
+            program: "  Block 2 · Week 3 · Push B ",
+            variant: "B",
+            deload: false,
+            limits);
+
+        // biceps are avoided while the elbow pain is severe; rotator_cuff and neck are not tracked muscles; max 4.
+        Assert.Equal(["side_delts", "chest", "quads", "glutes"], meta.Focus);
+        Assert.Equal(AiOutputValidator.MaxRationaleLines, meta.Rationale.Count);
+        Assert.All(meta.Rationale, l => Assert.True(l.Length <= AiOutputValidator.MaxRationaleLength));
+        Assert.EndsWith("…", meta.Rationale[1]);
+        var change = Assert.Single(meta.Changes);
+        Assert.Equal(("barbell-bench-press", "machine-chest-press"), (change.From, change.To));
+        Assert.Equal("Block 2 · Week 3 · Push B", meta.Program);
+        Assert.Equal("B", meta.Variant);
+    }
+
+    [Fact]
+    public void Feedback_is_validated_against_the_section_4_3_vocabulary()
+    {
+        var result = AiOutputValidator.ValidateFeedback(
+        [
+            new AiFeedbackOutput { Kind = "pain", Region = "neck", Severity = 5, Note = "neck hurts", ReviewInDays = 0 },
+            new AiFeedbackOutput { Kind = "discomfort", Region = "knee", Severity = null, Note = "knee niggle" },
+            new AiFeedbackOutput { Kind = "pain", Region = "toe", Note = "bad region, no exercise" },
+            new AiFeedbackOutput { Kind = "discomfort", Region = null, ExerciseId = "leg-extension", Severity = 1, Note = "only on this one" },
+            new AiFeedbackOutput { Kind = "unavailable", ExerciseId = "leg-press", EquipmentId = "leg_press", Severity = 2, Note = "broken", ReviewInDays = 3 },
+            new AiFeedbackOutput { Kind = "unavailable", EquipmentId = "warp_drive", Note = "unknown equipment" },
+            new AiFeedbackOutput { Kind = "too_easy", ExerciseId = null, Note = "no exercise" },
+            new AiFeedbackOutput { Kind = "hungry", Note = "unknown kind" },
+            new AiFeedbackOutput { Kind = "note", Note = new string('n', 2500), EquipmentId = "leg_press" },
+        ], TestEnv.Catalog);
+
+        Assert.Equal(["pain", "discomfort", "discomfort", "unavailable", "note"], result.Select(f => f.Kind));
+        Assert.Equal((3, 1), (result[0].Severity!.Value, result[0].ReviewInDays!.Value));       // clamped
+        Assert.Equal((1, 14), (result[1].Severity!.Value, result[1].ReviewInDays!.Value));      // defaults
+        Assert.Equal("leg-extension", result[2].ExerciseId);
+        Assert.Null(result[2].Region);
+        Assert.Null(result[3].Severity);                                                      // not pain-like
+        Assert.Equal(("leg-press", "leg_press", 3), (result[3].ExerciseId, result[3].EquipmentId, result[3].ReviewInDays!.Value));
+        Assert.Null(result[4].EquipmentId);
+        Assert.Null(result[4].ReviewInDays);
+        Assert.Equal(AiOutputValidator.MaxFeedbackNote, result[4].Note.Length);
+    }
 }

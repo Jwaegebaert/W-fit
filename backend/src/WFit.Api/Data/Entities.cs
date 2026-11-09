@@ -53,6 +53,26 @@ public sealed class PlannedWorkout : SyncEntity
 
     /// <summary>Workout blocks serialized as JSON (nvarchar(max)).</summary>
     public string BlocksJson { get; set; } = "[]";
+
+    /// <summary>Plan meta JSON object (program, variant, deload, focus, rationale, changes), ≤ 8000 chars.</summary>
+    public string MetaJson { get; set; } = "{}";
+}
+
+/// <summary>Feedback memory: pain / discomfort per region, per-exercise feedback, check-ins and resolutions.</summary>
+public sealed class FeedbackEntry : SyncEntity
+{
+    public string Id { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+    public string Kind { get; set; } = "note";
+    public string? Region { get; set; }
+    public int? Severity { get; set; }
+    public string? ExerciseId { get; set; }
+    public string? SessionId { get; set; }
+    public string Note { get; set; } = "";
+    public string Status { get; set; } = "active";
+    public DateOnly? ReviewOn { get; set; }
+    public DateTimeOffset? ResolvedAt { get; set; }
+    public string Source { get; set; } = "user";
 }
 
 public sealed class WorkoutSession : SyncEntity
@@ -123,6 +143,9 @@ public sealed class CatalogExercise
     public string? Badminton { get; set; }
     public List<string> Instructions { get; set; } = [];
     public string? Tip { get; set; }
+
+    /// <summary>Body regions placed under meaningful load (catalog v3 <c>stress</c>).</summary>
+    public List<string> Stress { get; set; } = [];
 }
 
 public sealed class CatalogEquipment
@@ -137,21 +160,4 @@ public sealed class AppMeta
 {
     public string Key { get; set; } = "";
     public string Value { get; set; } = "";
-}
-
-/// <summary>AI consumption per UTC day.</summary>
-public sealed class AiUsage
-{
-    public DateOnly Day { get; set; }
-    public int Calls { get; set; }
-    public long InputTokens { get; set; }
-    public long OutputTokens { get; set; }
-}
-
-/// <summary>Insights response cached per UTC day.</summary>
-public sealed class InsightsCache
-{
-    public DateOnly Day { get; set; }
-    public string Json { get; set; } = "";
-    public DateTimeOffset GeneratedAt { get; set; }
 }

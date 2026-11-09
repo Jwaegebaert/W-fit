@@ -22,25 +22,6 @@ namespace WFit.Api.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("WFit.Api.Data.AiUsage", b =>
-                {
-                    b.Property<DateOnly>("Day")
-                        .HasColumnType("date");
-
-                    b.Property<int>("Calls")
-                        .HasColumnType("int");
-
-                    b.Property<long>("InputTokens")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("OutputTokens")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Day");
-
-                    b.ToTable("AiUsage");
-                });
-
             modelBuilder.Entity("WFit.Api.Data.AppMeta", b =>
                 {
                     b.Property<string>("Key")
@@ -207,6 +188,10 @@ namespace WFit.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.PrimitiveCollection<string>("Stress")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Tip")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -276,21 +261,70 @@ namespace WFit.Api.Data.Migrations
                     b.ToTable("ExercisePreferences");
                 });
 
-            modelBuilder.Entity("WFit.Api.Data.InsightsCache", b =>
+            modelBuilder.Entity("WFit.Api.Data.FeedbackEntry", b =>
                 {
-                    b.Property<DateOnly>("Day")
-                        .HasColumnType("date");
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
-                    b.Property<DateTimeOffset>("GeneratedAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("Json")
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ExerciseId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Kind")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
-                    b.HasKey("Day");
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
-                    b.ToTable("InsightsCache");
+                    b.Property<string>("Region")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly?>("ReviewOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("ServerUpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<int?>("Severity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServerUpdatedAt");
+
+                    b.ToTable("FeedbackEntries");
                 });
 
             modelBuilder.Entity("WFit.Api.Data.PlannedWorkout", b =>
@@ -322,6 +356,14 @@ namespace WFit.Api.Data.Migrations
 
                     b.Property<int>("EstimatedMinutes")
                         .HasColumnType("int");
+
+                    b.Property<string>("MetaJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("{}")
+                        .HasColumnName("Meta");
 
                     b.Property<DateTimeOffset>("ServerUpdatedAt")
                         .HasColumnType("datetimeoffset");

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/balance/balance_screen.dart';
 import 'features/body/body_screen.dart';
 import 'features/coach/coach_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
@@ -59,6 +60,7 @@ final router = GoRouter(
     ),
     GoRoute(path: '/library', parentNavigatorKey: _rootKey, builder: (_, _) => const LibraryScreen()),
     GoRoute(path: '/body', parentNavigatorKey: _rootKey, builder: (_, _) => const BodyScreen()),
+    GoRoute(path: '/balance', parentNavigatorKey: _rootKey, builder: (_, _) => const BalanceScreen()),
     GoRoute(path: '/settings', parentNavigatorKey: _rootKey, builder: (_, _) => const SettingsScreen()),
     GoRoute(path: '/settings/profile', parentNavigatorKey: _rootKey, builder: (_, _) => const ProfileScreen()),
     GoRoute(path: '/settings/equipment', parentNavigatorKey: _rootKey, builder: (_, _) => const EquipmentScreen()),

@@ -129,6 +129,37 @@ final allLoggedSetsProvider = FutureProvider<List<LoggedSet>>((ref) async {
 
 final coachServiceProvider = Provider<CoachService>((ref) => CoachService(ref));
 
+final activeFeedbackProvider =
+    StreamProvider<List<FeedbackEntry>>((ref) => ref.watch(repositoryProvider).watchActiveFeedback());
+
+/// Pain / discomfort entries whose check-in date has come.
+final dueCheckInsProvider =
+    StreamProvider<List<FeedbackEntry>>((ref) => ref.watch(repositoryProvider).watchDueCheckIns(DateTime.now()));
+
+/// Program, balance, limitations and trends as of today; recomputed when sessions or feedback change.
+final coachSnapshotProvider = FutureProvider<CoachSnapshot>((ref) async {
+  await ref.watch(completedSessionsProvider.future);
+  await ref.watch(activeFeedbackProvider.future);
+  return ref.read(coachServiceProvider).snapshot();
+});
+
+/// Latest cached AI insights from the last 7 days (for the coach's focus muscles), or null.
+final cachedInsightsProvider = FutureProvider<Insights?>((ref) async {
+  final i = await ref.read(coachServiceProvider).cachedInsights();
+  final at = i?.generatedAt;
+  return at != null && DateTime.now().difference(at).inDays > 7 ? null : i;
+});
+
+/// Date key of the plan the AI coach is refining in the background (null when idle).
+class CoachPreparingNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void prepare(String? dateKey) => state = dateKey;
+}
+
+final coachPreparingProvider = NotifierProvider<CoachPreparingNotifier, String?>(CoachPreparingNotifier.new);
+
 /// Equipment temporarily occupied during the current gym visit.
 class OccupiedEquipmentNotifier extends Notifier<Set<String>> {
   @override

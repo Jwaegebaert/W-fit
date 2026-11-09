@@ -7,7 +7,8 @@
   2. Reuses the existing API key from Key Vault (or generates a new one on first deploy).
   3. Creates the Function App's managed-identity user in Azure SQL (passwordless).
   4. Publishes backend/src/WFit.Api to the Flex Consumption app (zip deploy).
-  5. Smoke-tests /api/health and an authenticated endpoint (wakes SQL, runs migrations, seeds catalog).
+  5. Removes retired Azure OpenAI deployments (gpt-4.1-mini) that the template no longer declares (idempotent).
+  6. Smoke-tests /api/health, /api/ai/usage (Table Storage, no SQL) and /api/sync (wakes SQL, runs migrations, seeds catalog).
 
 .EXAMPLE
   ./infra/deploy.ps1 -AlertEmail you@example.com
@@ -20,7 +21,10 @@ param(
     [string]$AlertEmail,
     [switch]$SkipInfra,
     [switch]$SkipCode,
-    [switch]$WhatIf
+    [switch]$WhatIf,
+    # Model deployments that earlier versions of the template created and the app no longer uses.
+    [string[]]$RetiredOpenAiDeployments = @('gpt-4.1-mini'),
+    [switch]$KeepRetiredDeployments
 )
 
 $ErrorActionPreference = 'Stop'
@@ -148,6 +152,23 @@ if (-not $SkipCode) {
     }
 }
 
+if (-not $KeepRetiredDeployments -and $RetiredOpenAiDeployments.Count -gt 0) {
+    Step 'Removing retired Azure OpenAI deployments'
+    # Incremental Bicep deployments never delete resources, so deployments dropped from the template are removed here.
+    $openAiName = $outputs.openAiAccountName.value
+    if (-not $openAiName) { $openAiName = az cognitiveservices account list -g $ResourceGroup --query "[?kind=='OpenAI'] | [0].name" -o tsv }
+    if ($openAiName) {
+        $existing = @(az cognitiveservices account deployment list -g $ResourceGroup -n $openAiName --query '[].name' -o tsv)
+        foreach ($name in $RetiredOpenAiDeployments) {
+            if ($existing -contains $name) {
+                az cognitiveservices account deployment delete -g $ResourceGroup -n $openAiName --deployment-name $name -o none
+                Write-Host "Deleted deployment $name."
+            }
+            else { Write-Host "Deployment $name not present." }
+        }
+    }
+}
+
 Step 'Smoke test'
 $health = $null
 for ($i = 1; $i -le 12 -and -not $health; $i++) {
@@ -157,8 +178,25 @@ if (-not $health) { throw 'Health check failed.' }
 Write-Host "health: $($health | ConvertTo-Json -Compress)"
 
 $key = az keyvault secret show --vault-name $vaultName -n wfit-api-key --query value -o tsv
-$usage = Invoke-RestMethod "$apiBase/ai/usage" -Headers @{ 'X-Api-Key' = $key } -TimeoutSec 180
-Write-Host "ai/usage (SQL + migrations OK): $($usage | ConvertTo-Json -Compress)"
+$headers = @{ 'X-Api-Key' = $key }
+
+# Stateless AI endpoints: Table Storage only. Retry while new role assignments propagate.
+$usage = $null
+for ($i = 1; $i -le 6 -and -not $usage; $i++) {
+    try { $usage = Invoke-RestMethod "$apiBase/ai/usage" -Headers $headers -TimeoutSec 60 }
+    catch {
+        if ($i -eq 6) { throw }
+        Write-Host "ai/usage not ready yet ($($_.Exception.Message)); retrying in 20s…"
+        Start-Sleep -Seconds 20
+    }
+}
+Write-Host "ai/usage (Table Storage OK, model $($usage.model)): $($usage | ConvertTo-Json -Compress)"
+
+# Sync is the only SQL endpoint: an empty incremental sync wakes the database, applies migrations and seeds the catalog.
+$since = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
+$sync = Invoke-RestMethod "$apiBase/sync" -Method Post -Headers $headers -ContentType 'application/json' `
+    -Body (@{ since = $since; changes = $null } | ConvertTo-Json -Compress) -TimeoutSec 180
+Write-Host "sync (SQL + migrations OK): serverTime $($sync.serverTime)"
 
 Write-Host "`nDone. Configure the app (Settings → Backend connection):" -ForegroundColor Green
 Write-Host "  API URL : $apiBase"

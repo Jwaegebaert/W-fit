@@ -87,6 +87,7 @@ class Exercise {
     required this.instructions,
     this.tip,
     this.mistakes = const [],
+    this.stress = const [],
   });
 
   factory Exercise.fromJson(Map<String, dynamic> j) => Exercise(
@@ -112,6 +113,7 @@ class Exercise {
         instructions: (j['instructions'] as List).cast<String>(),
         tip: j['tip'] as String?,
         mistakes: (j['mistakes'] as List?)?.cast<String>() ?? const [],
+        stress: (j['stress'] as List?)?.cast<String>() ?? const [],
       );
 
   /// Equipment id that marks floor work (lying, kneeling or sitting on a mat / the floor).
@@ -143,6 +145,10 @@ class Exercise {
 
   /// Common beginner mistakes (2–3 short sentences).
   final List<String> mistakes;
+
+  /// Body regions (see `BodyRegion` in muscles.dart) placed under meaningful load or strain; used to avoid
+  /// aggravating reported pain.
+  final List<String> stress;
 
   bool get isWeighted => incrementKg > 0;
   bool get isFloor => equipment.contains(floorEquipmentId);

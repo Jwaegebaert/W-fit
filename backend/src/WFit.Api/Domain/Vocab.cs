@@ -41,6 +41,39 @@ public static class Vocab
         public const string Intermediate = "intermediate";
     }
 
+    /// <summary>Feedback memory kinds (IMPROVEMENT-PLAN §4.3).</summary>
+    public static class FeedbackKind
+    {
+        public const string Pain = "pain";
+        public const string Discomfort = "discomfort";
+        public const string TooEasy = "too_easy";
+        public const string TooHard = "too_hard";
+        public const string Unavailable = "unavailable";
+        public const string Dislike = "dislike";
+        public const string Like = "like";
+        public const string Note = "note";
+
+        public static bool IsPainLike(string? kind) => kind is Pain or Discomfort;
+    }
+
+    public static class FeedbackStatus
+    {
+        public const string Active = "active";
+        public const string Resolved = "resolved";
+    }
+
+    public static class FeedbackSource
+    {
+        public const string User = "user";
+        public const string Coach = "coach";
+    }
+
+    public static readonly IReadOnlySet<string> FeedbackKinds = Set(
+        FeedbackKind.Pain, FeedbackKind.Discomfort, FeedbackKind.TooEasy, FeedbackKind.TooHard,
+        FeedbackKind.Unavailable, FeedbackKind.Dislike, FeedbackKind.Like, FeedbackKind.Note);
+    public static readonly IReadOnlySet<string> FeedbackStatuses = Set(FeedbackStatus.Active, FeedbackStatus.Resolved);
+    public static readonly IReadOnlySet<string> FeedbackSources = Set(FeedbackSource.User, FeedbackSource.Coach);
+
     public static readonly IReadOnlySet<string> Experiences = Set(Experience.Beginner, Experience.Novice, Experience.Intermediate);
     public static readonly IReadOnlySet<string> Preferences = Set(Preference.Liked, Preference.Neutral, Preference.Disliked, Preference.Banned);
     public static readonly IReadOnlySet<string> DayTypes = Set("push", "pull", "legs");
@@ -75,6 +108,15 @@ public static class Vocab
         a == b || (IsMain(a) && IsMain(b));
 
     public static bool IsMain(string category) => category is Category.Strength or Category.Power;
+
+    /// <summary>Workout section an exercise of the given catalog category normally belongs to.</summary>
+    public static WorkoutSection SectionFor(string category) => category switch
+    {
+        Category.Warmup => WorkoutSection.Warmup,
+        Category.Core => WorkoutSection.Core,
+        Category.Cooldown => WorkoutSection.Cooldown,
+        _ => WorkoutSection.Main,
+    };
 
     private static HashSet<string> Set(params string[] values) => new(values, StringComparer.Ordinal);
 }

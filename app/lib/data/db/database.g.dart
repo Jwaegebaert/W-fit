@@ -1729,6 +1729,18 @@ class $PlannedWorkoutsTable extends PlannedWorkouts
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _metaJsonMeta = const VerificationMeta(
+    'metaJson',
+  );
+  @override
+  late final GeneratedColumn<String> metaJson = GeneratedColumn<String>(
+    'meta_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     updatedAt,
@@ -1743,6 +1755,7 @@ class $PlannedWorkoutsTable extends PlannedWorkouts
     estimatedMinutes,
     coachNote,
     blocksJson,
+    metaJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1842,6 +1855,12 @@ class $PlannedWorkoutsTable extends PlannedWorkouts
     } else if (isInserting) {
       context.missing(_blocksJsonMeta);
     }
+    if (data.containsKey('meta_json')) {
+      context.handle(
+        _metaJsonMeta,
+        metaJson.isAcceptableOrUnknown(data['meta_json']!, _metaJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -1899,6 +1918,10 @@ class $PlannedWorkoutsTable extends PlannedWorkouts
         DriftSqlType.string,
         data['${effectivePrefix}blocks_json'],
       )!,
+      metaJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}meta_json'],
+      )!,
     );
   }
 
@@ -1921,6 +1944,9 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
   final int estimatedMinutes;
   final String coachNote;
   final String blocksJson;
+
+  /// Plan metadata (program position, variant, focus, rationale, changes) as a JSON object; added in schema v2.
+  final String metaJson;
   const PlannedWorkout({
     required this.updatedAt,
     required this.deleted,
@@ -1934,6 +1960,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
     required this.estimatedMinutes,
     required this.coachNote,
     required this.blocksJson,
+    required this.metaJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1950,6 +1977,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
     map['estimated_minutes'] = Variable<int>(estimatedMinutes);
     map['coach_note'] = Variable<String>(coachNote);
     map['blocks_json'] = Variable<String>(blocksJson);
+    map['meta_json'] = Variable<String>(metaJson);
     return map;
   }
 
@@ -1967,6 +1995,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
       estimatedMinutes: Value(estimatedMinutes),
       coachNote: Value(coachNote),
       blocksJson: Value(blocksJson),
+      metaJson: Value(metaJson),
     );
   }
 
@@ -1988,6 +2017,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
       estimatedMinutes: serializer.fromJson<int>(json['estimatedMinutes']),
       coachNote: serializer.fromJson<String>(json['coachNote']),
       blocksJson: serializer.fromJson<String>(json['blocksJson']),
+      metaJson: serializer.fromJson<String>(json['metaJson']),
     );
   }
   @override
@@ -2006,6 +2036,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
       'estimatedMinutes': serializer.toJson<int>(estimatedMinutes),
       'coachNote': serializer.toJson<String>(coachNote),
       'blocksJson': serializer.toJson<String>(blocksJson),
+      'metaJson': serializer.toJson<String>(metaJson),
     };
   }
 
@@ -2022,6 +2053,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
     int? estimatedMinutes,
     String? coachNote,
     String? blocksJson,
+    String? metaJson,
   }) => PlannedWorkout(
     updatedAt: updatedAt ?? this.updatedAt,
     deleted: deleted ?? this.deleted,
@@ -2035,6 +2067,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
     estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
     coachNote: coachNote ?? this.coachNote,
     blocksJson: blocksJson ?? this.blocksJson,
+    metaJson: metaJson ?? this.metaJson,
   );
   PlannedWorkout copyWithCompanion(PlannedWorkoutsCompanion data) {
     return PlannedWorkout(
@@ -2054,6 +2087,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
       blocksJson: data.blocksJson.present
           ? data.blocksJson.value
           : this.blocksJson,
+      metaJson: data.metaJson.present ? data.metaJson.value : this.metaJson,
     );
   }
 
@@ -2071,7 +2105,8 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
           ..write('status: $status, ')
           ..write('estimatedMinutes: $estimatedMinutes, ')
           ..write('coachNote: $coachNote, ')
-          ..write('blocksJson: $blocksJson')
+          ..write('blocksJson: $blocksJson, ')
+          ..write('metaJson: $metaJson')
           ..write(')'))
         .toString();
   }
@@ -2090,6 +2125,7 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
     estimatedMinutes,
     coachNote,
     blocksJson,
+    metaJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -2106,7 +2142,8 @@ class PlannedWorkout extends DataClass implements Insertable<PlannedWorkout> {
           other.status == this.status &&
           other.estimatedMinutes == this.estimatedMinutes &&
           other.coachNote == this.coachNote &&
-          other.blocksJson == this.blocksJson);
+          other.blocksJson == this.blocksJson &&
+          other.metaJson == this.metaJson);
 }
 
 class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
@@ -2122,6 +2159,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
   final Value<int> estimatedMinutes;
   final Value<String> coachNote;
   final Value<String> blocksJson;
+  final Value<String> metaJson;
   final Value<int> rowid;
   const PlannedWorkoutsCompanion({
     this.updatedAt = const Value.absent(),
@@ -2136,6 +2174,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
     this.estimatedMinutes = const Value.absent(),
     this.coachNote = const Value.absent(),
     this.blocksJson = const Value.absent(),
+    this.metaJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PlannedWorkoutsCompanion.insert({
@@ -2151,6 +2190,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
     this.estimatedMinutes = const Value.absent(),
     this.coachNote = const Value.absent(),
     required String blocksJson,
+    this.metaJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : updatedAt = Value(updatedAt),
        id = Value(id),
@@ -2172,6 +2212,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
     Expression<int>? estimatedMinutes,
     Expression<String>? coachNote,
     Expression<String>? blocksJson,
+    Expression<String>? metaJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2187,6 +2228,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
       if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
       if (coachNote != null) 'coach_note': coachNote,
       if (blocksJson != null) 'blocks_json': blocksJson,
+      if (metaJson != null) 'meta_json': metaJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2204,6 +2246,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
     Value<int>? estimatedMinutes,
     Value<String>? coachNote,
     Value<String>? blocksJson,
+    Value<String>? metaJson,
     Value<int>? rowid,
   }) {
     return PlannedWorkoutsCompanion(
@@ -2219,6 +2262,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       coachNote: coachNote ?? this.coachNote,
       blocksJson: blocksJson ?? this.blocksJson,
+      metaJson: metaJson ?? this.metaJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2262,6 +2306,9 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
     if (blocksJson.present) {
       map['blocks_json'] = Variable<String>(blocksJson.value);
     }
+    if (metaJson.present) {
+      map['meta_json'] = Variable<String>(metaJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2283,6 +2330,7 @@ class PlannedWorkoutsCompanion extends UpdateCompanion<PlannedWorkout> {
           ..write('estimatedMinutes: $estimatedMinutes, ')
           ..write('coachNote: $coachNote, ')
           ..write('blocksJson: $blocksJson, ')
+          ..write('metaJson: $metaJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4677,6 +4725,858 @@ class BodyMetricsCompanion extends UpdateCompanion<BodyMetric> {
   }
 }
 
+class $FeedbackEntriesTable extends FeedbackEntries
+    with TableInfo<$FeedbackEntriesTable, FeedbackEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FeedbackEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedMeta = const VerificationMeta(
+    'deleted',
+  );
+  @override
+  late final GeneratedColumn<bool> deleted = GeneratedColumn<bool>(
+    'deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _regionMeta = const VerificationMeta('region');
+  @override
+  late final GeneratedColumn<String> region = GeneratedColumn<String>(
+    'region',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _severityMeta = const VerificationMeta(
+    'severity',
+  );
+  @override
+  late final GeneratedColumn<int> severity = GeneratedColumn<int>(
+    'severity',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _exerciseIdMeta = const VerificationMeta(
+    'exerciseId',
+  );
+  @override
+  late final GeneratedColumn<String> exerciseId = GeneratedColumn<String>(
+    'exercise_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('active'),
+  );
+  static const VerificationMeta _reviewOnMeta = const VerificationMeta(
+    'reviewOn',
+  );
+  @override
+  late final GeneratedColumn<String> reviewOn = GeneratedColumn<String>(
+    'review_on',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _resolvedAtMeta = const VerificationMeta(
+    'resolvedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> resolvedAt = GeneratedColumn<DateTime>(
+    'resolved_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('user'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    updatedAt,
+    deleted,
+    dirty,
+    id,
+    createdAt,
+    kind,
+    region,
+    severity,
+    exerciseId,
+    sessionId,
+    note,
+    status,
+    reviewOn,
+    resolvedAt,
+    source,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'feedback_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FeedbackEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted')) {
+      context.handle(
+        _deletedMeta,
+        deleted.isAcceptableOrUnknown(data['deleted']!, _deletedMeta),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('region')) {
+      context.handle(
+        _regionMeta,
+        region.isAcceptableOrUnknown(data['region']!, _regionMeta),
+      );
+    }
+    if (data.containsKey('severity')) {
+      context.handle(
+        _severityMeta,
+        severity.isAcceptableOrUnknown(data['severity']!, _severityMeta),
+      );
+    }
+    if (data.containsKey('exercise_id')) {
+      context.handle(
+        _exerciseIdMeta,
+        exerciseId.isAcceptableOrUnknown(data['exercise_id']!, _exerciseIdMeta),
+      );
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    }
+    if (data.containsKey('review_on')) {
+      context.handle(
+        _reviewOnMeta,
+        reviewOn.isAcceptableOrUnknown(data['review_on']!, _reviewOnMeta),
+      );
+    }
+    if (data.containsKey('resolved_at')) {
+      context.handle(
+        _resolvedAtMeta,
+        resolvedAt.isAcceptableOrUnknown(data['resolved_at']!, _resolvedAtMeta),
+      );
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FeedbackEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FeedbackEntry(
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}deleted'],
+      )!,
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      region: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}region'],
+      ),
+      severity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}severity'],
+      ),
+      exerciseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}exercise_id'],
+      ),
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      reviewOn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}review_on'],
+      ),
+      resolvedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}resolved_at'],
+      ),
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      )!,
+    );
+  }
+
+  @override
+  $FeedbackEntriesTable createAlias(String alias) {
+    return $FeedbackEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class FeedbackEntry extends DataClass implements Insertable<FeedbackEntry> {
+  final DateTime updatedAt;
+  final bool deleted;
+  final bool dirty;
+  final String id;
+  final DateTime createdAt;
+
+  /// pain | discomfort | too_easy | too_hard | unavailable | dislike | like | note
+  final String kind;
+  final String? region;
+
+  /// 1 mild, 2 moderate, 3 severe (pain/discomfort only).
+  final int? severity;
+  final String? exerciseId;
+  final String? sessionId;
+  final String note;
+
+  /// active | resolved
+  final String status;
+
+  /// yyyy-MM-dd; when the app asks "still an issue?".
+  final String? reviewOn;
+  final DateTime? resolvedAt;
+
+  /// user | coach
+  final String source;
+  const FeedbackEntry({
+    required this.updatedAt,
+    required this.deleted,
+    required this.dirty,
+    required this.id,
+    required this.createdAt,
+    required this.kind,
+    this.region,
+    this.severity,
+    this.exerciseId,
+    this.sessionId,
+    required this.note,
+    required this.status,
+    this.reviewOn,
+    this.resolvedAt,
+    required this.source,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['deleted'] = Variable<bool>(deleted);
+    map['dirty'] = Variable<bool>(dirty);
+    map['id'] = Variable<String>(id);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || region != null) {
+      map['region'] = Variable<String>(region);
+    }
+    if (!nullToAbsent || severity != null) {
+      map['severity'] = Variable<int>(severity);
+    }
+    if (!nullToAbsent || exerciseId != null) {
+      map['exercise_id'] = Variable<String>(exerciseId);
+    }
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<String>(sessionId);
+    }
+    map['note'] = Variable<String>(note);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || reviewOn != null) {
+      map['review_on'] = Variable<String>(reviewOn);
+    }
+    if (!nullToAbsent || resolvedAt != null) {
+      map['resolved_at'] = Variable<DateTime>(resolvedAt);
+    }
+    map['source'] = Variable<String>(source);
+    return map;
+  }
+
+  FeedbackEntriesCompanion toCompanion(bool nullToAbsent) {
+    return FeedbackEntriesCompanion(
+      updatedAt: Value(updatedAt),
+      deleted: Value(deleted),
+      dirty: Value(dirty),
+      id: Value(id),
+      createdAt: Value(createdAt),
+      kind: Value(kind),
+      region: region == null && nullToAbsent
+          ? const Value.absent()
+          : Value(region),
+      severity: severity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(severity),
+      exerciseId: exerciseId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(exerciseId),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      note: Value(note),
+      status: Value(status),
+      reviewOn: reviewOn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reviewOn),
+      resolvedAt: resolvedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(resolvedAt),
+      source: Value(source),
+    );
+  }
+
+  factory FeedbackEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FeedbackEntry(
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deleted: serializer.fromJson<bool>(json['deleted']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
+      id: serializer.fromJson<String>(json['id']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      kind: serializer.fromJson<String>(json['kind']),
+      region: serializer.fromJson<String?>(json['region']),
+      severity: serializer.fromJson<int?>(json['severity']),
+      exerciseId: serializer.fromJson<String?>(json['exerciseId']),
+      sessionId: serializer.fromJson<String?>(json['sessionId']),
+      note: serializer.fromJson<String>(json['note']),
+      status: serializer.fromJson<String>(json['status']),
+      reviewOn: serializer.fromJson<String?>(json['reviewOn']),
+      resolvedAt: serializer.fromJson<DateTime?>(json['resolvedAt']),
+      source: serializer.fromJson<String>(json['source']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deleted': serializer.toJson<bool>(deleted),
+      'dirty': serializer.toJson<bool>(dirty),
+      'id': serializer.toJson<String>(id),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'kind': serializer.toJson<String>(kind),
+      'region': serializer.toJson<String?>(region),
+      'severity': serializer.toJson<int?>(severity),
+      'exerciseId': serializer.toJson<String?>(exerciseId),
+      'sessionId': serializer.toJson<String?>(sessionId),
+      'note': serializer.toJson<String>(note),
+      'status': serializer.toJson<String>(status),
+      'reviewOn': serializer.toJson<String?>(reviewOn),
+      'resolvedAt': serializer.toJson<DateTime?>(resolvedAt),
+      'source': serializer.toJson<String>(source),
+    };
+  }
+
+  FeedbackEntry copyWith({
+    DateTime? updatedAt,
+    bool? deleted,
+    bool? dirty,
+    String? id,
+    DateTime? createdAt,
+    String? kind,
+    Value<String?> region = const Value.absent(),
+    Value<int?> severity = const Value.absent(),
+    Value<String?> exerciseId = const Value.absent(),
+    Value<String?> sessionId = const Value.absent(),
+    String? note,
+    String? status,
+    Value<String?> reviewOn = const Value.absent(),
+    Value<DateTime?> resolvedAt = const Value.absent(),
+    String? source,
+  }) => FeedbackEntry(
+    updatedAt: updatedAt ?? this.updatedAt,
+    deleted: deleted ?? this.deleted,
+    dirty: dirty ?? this.dirty,
+    id: id ?? this.id,
+    createdAt: createdAt ?? this.createdAt,
+    kind: kind ?? this.kind,
+    region: region.present ? region.value : this.region,
+    severity: severity.present ? severity.value : this.severity,
+    exerciseId: exerciseId.present ? exerciseId.value : this.exerciseId,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
+    note: note ?? this.note,
+    status: status ?? this.status,
+    reviewOn: reviewOn.present ? reviewOn.value : this.reviewOn,
+    resolvedAt: resolvedAt.present ? resolvedAt.value : this.resolvedAt,
+    source: source ?? this.source,
+  );
+  FeedbackEntry copyWithCompanion(FeedbackEntriesCompanion data) {
+    return FeedbackEntry(
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deleted: data.deleted.present ? data.deleted.value : this.deleted,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
+      id: data.id.present ? data.id.value : this.id,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      region: data.region.present ? data.region.value : this.region,
+      severity: data.severity.present ? data.severity.value : this.severity,
+      exerciseId: data.exerciseId.present
+          ? data.exerciseId.value
+          : this.exerciseId,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      note: data.note.present ? data.note.value : this.note,
+      status: data.status.present ? data.status.value : this.status,
+      reviewOn: data.reviewOn.present ? data.reviewOn.value : this.reviewOn,
+      resolvedAt: data.resolvedAt.present
+          ? data.resolvedAt.value
+          : this.resolvedAt,
+      source: data.source.present ? data.source.value : this.source,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FeedbackEntry(')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deleted: $deleted, ')
+          ..write('dirty: $dirty, ')
+          ..write('id: $id, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('kind: $kind, ')
+          ..write('region: $region, ')
+          ..write('severity: $severity, ')
+          ..write('exerciseId: $exerciseId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('note: $note, ')
+          ..write('status: $status, ')
+          ..write('reviewOn: $reviewOn, ')
+          ..write('resolvedAt: $resolvedAt, ')
+          ..write('source: $source')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    updatedAt,
+    deleted,
+    dirty,
+    id,
+    createdAt,
+    kind,
+    region,
+    severity,
+    exerciseId,
+    sessionId,
+    note,
+    status,
+    reviewOn,
+    resolvedAt,
+    source,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FeedbackEntry &&
+          other.updatedAt == this.updatedAt &&
+          other.deleted == this.deleted &&
+          other.dirty == this.dirty &&
+          other.id == this.id &&
+          other.createdAt == this.createdAt &&
+          other.kind == this.kind &&
+          other.region == this.region &&
+          other.severity == this.severity &&
+          other.exerciseId == this.exerciseId &&
+          other.sessionId == this.sessionId &&
+          other.note == this.note &&
+          other.status == this.status &&
+          other.reviewOn == this.reviewOn &&
+          other.resolvedAt == this.resolvedAt &&
+          other.source == this.source);
+}
+
+class FeedbackEntriesCompanion extends UpdateCompanion<FeedbackEntry> {
+  final Value<DateTime> updatedAt;
+  final Value<bool> deleted;
+  final Value<bool> dirty;
+  final Value<String> id;
+  final Value<DateTime> createdAt;
+  final Value<String> kind;
+  final Value<String?> region;
+  final Value<int?> severity;
+  final Value<String?> exerciseId;
+  final Value<String?> sessionId;
+  final Value<String> note;
+  final Value<String> status;
+  final Value<String?> reviewOn;
+  final Value<DateTime?> resolvedAt;
+  final Value<String> source;
+  final Value<int> rowid;
+  const FeedbackEntriesCompanion({
+    this.updatedAt = const Value.absent(),
+    this.deleted = const Value.absent(),
+    this.dirty = const Value.absent(),
+    this.id = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.region = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.exerciseId = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.status = const Value.absent(),
+    this.reviewOn = const Value.absent(),
+    this.resolvedAt = const Value.absent(),
+    this.source = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FeedbackEntriesCompanion.insert({
+    required DateTime updatedAt,
+    this.deleted = const Value.absent(),
+    this.dirty = const Value.absent(),
+    required String id,
+    required DateTime createdAt,
+    required String kind,
+    this.region = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.exerciseId = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.note = const Value.absent(),
+    this.status = const Value.absent(),
+    this.reviewOn = const Value.absent(),
+    this.resolvedAt = const Value.absent(),
+    this.source = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : updatedAt = Value(updatedAt),
+       id = Value(id),
+       createdAt = Value(createdAt),
+       kind = Value(kind);
+  static Insertable<FeedbackEntry> custom({
+    Expression<DateTime>? updatedAt,
+    Expression<bool>? deleted,
+    Expression<bool>? dirty,
+    Expression<String>? id,
+    Expression<DateTime>? createdAt,
+    Expression<String>? kind,
+    Expression<String>? region,
+    Expression<int>? severity,
+    Expression<String>? exerciseId,
+    Expression<String>? sessionId,
+    Expression<String>? note,
+    Expression<String>? status,
+    Expression<String>? reviewOn,
+    Expression<DateTime>? resolvedAt,
+    Expression<String>? source,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deleted != null) 'deleted': deleted,
+      if (dirty != null) 'dirty': dirty,
+      if (id != null) 'id': id,
+      if (createdAt != null) 'created_at': createdAt,
+      if (kind != null) 'kind': kind,
+      if (region != null) 'region': region,
+      if (severity != null) 'severity': severity,
+      if (exerciseId != null) 'exercise_id': exerciseId,
+      if (sessionId != null) 'session_id': sessionId,
+      if (note != null) 'note': note,
+      if (status != null) 'status': status,
+      if (reviewOn != null) 'review_on': reviewOn,
+      if (resolvedAt != null) 'resolved_at': resolvedAt,
+      if (source != null) 'source': source,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FeedbackEntriesCompanion copyWith({
+    Value<DateTime>? updatedAt,
+    Value<bool>? deleted,
+    Value<bool>? dirty,
+    Value<String>? id,
+    Value<DateTime>? createdAt,
+    Value<String>? kind,
+    Value<String?>? region,
+    Value<int?>? severity,
+    Value<String?>? exerciseId,
+    Value<String?>? sessionId,
+    Value<String>? note,
+    Value<String>? status,
+    Value<String?>? reviewOn,
+    Value<DateTime?>? resolvedAt,
+    Value<String>? source,
+    Value<int>? rowid,
+  }) {
+    return FeedbackEntriesCompanion(
+      updatedAt: updatedAt ?? this.updatedAt,
+      deleted: deleted ?? this.deleted,
+      dirty: dirty ?? this.dirty,
+      id: id ?? this.id,
+      createdAt: createdAt ?? this.createdAt,
+      kind: kind ?? this.kind,
+      region: region ?? this.region,
+      severity: severity ?? this.severity,
+      exerciseId: exerciseId ?? this.exerciseId,
+      sessionId: sessionId ?? this.sessionId,
+      note: note ?? this.note,
+      status: status ?? this.status,
+      reviewOn: reviewOn ?? this.reviewOn,
+      resolvedAt: resolvedAt ?? this.resolvedAt,
+      source: source ?? this.source,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deleted.present) {
+      map['deleted'] = Variable<bool>(deleted.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (region.present) {
+      map['region'] = Variable<String>(region.value);
+    }
+    if (severity.present) {
+      map['severity'] = Variable<int>(severity.value);
+    }
+    if (exerciseId.present) {
+      map['exercise_id'] = Variable<String>(exerciseId.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (reviewOn.present) {
+      map['review_on'] = Variable<String>(reviewOn.value);
+    }
+    if (resolvedAt.present) {
+      map['resolved_at'] = Variable<DateTime>(resolvedAt.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FeedbackEntriesCompanion(')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deleted: $deleted, ')
+          ..write('dirty: $dirty, ')
+          ..write('id: $id, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('kind: $kind, ')
+          ..write('region: $region, ')
+          ..write('severity: $severity, ')
+          ..write('exerciseId: $exerciseId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('note: $note, ')
+          ..write('status: $status, ')
+          ..write('reviewOn: $reviewOn, ')
+          ..write('resolvedAt: $resolvedAt, ')
+          ..write('source: $source, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $KeyValuesTable extends KeyValues
     with TableInfo<$KeyValuesTable, KeyValue> {
   @override
@@ -4899,6 +5799,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $SetLogsTable setLogs = $SetLogsTable(this);
   late final $BodyMetricsTable bodyMetrics = $BodyMetricsTable(this);
+  late final $FeedbackEntriesTable feedbackEntries = $FeedbackEntriesTable(
+    this,
+  );
   late final $KeyValuesTable keyValues = $KeyValuesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -4912,6 +5815,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     workoutSessions,
     setLogs,
     bodyMetrics,
+    feedbackEntries,
     keyValues,
   ];
 }
@@ -5782,6 +6686,7 @@ typedef $$PlannedWorkoutsTableCreateCompanionBuilder =
       Value<int> estimatedMinutes,
       Value<String> coachNote,
       required String blocksJson,
+      Value<String> metaJson,
       Value<int> rowid,
     });
 typedef $$PlannedWorkoutsTableUpdateCompanionBuilder =
@@ -5798,6 +6703,7 @@ typedef $$PlannedWorkoutsTableUpdateCompanionBuilder =
       Value<int> estimatedMinutes,
       Value<String> coachNote,
       Value<String> blocksJson,
+      Value<String> metaJson,
       Value<int> rowid,
     });
 
@@ -5867,6 +6773,11 @@ class $$PlannedWorkoutsTableFilterComposer
 
   ColumnFilters<String> get blocksJson => $composableBuilder(
     column: $table.blocksJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metaJson => $composableBuilder(
+    column: $table.metaJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5939,6 +6850,11 @@ class $$PlannedWorkoutsTableOrderingComposer
     column: $table.blocksJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get metaJson => $composableBuilder(
+    column: $table.metaJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PlannedWorkoutsTableAnnotationComposer
@@ -5989,6 +6905,9 @@ class $$PlannedWorkoutsTableAnnotationComposer
     column: $table.blocksJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get metaJson =>
+      $composableBuilder(column: $table.metaJson, builder: (column) => column);
 }
 
 class $$PlannedWorkoutsTableTableManager
@@ -6040,6 +6959,7 @@ class $$PlannedWorkoutsTableTableManager
                 Value<int> estimatedMinutes = const Value.absent(),
                 Value<String> coachNote = const Value.absent(),
                 Value<String> blocksJson = const Value.absent(),
+                Value<String> metaJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PlannedWorkoutsCompanion(
                 updatedAt: updatedAt,
@@ -6054,6 +6974,7 @@ class $$PlannedWorkoutsTableTableManager
                 estimatedMinutes: estimatedMinutes,
                 coachNote: coachNote,
                 blocksJson: blocksJson,
+                metaJson: metaJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6070,6 +6991,7 @@ class $$PlannedWorkoutsTableTableManager
                 Value<int> estimatedMinutes = const Value.absent(),
                 Value<String> coachNote = const Value.absent(),
                 required String blocksJson,
+                Value<String> metaJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PlannedWorkoutsCompanion.insert(
                 updatedAt: updatedAt,
@@ -6084,6 +7006,7 @@ class $$PlannedWorkoutsTableTableManager
                 estimatedMinutes: estimatedMinutes,
                 coachNote: coachNote,
                 blocksJson: blocksJson,
+                metaJson: metaJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -7257,6 +8180,411 @@ typedef $$BodyMetricsTableProcessedTableManager =
       BodyMetric,
       PrefetchHooks Function()
     >;
+typedef $$FeedbackEntriesTableCreateCompanionBuilder =
+    FeedbackEntriesCompanion Function({
+      required DateTime updatedAt,
+      Value<bool> deleted,
+      Value<bool> dirty,
+      required String id,
+      required DateTime createdAt,
+      required String kind,
+      Value<String?> region,
+      Value<int?> severity,
+      Value<String?> exerciseId,
+      Value<String?> sessionId,
+      Value<String> note,
+      Value<String> status,
+      Value<String?> reviewOn,
+      Value<DateTime?> resolvedAt,
+      Value<String> source,
+      Value<int> rowid,
+    });
+typedef $$FeedbackEntriesTableUpdateCompanionBuilder =
+    FeedbackEntriesCompanion Function({
+      Value<DateTime> updatedAt,
+      Value<bool> deleted,
+      Value<bool> dirty,
+      Value<String> id,
+      Value<DateTime> createdAt,
+      Value<String> kind,
+      Value<String?> region,
+      Value<int?> severity,
+      Value<String?> exerciseId,
+      Value<String?> sessionId,
+      Value<String> note,
+      Value<String> status,
+      Value<String?> reviewOn,
+      Value<DateTime?> resolvedAt,
+      Value<String> source,
+      Value<int> rowid,
+    });
+
+class $$FeedbackEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $FeedbackEntriesTable> {
+  $$FeedbackEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get deleted => $composableBuilder(
+    column: $table.deleted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get exerciseId => $composableBuilder(
+    column: $table.exerciseId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reviewOn => $composableBuilder(
+    column: $table.reviewOn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get resolvedAt => $composableBuilder(
+    column: $table.resolvedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FeedbackEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FeedbackEntriesTable> {
+  $$FeedbackEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get deleted => $composableBuilder(
+    column: $table.deleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get exerciseId => $composableBuilder(
+    column: $table.exerciseId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reviewOn => $composableBuilder(
+    column: $table.reviewOn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get resolvedAt => $composableBuilder(
+    column: $table.resolvedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FeedbackEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FeedbackEntriesTable> {
+  $$FeedbackEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get deleted =>
+      $composableBuilder(column: $table.deleted, builder: (column) => column);
+
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get region =>
+      $composableBuilder(column: $table.region, builder: (column) => column);
+
+  GeneratedColumn<int> get severity =>
+      $composableBuilder(column: $table.severity, builder: (column) => column);
+
+  GeneratedColumn<String> get exerciseId => $composableBuilder(
+    column: $table.exerciseId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get reviewOn =>
+      $composableBuilder(column: $table.reviewOn, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get resolvedAt => $composableBuilder(
+    column: $table.resolvedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+}
+
+class $$FeedbackEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FeedbackEntriesTable,
+          FeedbackEntry,
+          $$FeedbackEntriesTableFilterComposer,
+          $$FeedbackEntriesTableOrderingComposer,
+          $$FeedbackEntriesTableAnnotationComposer,
+          $$FeedbackEntriesTableCreateCompanionBuilder,
+          $$FeedbackEntriesTableUpdateCompanionBuilder,
+          (
+            FeedbackEntry,
+            BaseReferences<_$AppDatabase, $FeedbackEntriesTable, FeedbackEntry>,
+          ),
+          FeedbackEntry,
+          PrefetchHooks Function()
+        > {
+  $$FeedbackEntriesTableTableManager(
+    _$AppDatabase db,
+    $FeedbackEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FeedbackEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FeedbackEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FeedbackEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<bool> deleted = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> region = const Value.absent(),
+                Value<int?> severity = const Value.absent(),
+                Value<String?> exerciseId = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> reviewOn = const Value.absent(),
+                Value<DateTime?> resolvedAt = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FeedbackEntriesCompanion(
+                updatedAt: updatedAt,
+                deleted: deleted,
+                dirty: dirty,
+                id: id,
+                createdAt: createdAt,
+                kind: kind,
+                region: region,
+                severity: severity,
+                exerciseId: exerciseId,
+                sessionId: sessionId,
+                note: note,
+                status: status,
+                reviewOn: reviewOn,
+                resolvedAt: resolvedAt,
+                source: source,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required DateTime updatedAt,
+                Value<bool> deleted = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
+                required String id,
+                required DateTime createdAt,
+                required String kind,
+                Value<String?> region = const Value.absent(),
+                Value<int?> severity = const Value.absent(),
+                Value<String?> exerciseId = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+                Value<String> note = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> reviewOn = const Value.absent(),
+                Value<DateTime?> resolvedAt = const Value.absent(),
+                Value<String> source = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FeedbackEntriesCompanion.insert(
+                updatedAt: updatedAt,
+                deleted: deleted,
+                dirty: dirty,
+                id: id,
+                createdAt: createdAt,
+                kind: kind,
+                region: region,
+                severity: severity,
+                exerciseId: exerciseId,
+                sessionId: sessionId,
+                note: note,
+                status: status,
+                reviewOn: reviewOn,
+                resolvedAt: resolvedAt,
+                source: source,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FeedbackEntriesTable, FeedbackEntry>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $FeedbackEntriesTable,
+                    FeedbackEntry
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FeedbackEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FeedbackEntriesTable,
+      FeedbackEntry,
+      $$FeedbackEntriesTableFilterComposer,
+      $$FeedbackEntriesTableOrderingComposer,
+      $$FeedbackEntriesTableAnnotationComposer,
+      $$FeedbackEntriesTableCreateCompanionBuilder,
+      $$FeedbackEntriesTableUpdateCompanionBuilder,
+      (
+        FeedbackEntry,
+        BaseReferences<_$AppDatabase, $FeedbackEntriesTable, FeedbackEntry>,
+      ),
+      FeedbackEntry,
+      PrefetchHooks Function()
+    >;
 typedef $$KeyValuesTableCreateCompanionBuilder =
     KeyValuesCompanion Function({
       required String key,
@@ -7417,6 +8745,8 @@ class $AppDatabaseManager {
       $$SetLogsTableTableManager(_db, _db.setLogs);
   $$BodyMetricsTableTableManager get bodyMetrics =>
       $$BodyMetricsTableTableManager(_db, _db.bodyMetrics);
+  $$FeedbackEntriesTableTableManager get feedbackEntries =>
+      $$FeedbackEntriesTableTableManager(_db, _db.feedbackEntries);
   $$KeyValuesTableTableManager get keyValues =>
       $$KeyValuesTableTableManager(_db, _db.keyValues);
 }

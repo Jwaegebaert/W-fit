@@ -127,6 +127,7 @@ void main() {
         ('/stats', '23-stats'),
         ('/progress/$weightedId', '24-exercise-progress'),
         ('/coach', '25-coach'),
+        ('/balance', '25b-balance'),
         ('/body', '26-body'),
         ('/library', '27-library'),
         ('/exercise/$weightedId', '28-exercise-detail'),
@@ -146,6 +147,20 @@ void main() {
         await settle(tester);
         await tester.tap(find.text('Measurements (optional)'));
         await shot('33-body-form');
+        Navigator.of(tester.element(find.byType(BottomSheet))).pop();
+        await settle(tester, frames: 10);
+
+        await go(tester, '/coach');
+        await tester.ensureVisible(find.text('Report pain / tell your coach'));
+        await tester.pump();
+        await tester.tap(find.text('Report pain / tell your coach'));
+        await settle(tester);
+        await tester.ensureVisible(find.text('Neck'));
+        await tester.pump();
+        await tester.tap(find.text('Neck'));
+        await shot('34-report-sheet');
+        await shotEnd('35-report-sheet-end',
+            scrollable: find.descendant(of: find.byType(BottomSheet), matching: find.byType(Scrollable)).first);
         Navigator.of(tester.element(find.byType(BottomSheet))).pop();
         await settle(tester, frames: 10);
       }

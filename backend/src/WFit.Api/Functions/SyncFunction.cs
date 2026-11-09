@@ -8,7 +8,9 @@ namespace WFit.Api.Functions;
 
 public sealed class SyncFunction(SyncService sync)
 {
-    [Function("Sync")]
+    public const string Name = "Sync";
+
+    [Function(Name)]
     public async Task<IActionResult> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "sync")] HttpRequest req)
     {

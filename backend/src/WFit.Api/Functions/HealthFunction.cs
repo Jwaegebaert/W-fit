@@ -11,7 +11,7 @@ public sealed record HealthResponse(string Status, string Version);
 public sealed class HealthFunction
 {
     public const string Name = "Health";
-    public const string ApiVersion = "1.0.0";
+    public const string ApiVersion = "3.0.0";
 
     [Function(Name)]
     public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "health")] HttpRequest req) =>

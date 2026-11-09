@@ -24,22 +24,33 @@ param apiKey string
 @description('Optional public IP allowed through the SQL firewall (deployment-time T-SQL). Empty = none.')
 param clientIp string = ''
 
-@description('Chat model for the AI coach (non-reasoning model, supports structured outputs).')
-param openAiModelName string = 'gpt-4.1-mini'
-param openAiModelVersion string = '2025-04-14'
+@description('Primary chat deployment for the AI coach (reasoning model; the deployment is named after the model).')
+param openAiPrimaryModelName string = 'gpt-6-sol'
+param openAiPrimaryModelVersion string = '2026-09-22'
+
+@description('Fallback deployment, used once when the primary is throttled (429), fails (5xx) or times out.')
+param openAiFallbackModelName string = 'gpt-6-luna'
+param openAiFallbackModelVersion string = '2026-09-22'
 
 @description('Deployment SKU. DataZoneStandard keeps inference inside the EU data zone.')
 param openAiSku string = 'DataZoneStandard'
 
-@description('Tokens-per-minute capacity in thousands. A platform-level throttle on AI spend.')
+@description('Tokens-per-minute capacity in thousands, per deployment. A platform-level throttle on AI spend.')
 @minValue(1)
 @maxValue(50)
-param openAiCapacity int = 20
+param openAiCapacity int = 50
+
+@description('Model version upgrade policy (matches the existing deployments so redeploying is a no-op).')
+@allowed(['OnceNewDefaultVersionAvailable', 'OnceCurrentVersionExpired', 'NoAutoUpgrade'])
+param openAiVersionUpgradeOption string = 'OnceNewDefaultVersionAvailable'
 
 @description('Application-level AI limits (cost safeguards).')
-param aiDailyCallLimit int = 25
-param aiMonthlyTokenLimit int = 2000000
-param aiMaxOutputTokens int = 1800
+param aiDailyCallLimit int = 40
+param aiMonthlyTokenLimit int = 3000000
+@description('max_completion_tokens per call; includes reasoning tokens.')
+param aiMaxOutputTokens int = 8000
+@description('Per-attempt model timeout in seconds (the fallback attempt gets its own).')
+param aiCallTimeoutSeconds int = 60
 
 @description('Monthly budget in USD for this resource group.')
 param budgetAmount int = 50
@@ -66,6 +77,7 @@ var names = {
   openai: 'oai-wfit-${suffix}'
 }
 var deploymentContainer = 'app-package'
+var aiUsageTableName = 'aiusage'
 
 // ---------------- Monitoring (capped ingestion) ----------------
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -118,6 +130,17 @@ resource packageContainer 'Microsoft.Storage/storageAccounts/blobServices/contai
   name: deploymentContainer
 }
 
+// AI usage counters (calls / tokens per UTC day) — always warm, so the stateless AI endpoints never touch SQL.
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = {
+  parent: storage
+  name: 'default'
+}
+
+resource aiUsageTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: aiUsageTableName
+}
+
 // ---------------- Azure OpenAI (pay-per-token, no fixed cost) ----------------
 resource openai 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   name: names.openai
@@ -132,9 +155,11 @@ resource openai 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
   }
 }
 
-resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+// Reasoning models: gpt-6-sol (primary, low effort for interactive calls) and gpt-6-luna (fallback).
+// Deployments on one account must not be written concurrently, hence the dependsOn chain.
+resource primaryDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
   parent: openai
-  name: openAiModelName
+  name: openAiPrimaryModelName
   sku: {
     name: openAiSku
     capacity: openAiCapacity
@@ -142,11 +167,31 @@ resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-1
   properties: {
     model: {
       format: 'OpenAI'
-      name: openAiModelName
-      version: openAiModelVersion
+      name: openAiPrimaryModelName
+      version: openAiPrimaryModelVersion
     }
-    versionUpgradeOption: 'NoAutoUpgrade'
+    versionUpgradeOption: openAiVersionUpgradeOption
+    raiPolicyName: 'Microsoft.DefaultV2'
   }
+}
+
+resource fallbackDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: openai
+  name: openAiFallbackModelName
+  sku: {
+    name: openAiSku
+    capacity: openAiCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: openAiFallbackModelName
+      version: openAiFallbackModelVersion
+    }
+    versionUpgradeOption: openAiVersionUpgradeOption
+    raiPolicyName: 'Microsoft.DefaultV2'
+  }
+  dependsOn: [primaryDeployment]
 }
 
 // ---------------- Key Vault (API key) ----------------
@@ -287,11 +332,14 @@ resource func 'Microsoft.Web/sites@2024-04-01' = {
           value: 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Database=${names.db};Authentication=Active Directory Managed Identity;Encrypt=True;TrustServerCertificate=False;Connect Timeout=90;'
         }
         { name: 'AZURE_OPENAI_ENDPOINT', value: openai.properties.endpoint }
-        { name: 'AZURE_OPENAI_DEPLOYMENT', value: chatDeployment.name }
+        { name: 'AZURE_OPENAI_DEPLOYMENT', value: primaryDeployment.name }
+        { name: 'AZURE_OPENAI_FALLBACK_DEPLOYMENT', value: fallbackDeployment.name }
+        { name: 'AZURE_STORAGE_TABLE_ENDPOINT', value: storage.properties.primaryEndpoints.table }
         { name: 'AI_ENABLED', value: 'true' }
         { name: 'AI_DAILY_CALL_LIMIT', value: string(aiDailyCallLimit) }
         { name: 'AI_MONTHLY_TOKEN_LIMIT', value: string(aiMonthlyTokenLimit) }
         { name: 'AI_MAX_OUTPUT_TOKENS', value: string(aiMaxOutputTokens) }
+        { name: 'AI_CALL_TIMEOUT_SECONDS', value: string(aiCallTimeoutSeconds) }
       ]
     }
   }
@@ -300,6 +348,7 @@ resource func 'Microsoft.Web/sites@2024-04-01' = {
 // ---------------- RBAC for the Function App's managed identity ----------------
 var roles = {
   storageBlobDataOwner: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+  storageTableDataContributor: '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
   keyVaultSecretsUser: '4633458b-17de-408a-b874-0445c86b69e6'
   openAiUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
   keyVaultSecretsOfficer: 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
@@ -312,6 +361,17 @@ resource funcStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
     principalId: func.identity.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageBlobDataOwner)
+  }
+}
+
+// AI usage counters in Table Storage (aiusage).
+resource funcTableRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: storage
+  name: guid(storage.id, func.id, roles.storageTableDataContributor)
+  properties: {
+    principalId: func.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.storageTableDataContributor)
   }
 }
 
@@ -397,3 +457,6 @@ output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
 output sqlDatabaseName string = names.db
 output keyVaultName string = vault.name
 output openAiEndpoint string = openai.properties.endpoint
+output openAiAccountName string = openai.name
+output openAiDeployments array = [primaryDeployment.name, fallbackDeployment.name]
+output aiUsageTableEndpoint string = '${storage.properties.primaryEndpoints.table}${aiUsageTable.name}'
