@@ -67,7 +67,7 @@ authentication uses `DefaultAzureCredential` (developer credentials, e.g. `az lo
 
 ```powershell
 $env:WFIT_LIVE_AI = "1"
-$env:AZURE_OPENAI_ENDPOINT = "https://<openai-account>.openai.azure.com/"
+$env:AZURE_OPENAI_ENDPOINT = "https://<your-openai-account>.openai.azure.com/"
 # optional: $env:AZURE_OPENAI_DEPLOYMENT = "gpt-6-luna"
 dotnet test backend\WFit.sln --filter "FullyQualifiedName~LiveCoachEvalTests" --logger "console;verbosity=detailed"
 ```

@@ -12,7 +12,7 @@
 │  • fl_chart statistics       │                                  │  • AI usage limits (Table Storage)│
 └──────────────────────────────┘                                  └───────┬───────────────┬──────────┘
                                                                           │               │
-                                                     Azure SQL free offer │               │ Azure OpenAI (<resource-group>)
+                                                     Azure SQL free offer │               │ Azure OpenAI
                                                      serverless, AutoPause│               │ gpt-6-sol (+ gpt-6-luna fallback)
 ```
 

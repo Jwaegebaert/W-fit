@@ -24,7 +24,7 @@ public sealed class LiveFactAttribute : FactAttribute
 /// <summary>
 /// Live evaluation of the coach against the deployed model (IMPROVEMENT-PLAN §6.4). Scenario briefs are built in code with
 /// real catalog ids; the assertions check hard constraints and that the rationale addresses the scenario.
-/// <code>$env:WFIT_LIVE_AI="1"; $env:AZURE_OPENAI_ENDPOINT="https://<openai-account>.openai.azure.com/"
+/// <code>$env:WFIT_LIVE_AI="1"; $env:AZURE_OPENAI_ENDPOINT="https://&lt;your-openai-account&gt;.openai.azure.com/"
 /// dotnet test backend\WFit.sln --filter "FullyQualifiedName~LiveCoachEvalTests" --logger "console;verbosity=detailed"</code>
 /// </summary>
 public sealed class LiveCoachEvalTests(ITestOutputHelper output)

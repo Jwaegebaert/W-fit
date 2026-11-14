@@ -88,7 +88,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         TextField(
           controller: _url,
           keyboardType: TextInputType.url,
-          decoration: const InputDecoration(labelText: 'API URL', hintText: 'https://func-wfit-xxxx.azurewebsites.net'),
+          decoration: const InputDecoration(labelText: 'API URL', hintText: 'https://<your-function-app>.azurewebsites.net'),
         ),
         const SizedBox(height: 12),
         TextField(

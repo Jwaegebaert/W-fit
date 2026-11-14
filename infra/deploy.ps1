@@ -11,12 +11,13 @@
   6. Smoke-tests /api/health, /api/ai/usage (Table Storage, no SQL) and /api/sync (wakes SQL, runs migrations, seeds catalog).
 
 .EXAMPLE
-  ./infra/deploy.ps1 -AlertEmail you@example.com
-  ./infra/deploy.ps1 -SkipInfra          # code-only redeploy
+  ./infra/deploy.ps1 -ResourceGroup <resource-group> -AlertEmail you@example.com
+  ./infra/deploy.ps1 -ResourceGroup <resource-group> -SkipInfra          # code-only redeploy
 #>
 [CmdletBinding()]
 param(
-    [string]$ResourceGroup = '<resource-group>',
+    [Parameter(Mandatory)]
+    [string]$ResourceGroup,
     [string]$Location = 'westeurope',
     [string]$AlertEmail,
     [switch]$SkipInfra,

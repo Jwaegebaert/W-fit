@@ -5,7 +5,7 @@ targetScope = 'resourceGroup'
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
-@description('Region for Azure SQL (West/North Europe currently reject new SQL servers on this subscription; Sweden Central accepts them).')
+@description('Region for Azure SQL. Some subscriptions cannot create SQL servers in every region, so this can differ from the other resources.')
 param sqlLocation string = 'swedencentral'
 
 @description('Short suffix to make global names unique.')

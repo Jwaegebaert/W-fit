@@ -210,9 +210,9 @@ public class AiGatewayTests
     }
 
     [Theory]
-    [InlineData("https://oai-wfit.openai.azure.com/", "https://oai-wfit.openai.azure.com/openai/v1/")]
-    [InlineData("https://oai-wfit.openai.azure.com", "https://oai-wfit.openai.azure.com/openai/v1/")]
-    [InlineData("https://oai-wfit.openai.azure.com/openai/v1", "https://oai-wfit.openai.azure.com/openai/v1/")]
+    [InlineData("https://my-openai.openai.azure.com/", "https://my-openai.openai.azure.com/openai/v1/")]
+    [InlineData("https://my-openai.openai.azure.com", "https://my-openai.openai.azure.com/openai/v1/")]
+    [InlineData("https://my-openai.openai.azure.com/openai/v1", "https://my-openai.openai.azure.com/openai/v1/")]
     public void Endpoint_is_normalised_to_the_v1_api(string endpoint, string expected) =>
         Assert.Equal(expected, AzureOpenAiClient.V1Endpoint(endpoint).ToString());
 
@@ -223,7 +223,7 @@ public class AiGatewayTests
             new ConfigurationBuilder().AddInMemoryCollection(values.Select(v => new KeyValuePair<string, string?>(v.Key, v.Value))).Build();
 
         Assert.Equal("https://x.table.core.windows.net/", AiUsageStoreConfig.ResolveTableEndpoint(Config(("AZURE_STORAGE_TABLE_ENDPOINT", "https://x.table.core.windows.net/"))));
-        Assert.Equal("https://stwfit.table.core.windows.net", AiUsageStoreConfig.ResolveTableEndpoint(Config(("AzureWebJobsStorage__accountName", "stwfit"))));
+        Assert.Equal("https://mystorage.table.core.windows.net", AiUsageStoreConfig.ResolveTableEndpoint(Config(("AzureWebJobsStorage__accountName", "mystorage"))));
         Assert.Null(AiUsageStoreConfig.ResolveTableEndpoint(Config()));
     }
 

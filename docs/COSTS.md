@@ -3,27 +3,27 @@
 Hard ceiling: **$50/month**. Design target: $20–35/month. **Estimated actual: ≈ $1.50–4/month** (worst case with every
 AI limit maxed out: ≈ $15/month).
 
-Everything W-fit uses lives in the dedicated resource group `<resource-group>`, so a single resource-group budget covers
-all of it, including AI consumption. W-fit has its own pay-per-token Azure OpenAI account (no fixed cost) instead of
-sharing another shared account, so its spend stays isolated and visible.
+Everything W-fit uses lives in one dedicated resource group, so a single resource-group budget covers all of it,
+including AI consumption. W-fit has its own pay-per-token Azure OpenAI account (no fixed cost) instead of sharing one
+with other projects, so its spend stays isolated and visible.
 
-## Deployed resources
+## Resources
 
-| Resource | Name | Region | SKU / configuration | Free allowance | Expected usage (1 user, ~12 workouts/mo) | Est. $/month | Worst case |
-|---|---|---|---|---|---|---|---|
-| Azure SQL Database | `<sql-server>/wfit` | Sweden Central¹ | Serverless GP Gen5 (0.5–2 vCore, 32 GB), **free offer**, `freeLimitExhaustionBehavior = AutoPause`, auto-pause 60 min | 100k vCore-s + 32 GB data + 32 GB backup / month | ~30–60 short wake-ups ≈ 30–60k vCore-s | **$0.00** | $0.00 (pauses instead of billing) |
-| Functions | `<function-app>` + `<plan>` | West Europe | **Flex Consumption** FC1, 512 MB instances, max 2 instances, no always-ready | 100k GB-s + 250k executions / month | < 1k executions, < 1k GB-s | **$0.00** | < $0.50 |
-| Storage account | `<storage-account>` | West Europe | StorageV2 Standard_LRS, shared-key disabled (managed identity only); blob (deploy package) + table `aiusage` | — | < 1 GB, < 100k transactions | **$0.05–0.30** | $1.00 |
-| Azure OpenAI | `<openai-account>` / deployments `gpt-6-sol` (primary) + `gpt-6-luna` (fallback) | West Europe (EU data zone) | S0, **DataZoneStandard**, 50K TPM each, keys disabled | — | ~40 calls ≈ 250k input + 50k output tokens | **$1.20–3.50** | ≈ $14 (3M-token monthly app cap) |
-| Key Vault | `<key-vault>` | West Europe | Standard, RBAC, 1 secret | — | < 5k operations | **$0.01** | $0.05 |
-| Log Analytics + App Insights | `<log-workspace>`, `<app-insights>` | West Europe | PerGB2018, **daily cap 0.1 GB**, 30-day retention, 50 % sampling | 5 GB ingestion / month | < 0.3 GB | **$0.00** | ≈ $0.50 |
-| Budget | `budget-wfit-monthly` | — | $50/month on `<resource-group>`, alerts at 20/50/80 % actual + 100 % forecast | free | — | **$0.00** | $0.00 |
-| Inter-region traffic | Functions ⇄ SQL | WE ⇄ SE | Intra-Europe bandwidth | — | < 100 MB | **< $0.01** | $0.05 |
-| **Total** | | | | | | **≈ $1.50–4** | **≈ $15** |
+| Resource | Region | SKU / configuration | Free allowance | Expected usage (1 user, ~12 workouts/mo) | Est. $/month | Worst case |
+|---|---|---|---|---|---|---|
+| Azure SQL Database | SQL region¹ | Serverless GP Gen5 (0.5–2 vCore, 32 GB), **free offer**, `freeLimitExhaustionBehavior = AutoPause`, auto-pause 60 min | 100k vCore-s + 32 GB data + 32 GB backup / month | ~30–60 short wake-ups ≈ 30–60k vCore-s | **$0.00** | $0.00 (pauses instead of billing) |
+| Functions | Main region | **Flex Consumption** FC1, 512 MB instances, max 2 instances, no always-ready | 100k GB-s + 250k executions / month | < 1k executions, < 1k GB-s | **$0.00** | < $0.50 |
+| Storage account | Main region | StorageV2 Standard_LRS, shared-key disabled (managed identity only); blob (deploy package) + table `aiusage` | — | < 1 GB, < 100k transactions | **$0.05–0.30** | $1.00 |
+| Azure OpenAI | Main region (EU data zone) | S0, **DataZoneStandard**, 50K TPM each, keys disabled | — | ~40 calls ≈ 250k input + 50k output tokens | **$1.20–3.50** | ≈ $14 (3M-token monthly app cap) |
+| Key Vault | Main region | Standard, RBAC, 1 secret | — | < 5k operations | **$0.01** | $0.05 |
+| Log Analytics + App Insights | Main region | PerGB2018, **daily cap 0.1 GB**, 30-day retention, 50 % sampling | 5 GB ingestion / month | < 0.3 GB | **$0.00** | ≈ $0.50 |
+| Budget | — | $50/month on the resource group, alerts at 20/50/80 % actual + 100 % forecast | free | — | **$0.00** | $0.00 |
+| Inter-region traffic | Main ⇄ SQL region | Intra-Europe bandwidth | — | < 100 MB | **< $0.01** | $0.05 |
+| **Total** | | | | | **≈ $1.50–4** | **≈ $15** |
 
-¹ West Europe and North Europe currently reject new SQL servers for this subscription
-(`RegionDoesNotAllowProvisioning`), so SQL runs in Sweden Central. The rest stays in West Europe. That adds ~20 ms per
-query, which is irrelevant for a single user.
+¹ Some subscriptions can't create new SQL servers in every region (`RegionDoesNotAllowProvisioning`), so the template
+lets SQL live in its own region (`sqlLocation`) while everything else uses the resource group's region. Crossing
+regions adds ~20 ms per query, which is irrelevant for a single user.
 
 Measured (live evaluation, Nov 2026, gpt-6-sol, reasoning effort low): one workout plan ≈ 5.7k input + 1.1k output
 tokens (incl. ~200 reasoning) ≈ $0.03, 10–14 s. v2 used gpt-4.1-mini at ≈ $0.003 per plan but with clearly weaker
