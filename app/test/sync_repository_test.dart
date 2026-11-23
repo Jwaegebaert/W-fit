@@ -364,4 +364,32 @@ void main() {
     await repo.saveBodyMetric(const BodyMetricsCompanion(date: Value('2026-11-05'), waistCm: Value(84.0)));
     expect(await repo.latestBodyWeight(), 79.0);
   });
+  test('an edit made while a sync is in flight (same second) stays pending and survives the echo', () async {
+    final api = _EditDuringSyncApi();
+    final date = DateTime(2026, 11, 24);
+    final id = await repo.savePlanned(date: date, day: DayType.push, title: 'Rules plan', source: 'rules', coachNote: '', blocks: _blocks);
+    // While the push is on the wire, the coach saves its adjusted version (within the same second).
+    api.onRequest = () => repo.savePlanned(
+        id: id, date: date, day: DayType.push, title: 'Coach plan', source: 'ai', coachNote: '', blocks: _blocks);
+    await sync.sync(api);
+
+    final plan = (await repo.plannedById(id))!;
+    expect(plan.title, 'Coach plan', reason: 'the echoed older version must not overwrite the newer edit');
+    expect(plan.dirty, isTrue, reason: 'the newer edit still has to be pushed');
+    await sync.sync(api);
+    expect(api.store['plannedWorkouts']![id]!['title'], 'Coach plan');
+  });
+}
+
+/// Fake server that runs [onRequest] while the request is in flight (before answering).
+class _EditDuringSyncApi extends FakeSyncApi {
+  Future<void> Function()? onRequest;
+
+  @override
+  Future<Map<String, dynamic>> sync(Map<String, dynamic> request) async {
+    final hook = onRequest;
+    onRequest = null;
+    if (hook != null) await hook();
+    return super.sync(request);
+  }
 }

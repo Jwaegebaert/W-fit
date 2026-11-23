@@ -120,6 +120,34 @@ class Repository {
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Newest open plan dated before [date] (and not before [since]): a workout that was planned but not trained.
+  Future<PlannedWorkout?> latestMissedPlan(DateTime date, {required DateTime since}) async {
+    final rows = await (db.select(db.plannedWorkouts)
+          ..where((t) =>
+              t.deleted.equals(false) &
+              t.status.equals('planned') &
+              t.date.isSmallerThanValue(dateKey(date)) &
+              t.date.isBiggerOrEqualValue(dateKey(since)))
+          ..orderBy([(t) => OrderingTerm.desc(t.date), (t) => OrderingTerm.desc(t.updatedAt)])
+          ..limit(1))
+        .get();
+    return rows.firstOrNull;
+  }
+
+  /// Moves an open plan to [date] (keeping its id, exercises and source) and supersedes other open plans there.
+  Future<void> movePlanned(String id, DateTime date, {String? metaJson}) async {
+    await (db.update(db.plannedWorkouts)
+          ..where((t) =>
+              t.date.equals(dateKey(date)) & t.status.equals('planned') & t.id.equals(id).not() & t.deleted.equals(false)))
+        .write(PlannedWorkoutsCompanion(deleted: const Value(true), updatedAt: Value(_now), dirty: const Value(true)));
+    await (db.update(db.plannedWorkouts)..where((t) => t.id.equals(id))).write(PlannedWorkoutsCompanion(
+          date: Value(dateKey(date)),
+          metaJson: metaJson == null ? const Value.absent() : Value(metaJson),
+          updatedAt: Value(_now),
+          dirty: const Value(true),
+        ));
+  }
+
   Future<PlannedWorkout?> plannedById(String id) =>
       (db.select(db.plannedWorkouts)..where((t) => t.id.equals(id))).getSingleOrNull();
 

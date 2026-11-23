@@ -18,6 +18,9 @@ public static class AiOutputValidator
     /// <summary>Floor exercises (equipment "mat") allowed per warm-up / core / cooldown block when standing options exist.</summary>
     public const int MaxFloorItemsPerBlock = 1;
     public const int MaxNoteLength = 300;
+
+    /// <summary>Item notes show on one line at the top of the exercise card during a workout.</summary>
+    public const int MaxItemNoteLength = 90;
     public const int MaxSets = 5;
 
     /// <summary>Set caps for items the rule-engine draft did not already prescribe higher (no padding to fill time).</summary>
@@ -155,7 +158,7 @@ public static class AiOutputValidator
             DurationSeconds = duration,
             RestSeconds = ClampRest(item.RestSeconds, section),
             TargetWeightKg = exercise.IsTimed || exercise.LoadType == "none" ? null : ClampWeight(item.TargetWeightKg),
-            Notes = SyncMapper.Trunc(item.Notes?.Trim(), MaxNoteLength),
+            Notes = string.IsNullOrWhiteSpace(item.Notes) ? "" : Shorten(item.Notes.Trim(), MaxItemNoteLength),
         };
     }
 

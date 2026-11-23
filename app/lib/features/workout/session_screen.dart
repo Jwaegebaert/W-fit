@@ -18,6 +18,7 @@ import '../../widgets/common.dart';
 import '../../widgets/report_issue_sheet.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../settings/equipment_screen.dart' show showBarWeightDialog;
+import 'coach_strip.dart';
 import 'swap_sheet.dart';
 import 'workout_timer.dart';
 
@@ -62,6 +63,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         : ref.watch(plannedStreamProvider(session.plannedWorkoutId!)).value;
     final sets = ref.watch(_sessionSetsProvider(widget.sessionId)).value ?? const <SetLog>[];
     final blocks = plan == null ? const <PlanBlock>[] : Repository.decodeBlocks(plan.blocksJson);
+    final changes = plan == null ? const <PlanChange>[] : PlanMeta.decode(plan.metaJson).changes;
     final day = DayType.parse(session.dayType);
     final usedIds = blocks.expand((b) => b.items).map((i) => i.exerciseId).toSet();
 
@@ -101,6 +103,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             order: itemOrder,
             logged: sets.where((s) => s.exerciseOrder == itemOrder && s.exerciseId == item.exerciseId).toList(),
             expanded: key == openKey && !_collapsed.contains(key),
+            fromCoach: plan?.source == 'ai',
+            change: changes.where((c) => c.to == item.exerciseId).lastOrNull,
             onToggle: () => setState(() {
               if (key == openKey && !_collapsed.contains(key)) {
                 _collapsed.add(key);
@@ -270,6 +274,8 @@ class ExerciseCard extends ConsumerStatefulWidget {
     required this.expanded,
     required this.onToggle,
     this.onSwap,
+    this.fromCoach = false,
+    this.change,
   });
 
   final String sessionId;
@@ -280,6 +286,12 @@ class ExerciseCard extends ConsumerStatefulWidget {
   final bool expanded;
   final VoidCallback onToggle;
   final VoidCallback? onSwap;
+
+  /// The plan was written / refined by the AI coach (its item notes are the coach's).
+  final bool fromCoach;
+
+  /// The plan change that put this exercise here (coach adjustment or instant limitation swap), if any.
+  final PlanChange? change;
 
   @override
   ConsumerState<ExerciseCard> createState() => _ExerciseCardState();
@@ -485,34 +497,18 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   Widget _buildBody(BuildContext context, Exercise? e, String name) {
     final t = Theme.of(context);
     final isTimed = widget.item.isTimed;
-    final tip = e?.tip;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (_advice != null && _advice!.message.isNotEmpty && widget.section == Section.main)
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: t.colorScheme.secondaryContainer.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${_advice!.lastSummary != null ? 'Last time: ${_advice!.lastSummary}\n' : ''}${_advice!.message}',
-              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSecondaryContainer),
-            ),
-          ),
-        if (widget.item.notes.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(widget.item.notes, style: t.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
-          ),
-        if (tip != null && widget.section != Section.main)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(tip, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-          ),
+        CoachStrip(
+          item: widget.item,
+          exercise: e,
+          loads: ref.watch(loadModelProvider),
+          advice: _advice,
+          showProgress: widget.section == Section.main,
+          fromCoach: widget.fromCoach,
+          change: widget.change,
+        ),
         if (!isTimed && e?.bar != null) _barLine(e!),
         if (!isTimed)
           Padding(

@@ -326,12 +326,40 @@ class CoachService {
   // ---------------- plans ----------------
 
   /// Returns the open plan for [date], creating a rule-based one if none exists.
+  ///
+  /// A plan from an earlier day that was never trained (for example one the coach changed on request) moves to
+  /// [date] instead of being replaced, as long as it is still the next day type in the rotation.
   Future<PlannedWorkout> ensurePlan(DateTime date) async {
     final existing = await _repo.plannedForDate(date);
     if (existing != null) return existing;
+    final carried = await _carryForward(date);
+    if (carried != null) return carried;
     final id = await generateWithRules(date);
     return (await _repo.plannedById(id))!;
   }
+
+  /// Missed plans older than this are not carried forward (the program has moved on).
+  static const int carryForwardDays = 10;
+
+  Future<PlannedWorkout?> _carryForward(DateTime date) async {
+    final missed = await _repo.latestMissedPlan(date, since: addDays(dateOnly(date), -carryForwardDays));
+    if (missed == null || missed.dayType != (await nextDayType()).name || !await _isOpen(missed.id)) return null;
+    final meta = PlanMeta.decode(missed.metaJson);
+    final from = parseDateKey(missed.date);
+    final line = 'Moved from ${_weekday(from)} ${from.day}/${from.month}: not trained yet, '
+        '${missed.source == 'ai' ? 'coach changes kept' : 'same exercises'}';
+    final rationale = [line, ...meta.rationale.where((l) => !l.startsWith('Moved from'))].take(6).toList();
+    await _repo.movePlanned(missed.id, date, metaJson: meta.copyWith(rationale: rationale).encode());
+    await _adjustOpenPlans(); // limitations or equipment may have changed since it was planned
+    _syncSoon();
+    return _repo.plannedById(missed.id);
+  }
+
+  /// Identity of a plan's current version (timestamps only have second precision, so the content counts too).
+  static String? _planVersion(PlannedWorkout? p) =>
+      p == null ? null : '${p.updatedAt.toIso8601String()}|${p.source}|${p.title}|${p.date}|${_fingerprint(p.blocksJson)}';
+
+  static String _weekday(DateTime d) => const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d.weekday - 1];
 
   GeneratedWorkout _draft(CoachSnapshot s, DayType day, Set<String> occupied) =>
       RuleEngine(s.context(occupied: occupied)).generate(
@@ -360,6 +388,9 @@ class CoachService {
   /// (skipped when it is no longer open). Throws [ApiException] so the UI can explain and keep the rules plan.
   Future<String> generateWithAi(DateTime date, {DayType? day, String note = '', String? replaceId}) async {
     final dayType = day ?? await nextDayType();
+    // Optimistic check: a refinement that runs in the background must not overwrite a change made meanwhile
+    // (e.g. the athlete asked the coach for an adjustment while this request was in flight).
+    final baseline = replaceId == null ? null : _planVersion(await _repo.plannedById(replaceId));
     final snap = await snapshot(date: date, day: dayType);
     final occupied = ref.read(occupiedEquipmentProvider);
     final draft = _draft(snap, dayType, occupied);
@@ -383,6 +414,7 @@ class CoachService {
       throw ApiException('ai_unavailable', 'The AI coach returned an unusable workout.');
     }
     if (replaceId != null && !await _isOpen(replaceId)) return replaceId;
+    if (replaceId != null && _planVersion(await _repo.plannedById(replaceId)) != baseline) return replaceId;
     final id = await _repo.savePlanned(
       id: replaceId ?? w['id'] as String?,
       date: date,

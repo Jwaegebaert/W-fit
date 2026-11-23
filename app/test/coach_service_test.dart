@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value, driftRuntimeOptions;
@@ -185,4 +186,89 @@ void main() {
     await coach.pregenerateNext();
     expect(api.calls, 1, reason: 'one AI attempt per date');
   });
+
+  group('coach changes stick', () {
+    test('a coach-changed plan that was not trained moves to the next training day', () async {
+      final c = _container();
+      final coach = c.read(coachServiceProvider);
+      final repo = c.read(repositoryProvider);
+      final missedDay = DateTime.now().subtract(const Duration(days: 1));
+      final today = DateTime.now();
+      final id = await coach.generateWithRules(missedDay, day: DayType.push);
+      final original = (await repo.plannedById(id))!;
+      // The coach adjusted it (as /ai/adjust does) – then the athlete skipped that day.
+      await repo.savePlanned(
+        id: id,
+        date: missedDay,
+        day: DayType.push,
+        title: 'Coach plan',
+        source: 'ai',
+        coachNote: 'Lighter shoulders as you asked.',
+        blocks: Repository.decodeBlocks(original.blocksJson),
+      );
+
+      final next = await coach.ensurePlan(today);
+      expect(next.id, id, reason: 'the coach-changed plan is kept, not replaced by a fresh rules plan');
+      expect(next.title, 'Coach plan');
+      expect(next.date, dateKey(today));
+      expect(PlanMeta.decode(next.metaJson).rationale.first, startsWith('Moved from'));
+      expect(await repo.plannedForDate(missedDay), isNull);
+    });
+
+    test('a missed plan of another day type is not carried over', () async {
+      final c = _container();
+      final coach = c.read(coachServiceProvider);
+      final missedDay = DateTime.now().subtract(const Duration(days: 1));
+      final id = await coach.generateWithRules(missedDay, day: DayType.legs); // rotation says push next
+      final next = await coach.ensurePlan(DateTime.now());
+      expect(next.id, isNot(id));
+      expect(next.dayType, 'push');
+    });
+
+    test('a background AI refinement never overwrites a newer change to the same plan', () async {
+      final api = _GatedApi();
+      final c = _container(api: api);
+      final coach = c.read(coachServiceProvider);
+      final repo = c.read(repositoryProvider);
+      final date = DateTime.now().add(const Duration(days: 1));
+      final id = await coach.generateWithRules(date, day: DayType.push);
+      final plan = (await repo.plannedById(id))!;
+      api.blocks = jsonDecode(plan.blocksJson) as List;
+
+      final refining = coach.generateWithAi(date, day: DayType.push, replaceId: id);
+      await api.started.future;
+      // Meanwhile the athlete asks the coach for a change, which is saved first.
+      await repo.savePlanned(
+        id: id,
+        date: date,
+        day: DayType.push,
+        title: 'Coach plan',
+        source: 'ai',
+        coachNote: 'As you asked.',
+        blocks: Repository.decodeBlocks(plan.blocksJson),
+      );
+      api.release.complete();
+      await refining;
+
+      expect((await repo.plannedById(id))!.title, 'Coach plan', reason: 'the older background result is dropped');
+    });
+  });
+}
+
+/// API whose workout call waits until [release] completes and then returns [blocks] unchanged.
+class _GatedApi extends ApiClient {
+  _GatedApi() : super(const ApiConfig(baseUrl: 'https://fake.test', apiKey: 'key'));
+
+  final started = Completer<void>();
+  final release = Completer<void>();
+  List<dynamic> blocks = const [];
+
+  @override
+  Future<Map<String, dynamic>> post(String path, Object body, {Duration timeout = const Duration(seconds: 60)}) async {
+    if (!started.isCompleted) started.complete();
+    await release.future;
+    return {
+      'workout': {'id': 'ai-1', 'title': 'Background AI plan', 'coachNote': '', 'blocks': blocks, 'meta': <String, dynamic>{}},
+    };
+  }
 }

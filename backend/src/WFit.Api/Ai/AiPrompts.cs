@@ -70,7 +70,7 @@ public static class AiPrompts
         """ + Safety + """
 
         Output: title <= 6 words. coachNote 1-3 short sentences (focus, key progression, limitation note if any). Item notes
-        <= 12 words (load cue or progression hint). rationale: 2-6 lines, each citing concrete data, e.g. "Biceps 3.5 of 4-10
+        <= 10 words, one line on the workout screen (load cue or progression hint; "" if nothing useful). rationale: 2-6 lines, each citing concrete data, e.g. "Biceps 3.5 of 4-10
         sets -> +1 set on cable curls" or "Chest press stalled 3 sessions -> 10-12 reps at 50 kg". focus: muscles you
         deliberately prioritised. changes: every draft exercise you replaced (from = draft id, to = new id, short reason).
         Concise English. JSON only.

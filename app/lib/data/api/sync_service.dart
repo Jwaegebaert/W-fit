@@ -89,39 +89,52 @@ class SyncService {
       var pulled = 0;
       await db.transaction(() async {
         // Mark pushed rows clean unless they were modified again while the request was in flight.
-        if (profile != null) {
-          await (db.update(db.profiles)..where((t) => t.id.equals(profile.id) & t.updatedAt.equals(profile.updatedAt)))
+        if (profile != null &&
+            await unchanged((db.select(db.profiles)..where((t) => t.id.equals(profile.id))).getSingleOrNull(), profile)) {
+          await (db.update(db.profiles)..where((t) => t.id.equals(profile.id)))
               .write(const ProfilesCompanion(dirty: Value(false)));
         }
         for (final r in equipment) {
-          await (db.update(db.equipmentStatuses)
-                ..where((t) => t.equipmentId.equals(r.equipmentId) & t.updatedAt.equals(r.updatedAt)))
-              .write(const EquipmentStatusesCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.equipmentStatuses)..where((t) => t.equipmentId.equals(r.equipmentId))).getSingleOrNull(), r)) {
+            await (db.update(db.equipmentStatuses)..where((t) => t.equipmentId.equals(r.equipmentId)))
+                .write(const EquipmentStatusesCompanion(dirty: Value(false)));
+          }
         }
         for (final r in prefs) {
-          await (db.update(db.exercisePreferences)
-                ..where((t) => t.exerciseId.equals(r.exerciseId) & t.updatedAt.equals(r.updatedAt)))
-              .write(const ExercisePreferencesCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.exercisePreferences)..where((t) => t.exerciseId.equals(r.exerciseId))).getSingleOrNull(), r)) {
+            await (db.update(db.exercisePreferences)..where((t) => t.exerciseId.equals(r.exerciseId)))
+                .write(const ExercisePreferencesCompanion(dirty: Value(false)));
+          }
         }
         for (final r in planned) {
-          await (db.update(db.plannedWorkouts)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
-              .write(const PlannedWorkoutsCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.plannedWorkouts)..where((t) => t.id.equals(r.id))).getSingleOrNull(), r)) {
+            await (db.update(db.plannedWorkouts)..where((t) => t.id.equals(r.id)))
+                .write(const PlannedWorkoutsCompanion(dirty: Value(false)));
+          }
         }
         for (final r in sessions) {
-          await (db.update(db.workoutSessions)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
-              .write(const WorkoutSessionsCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.workoutSessions)..where((t) => t.id.equals(r.id))).getSingleOrNull(), r)) {
+            await (db.update(db.workoutSessions)..where((t) => t.id.equals(r.id)))
+                .write(const WorkoutSessionsCompanion(dirty: Value(false)));
+          }
         }
         for (final r in sets) {
-          await (db.update(db.setLogs)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
-              .write(const SetLogsCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.setLogs)..where((t) => t.id.equals(r.id))).getSingleOrNull(), r)) {
+            await (db.update(db.setLogs)..where((t) => t.id.equals(r.id)))
+                .write(const SetLogsCompanion(dirty: Value(false)));
+          }
         }
         for (final r in body) {
-          await (db.update(db.bodyMetrics)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
-              .write(const BodyMetricsCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.bodyMetrics)..where((t) => t.id.equals(r.id))).getSingleOrNull(), r)) {
+            await (db.update(db.bodyMetrics)..where((t) => t.id.equals(r.id)))
+                .write(const BodyMetricsCompanion(dirty: Value(false)));
+          }
         }
         for (final r in feedback) {
-          await (db.update(db.feedbackEntries)..where((t) => t.id.equals(r.id) & t.updatedAt.equals(r.updatedAt)))
-              .write(const FeedbackEntriesCompanion(dirty: Value(false)));
+          if (await unchanged((db.select(db.feedbackEntries)..where((t) => t.id.equals(r.id))).getSingleOrNull(), r)) {
+            await (db.update(db.feedbackEntries)..where((t) => t.id.equals(r.id)))
+                .write(const FeedbackEntriesCompanion(dirty: Value(false)));
+          }
         }
 
         pulled = await applyRemoteChanges(response['changes'] as Map<String, dynamic>? ?? const {});
@@ -138,8 +151,10 @@ class SyncService {
   /// Applies server records unless a newer local edit is still waiting to be pushed.
   Future<int> applyRemoteChanges(Map<String, dynamic> changes) async {
     var n = 0;
+    // A pending local edit wins ties: timestamps have 1 s precision, so the server can echo back our own previous
+    // push with the same updatedAt as a newer local change.
     bool keepLocal(bool? dirty, DateTime? localUpdated, DateTime remoteUpdated) =>
-        dirty == true && localUpdated != null && localUpdated.toUtc().isAfter(remoteUpdated);
+        dirty == true && localUpdated != null && !localUpdated.toUtc().isBefore(remoteUpdated);
 
     final p = changes['profile'] as Map<String, dynamic>?;
     if (p != null) {
@@ -284,6 +299,11 @@ class SyncService {
     return n;
   }
 }
+
+
+/// True when the row read back ([current]) is still exactly the version that was pushed ([pushed]). Rows are only
+/// marked clean then: an edit made while the request was in flight may share the pushed row's (1 s) timestamp.
+Future<bool> unchanged<D>(Future<D?> current, D pushed) async => await current == pushed;
 
 // ---------------- JSON mappers (contract: docs/API.md) ----------------
 Map<String, dynamic> profileToJson(Profile p) => {

@@ -157,6 +157,20 @@ public class AiOutputValidatorTests
     }
 
     [Fact]
+    public void Item_notes_fit_on_one_workout_line()
+    {
+        var longNote = string.Join(' ', Enumerable.Repeat("keep the elbows tucked and control the lowering", 4));
+        var item = AiOutputValidator.ClampItem(
+            Item("dumbbell-bench-press") with { Notes = longNote }, PushCandidates["strength"].First(e => e.Id == "dumbbell-bench-press"),
+            WorkoutSection.Main);
+
+        Assert.True(item.Notes!.Length <= AiOutputValidator.MaxItemNoteLength);
+        Assert.EndsWith("…", item.Notes);
+        Assert.Equal("", AiOutputValidator.ClampItem(Item("dumbbell-bench-press") with { Notes = "  " },
+            PushCandidates["strength"].First(e => e.Id == "dumbbell-bench-press"), WorkoutSection.Main).Notes);
+    }
+
+    [Fact]
     public void Focus_changes_keep_tracked_muscles_once_with_a_valid_level()
     {
         var result = AiOutputValidator.ValidateFocusChanges(
