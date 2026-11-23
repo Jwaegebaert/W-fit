@@ -49,6 +49,13 @@ class SettingsScreen extends ConsumerWidget {
               onTap: () => context.push('/settings/focus'),
             ),
             ListTile(
+              leading: const Icon(Icons.favorite_border_rounded),
+              title: const Text('Samsung Health'),
+              subtitle: const Text('Save workouts, read heart rate from your watch'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/settings/health'),
+            ),
+            ListTile(
               leading: const Icon(Icons.menu_book_outlined),
               title: const Text('Exercise preferences'),
               subtitle: const Text('Like, dislike or exclude exercises'),

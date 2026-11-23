@@ -99,6 +99,10 @@ public sealed class WorkoutSession : SyncEntity
     public int? Rating { get; set; }
     public int? PerceivedEffort { get; set; }
     public string Notes { get; set; } = "";
+
+    /// <summary>Average / maximum heart rate (bpm) during the session, from Health Connect.</summary>
+    public int? AvgHeartRate { get; set; }
+    public int? MaxHeartRate { get; set; }
 }
 
 public sealed class SetLog : SyncEntity

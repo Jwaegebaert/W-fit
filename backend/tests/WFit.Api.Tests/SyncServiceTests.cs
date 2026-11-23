@@ -67,6 +67,16 @@ public class SyncServiceTests
         Assert.Equal(["lower_back"], p.MuscleFocus.Light);
     }
 
+    [Theory]
+    [InlineData(128, 128)]
+    [InlineData(30, 30)]
+    [InlineData(230, 230)]
+    [InlineData(12, null)]
+    [InlineData(400, null)]
+    [InlineData(null, null)]
+    public void Session_heart_rate_is_kept_only_when_plausible(int? bpm, int? expected) =>
+        Assert.Equal(expected, SyncMapper.HeartRate(bpm));
+
     [Fact]
     public async Task Last_write_wins_by_client_updated_at()
     {

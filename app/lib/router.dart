@@ -11,6 +11,7 @@ import 'features/history/history_screen.dart';
 import 'features/history/session_detail_screen.dart';
 import 'features/settings/connection_screen.dart';
 import 'features/settings/equipment_screen.dart';
+import 'features/settings/health_screen.dart';
 import 'features/settings/muscle_focus_screen.dart';
 import 'features/settings/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -66,6 +67,7 @@ final router = GoRouter(
     GoRoute(path: '/settings/profile', parentNavigatorKey: _rootKey, builder: (_, _) => const ProfileScreen()),
     GoRoute(path: '/settings/equipment', parentNavigatorKey: _rootKey, builder: (_, _) => const EquipmentScreen()),
     GoRoute(path: '/settings/focus', parentNavigatorKey: _rootKey, builder: (_, _) => const MuscleFocusScreen()),
+    GoRoute(path: '/settings/health', parentNavigatorKey: _rootKey, builder: (_, _) => const HealthScreen()),
     GoRoute(path: '/settings/connection', parentNavigatorKey: _rootKey, builder: (_, _) => const ConnectionScreen()),
   ],
 );

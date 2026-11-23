@@ -77,6 +77,13 @@ class SessionDetailScreen extends ConsumerWidget {
               StatTile(label: 'sets', value: '${sets.where((s) => s.completed).length}', icon: Icons.checklist),
               StatTile(label: 'kg volume', value: volume.toStringAsFixed(0), icon: Icons.fitness_center),
             ]),
+            if (session.avgHeartRate != null) ...[
+              const SizedBox(height: 8),
+              StatRow(children: [
+                StatTile(label: 'avg heart rate', value: '${session.avgHeartRate} bpm', icon: Icons.monitor_heart_outlined),
+                StatTile(label: 'max heart rate', value: '${session.maxHeartRate ?? '–'} bpm', icon: Icons.favorite_border_rounded),
+              ]),
+            ],
             if (session.rating != null || session.perceivedEffort != null || session.notes.isNotEmpty) ...[
               const SizedBox(height: 12),
               Card(

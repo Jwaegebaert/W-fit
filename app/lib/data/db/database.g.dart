@@ -2692,6 +2692,40 @@ class $WorkoutSessionsTable extends WorkoutSessions
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _avgHeartRateMeta = const VerificationMeta(
+    'avgHeartRate',
+  );
+  @override
+  late final GeneratedColumn<int> avgHeartRate = GeneratedColumn<int>(
+    'avg_heart_rate',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _maxHeartRateMeta = const VerificationMeta(
+    'maxHeartRate',
+  );
+  @override
+  late final GeneratedColumn<int> maxHeartRate = GeneratedColumn<int>(
+    'max_heart_rate',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _healthExportedAtMeta = const VerificationMeta(
+    'healthExportedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> healthExportedAt =
+      GeneratedColumn<DateTime>(
+        'health_exported_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     updatedAt,
@@ -2707,6 +2741,9 @@ class $WorkoutSessionsTable extends WorkoutSessions
     rating,
     perceivedEffort,
     notes,
+    avgHeartRate,
+    maxHeartRate,
+    healthExportedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2814,6 +2851,33 @@ class $WorkoutSessionsTable extends WorkoutSessions
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('avg_heart_rate')) {
+      context.handle(
+        _avgHeartRateMeta,
+        avgHeartRate.isAcceptableOrUnknown(
+          data['avg_heart_rate']!,
+          _avgHeartRateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('max_heart_rate')) {
+      context.handle(
+        _maxHeartRateMeta,
+        maxHeartRate.isAcceptableOrUnknown(
+          data['max_heart_rate']!,
+          _maxHeartRateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('health_exported_at')) {
+      context.handle(
+        _healthExportedAtMeta,
+        healthExportedAt.isAcceptableOrUnknown(
+          data['health_exported_at']!,
+          _healthExportedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2875,6 +2939,18 @@ class $WorkoutSessionsTable extends WorkoutSessions
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       )!,
+      avgHeartRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}avg_heart_rate'],
+      ),
+      maxHeartRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_heart_rate'],
+      ),
+      healthExportedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}health_exported_at'],
+      ),
     );
   }
 
@@ -2898,6 +2974,13 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
   final int? rating;
   final int? perceivedEffort;
   final String notes;
+
+  /// Average / maximum heart rate (bpm) during the session, read from Health Connect (watch); added in schema v5.
+  final int? avgHeartRate;
+  final int? maxHeartRate;
+
+  /// When the session was saved to Health Connect (this device only, not synced); added in schema v5.
+  final DateTime? healthExportedAt;
   const WorkoutSession({
     required this.updatedAt,
     required this.deleted,
@@ -2912,6 +2995,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     this.rating,
     this.perceivedEffort,
     required this.notes,
+    this.avgHeartRate,
+    this.maxHeartRate,
+    this.healthExportedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2939,6 +3025,15 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       map['perceived_effort'] = Variable<int>(perceivedEffort);
     }
     map['notes'] = Variable<String>(notes);
+    if (!nullToAbsent || avgHeartRate != null) {
+      map['avg_heart_rate'] = Variable<int>(avgHeartRate);
+    }
+    if (!nullToAbsent || maxHeartRate != null) {
+      map['max_heart_rate'] = Variable<int>(maxHeartRate);
+    }
+    if (!nullToAbsent || healthExportedAt != null) {
+      map['health_exported_at'] = Variable<DateTime>(healthExportedAt);
+    }
     return map;
   }
 
@@ -2967,6 +3062,15 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           ? const Value.absent()
           : Value(perceivedEffort),
       notes: Value(notes),
+      avgHeartRate: avgHeartRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avgHeartRate),
+      maxHeartRate: maxHeartRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(maxHeartRate),
+      healthExportedAt: healthExportedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(healthExportedAt),
     );
   }
 
@@ -2989,6 +3093,11 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       rating: serializer.fromJson<int?>(json['rating']),
       perceivedEffort: serializer.fromJson<int?>(json['perceivedEffort']),
       notes: serializer.fromJson<String>(json['notes']),
+      avgHeartRate: serializer.fromJson<int?>(json['avgHeartRate']),
+      maxHeartRate: serializer.fromJson<int?>(json['maxHeartRate']),
+      healthExportedAt: serializer.fromJson<DateTime?>(
+        json['healthExportedAt'],
+      ),
     );
   }
   @override
@@ -3008,6 +3117,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       'rating': serializer.toJson<int?>(rating),
       'perceivedEffort': serializer.toJson<int?>(perceivedEffort),
       'notes': serializer.toJson<String>(notes),
+      'avgHeartRate': serializer.toJson<int?>(avgHeartRate),
+      'maxHeartRate': serializer.toJson<int?>(maxHeartRate),
+      'healthExportedAt': serializer.toJson<DateTime?>(healthExportedAt),
     };
   }
 
@@ -3025,6 +3137,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     Value<int?> rating = const Value.absent(),
     Value<int?> perceivedEffort = const Value.absent(),
     String? notes,
+    Value<int?> avgHeartRate = const Value.absent(),
+    Value<int?> maxHeartRate = const Value.absent(),
+    Value<DateTime?> healthExportedAt = const Value.absent(),
   }) => WorkoutSession(
     updatedAt: updatedAt ?? this.updatedAt,
     deleted: deleted ?? this.deleted,
@@ -3045,6 +3160,11 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
         ? perceivedEffort.value
         : this.perceivedEffort,
     notes: notes ?? this.notes,
+    avgHeartRate: avgHeartRate.present ? avgHeartRate.value : this.avgHeartRate,
+    maxHeartRate: maxHeartRate.present ? maxHeartRate.value : this.maxHeartRate,
+    healthExportedAt: healthExportedAt.present
+        ? healthExportedAt.value
+        : this.healthExportedAt,
   );
   WorkoutSession copyWithCompanion(WorkoutSessionsCompanion data) {
     return WorkoutSession(
@@ -3067,6 +3187,15 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           ? data.perceivedEffort.value
           : this.perceivedEffort,
       notes: data.notes.present ? data.notes.value : this.notes,
+      avgHeartRate: data.avgHeartRate.present
+          ? data.avgHeartRate.value
+          : this.avgHeartRate,
+      maxHeartRate: data.maxHeartRate.present
+          ? data.maxHeartRate.value
+          : this.maxHeartRate,
+      healthExportedAt: data.healthExportedAt.present
+          ? data.healthExportedAt.value
+          : this.healthExportedAt,
     );
   }
 
@@ -3085,7 +3214,10 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           ..write('durationSeconds: $durationSeconds, ')
           ..write('rating: $rating, ')
           ..write('perceivedEffort: $perceivedEffort, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('avgHeartRate: $avgHeartRate, ')
+          ..write('maxHeartRate: $maxHeartRate, ')
+          ..write('healthExportedAt: $healthExportedAt')
           ..write(')'))
         .toString();
   }
@@ -3105,6 +3237,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     rating,
     perceivedEffort,
     notes,
+    avgHeartRate,
+    maxHeartRate,
+    healthExportedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -3122,7 +3257,10 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           other.durationSeconds == this.durationSeconds &&
           other.rating == this.rating &&
           other.perceivedEffort == this.perceivedEffort &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.avgHeartRate == this.avgHeartRate &&
+          other.maxHeartRate == this.maxHeartRate &&
+          other.healthExportedAt == this.healthExportedAt);
 }
 
 class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
@@ -3139,6 +3277,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   final Value<int?> rating;
   final Value<int?> perceivedEffort;
   final Value<String> notes;
+  final Value<int?> avgHeartRate;
+  final Value<int?> maxHeartRate;
+  final Value<DateTime?> healthExportedAt;
   final Value<int> rowid;
   const WorkoutSessionsCompanion({
     this.updatedAt = const Value.absent(),
@@ -3154,6 +3295,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     this.rating = const Value.absent(),
     this.perceivedEffort = const Value.absent(),
     this.notes = const Value.absent(),
+    this.avgHeartRate = const Value.absent(),
+    this.maxHeartRate = const Value.absent(),
+    this.healthExportedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WorkoutSessionsCompanion.insert({
@@ -3170,6 +3314,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     this.rating = const Value.absent(),
     this.perceivedEffort = const Value.absent(),
     this.notes = const Value.absent(),
+    this.avgHeartRate = const Value.absent(),
+    this.maxHeartRate = const Value.absent(),
+    this.healthExportedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : updatedAt = Value(updatedAt),
        id = Value(id),
@@ -3190,6 +3337,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     Expression<int>? rating,
     Expression<int>? perceivedEffort,
     Expression<String>? notes,
+    Expression<int>? avgHeartRate,
+    Expression<int>? maxHeartRate,
+    Expression<DateTime>? healthExportedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3206,6 +3356,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
       if (rating != null) 'rating': rating,
       if (perceivedEffort != null) 'perceived_effort': perceivedEffort,
       if (notes != null) 'notes': notes,
+      if (avgHeartRate != null) 'avg_heart_rate': avgHeartRate,
+      if (maxHeartRate != null) 'max_heart_rate': maxHeartRate,
+      if (healthExportedAt != null) 'health_exported_at': healthExportedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3224,6 +3377,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     Value<int?>? rating,
     Value<int?>? perceivedEffort,
     Value<String>? notes,
+    Value<int?>? avgHeartRate,
+    Value<int?>? maxHeartRate,
+    Value<DateTime?>? healthExportedAt,
     Value<int>? rowid,
   }) {
     return WorkoutSessionsCompanion(
@@ -3240,6 +3396,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
       rating: rating ?? this.rating,
       perceivedEffort: perceivedEffort ?? this.perceivedEffort,
       notes: notes ?? this.notes,
+      avgHeartRate: avgHeartRate ?? this.avgHeartRate,
+      maxHeartRate: maxHeartRate ?? this.maxHeartRate,
+      healthExportedAt: healthExportedAt ?? this.healthExportedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3286,6 +3445,15 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (avgHeartRate.present) {
+      map['avg_heart_rate'] = Variable<int>(avgHeartRate.value);
+    }
+    if (maxHeartRate.present) {
+      map['max_heart_rate'] = Variable<int>(maxHeartRate.value);
+    }
+    if (healthExportedAt.present) {
+      map['health_exported_at'] = Variable<DateTime>(healthExportedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3308,6 +3476,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
           ..write('rating: $rating, ')
           ..write('perceivedEffort: $perceivedEffort, ')
           ..write('notes: $notes, ')
+          ..write('avgHeartRate: $avgHeartRate, ')
+          ..write('maxHeartRate: $maxHeartRate, ')
+          ..write('healthExportedAt: $healthExportedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7347,6 +7518,9 @@ typedef $$WorkoutSessionsTableCreateCompanionBuilder =
       Value<int?> rating,
       Value<int?> perceivedEffort,
       Value<String> notes,
+      Value<int?> avgHeartRate,
+      Value<int?> maxHeartRate,
+      Value<DateTime?> healthExportedAt,
       Value<int> rowid,
     });
 typedef $$WorkoutSessionsTableUpdateCompanionBuilder =
@@ -7364,6 +7538,9 @@ typedef $$WorkoutSessionsTableUpdateCompanionBuilder =
       Value<int?> rating,
       Value<int?> perceivedEffort,
       Value<String> notes,
+      Value<int?> avgHeartRate,
+      Value<int?> maxHeartRate,
+      Value<DateTime?> healthExportedAt,
       Value<int> rowid,
     });
 
@@ -7438,6 +7615,21 @@ class $$WorkoutSessionsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get avgHeartRate => $composableBuilder(
+    column: $table.avgHeartRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxHeartRate => $composableBuilder(
+    column: $table.maxHeartRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get healthExportedAt => $composableBuilder(
+    column: $table.healthExportedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7515,6 +7707,21 @@ class $$WorkoutSessionsTableOrderingComposer
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get avgHeartRate => $composableBuilder(
+    column: $table.avgHeartRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxHeartRate => $composableBuilder(
+    column: $table.maxHeartRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get healthExportedAt => $composableBuilder(
+    column: $table.healthExportedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$WorkoutSessionsTableAnnotationComposer
@@ -7570,6 +7777,21 @@ class $$WorkoutSessionsTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<int> get avgHeartRate => $composableBuilder(
+    column: $table.avgHeartRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get maxHeartRate => $composableBuilder(
+    column: $table.maxHeartRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get healthExportedAt => $composableBuilder(
+    column: $table.healthExportedAt,
+    builder: (column) => column,
+  );
 }
 
 class $$WorkoutSessionsTableTableManager
@@ -7622,6 +7844,9 @@ class $$WorkoutSessionsTableTableManager
                 Value<int?> rating = const Value.absent(),
                 Value<int?> perceivedEffort = const Value.absent(),
                 Value<String> notes = const Value.absent(),
+                Value<int?> avgHeartRate = const Value.absent(),
+                Value<int?> maxHeartRate = const Value.absent(),
+                Value<DateTime?> healthExportedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutSessionsCompanion(
                 updatedAt: updatedAt,
@@ -7637,6 +7862,9 @@ class $$WorkoutSessionsTableTableManager
                 rating: rating,
                 perceivedEffort: perceivedEffort,
                 notes: notes,
+                avgHeartRate: avgHeartRate,
+                maxHeartRate: maxHeartRate,
+                healthExportedAt: healthExportedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -7654,6 +7882,9 @@ class $$WorkoutSessionsTableTableManager
                 Value<int?> rating = const Value.absent(),
                 Value<int?> perceivedEffort = const Value.absent(),
                 Value<String> notes = const Value.absent(),
+                Value<int?> avgHeartRate = const Value.absent(),
+                Value<int?> maxHeartRate = const Value.absent(),
+                Value<DateTime?> healthExportedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WorkoutSessionsCompanion.insert(
                 updatedAt: updatedAt,
@@ -7669,6 +7900,9 @@ class $$WorkoutSessionsTableTableManager
                 rating: rating,
                 perceivedEffort: perceivedEffort,
                 notes: notes,
+                avgHeartRate: avgHeartRate,
+                maxHeartRate: maxHeartRate,
+                healthExportedAt: healthExportedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

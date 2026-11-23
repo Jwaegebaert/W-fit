@@ -555,6 +555,9 @@ namespace WFit.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
+                    b.Property<int?>("AvgHeartRate")
+                        .HasColumnType("int");
+
                     b.Property<string>("DayType")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -568,6 +571,9 @@ namespace WFit.Api.Data.Migrations
 
                     b.Property<DateTimeOffset?>("EndedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("MaxHeartRate")
+                        .HasColumnType("int");
 
                     b.Property<string>("Notes")
                         .IsRequired()

@@ -1,5 +1,6 @@
 package com.jwaegebaert.wfit
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity: the health plugin requests Health Connect permissions with registerForActivityResult.
+class MainActivity : FlutterFragmentActivity()

@@ -117,6 +117,8 @@ public sealed record WorkoutSessionDto : ISyncDto
     public int? Rating { get; init; }
     public int? PerceivedEffort { get; init; }
     public string Notes { get; init; } = "";
+    public int? AvgHeartRate { get; init; }
+    public int? MaxHeartRate { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
     public bool Deleted { get; init; }
 }

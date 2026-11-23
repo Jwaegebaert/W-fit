@@ -38,6 +38,7 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
       if (config.isConfigured) ref.read(apiClientProvider).health().ignore();
       ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
     });
+    ref.read(healthSyncProvider).catchUp();
   }
 
   @override
@@ -50,6 +51,7 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
+      ref.read(healthSyncProvider).catchUp(); // the watch's heart rate may have arrived meanwhile
     }
   }
 

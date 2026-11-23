@@ -67,7 +67,7 @@ public static class SyncMapper
     {
         Id = e.Id, PlannedWorkoutId = e.PlannedWorkoutId, DayType = e.DayType, Title = e.Title, StartedAt = e.StartedAt,
         EndedAt = e.EndedAt, DurationSeconds = e.DurationSeconds, Rating = e.Rating, PerceivedEffort = e.PerceivedEffort,
-        Notes = e.Notes, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+        Notes = e.Notes, AvgHeartRate = e.AvgHeartRate, MaxHeartRate = e.MaxHeartRate, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
     };
 
     public static SetLogDto ToDto(this SetLog e) => new()
@@ -207,7 +207,12 @@ public static class SyncMapper
         e.Rating = d.Rating;
         e.PerceivedEffort = d.PerceivedEffort;
         e.Notes = Trunc(d.Notes, Len.Text);
+        e.AvgHeartRate = HeartRate(d.AvgHeartRate);
+        e.MaxHeartRate = HeartRate(d.MaxHeartRate);
     }
+
+    /// <summary>Plausible heart rate (30-230 bpm) or null.</summary>
+    public static int? HeartRate(int? bpm) => bpm is >= 30 and <= 230 ? bpm : null;
 
     public static void Apply(this SetLog e, SetLogDto d, string sessionId)
     {

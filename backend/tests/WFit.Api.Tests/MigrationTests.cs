@@ -17,7 +17,7 @@ public class MigrationTests
     {
         using var db = SqlServerContext();
         Assert.False(db.Database.HasPendingModelChanges(), "Run `dotnet ef migrations add <Name>` – the model differs from the snapshot.");
-        Assert.Equal("MuscleFocus", db.Database.GetMigrations().Last().Split('_', 2)[1]);
+        Assert.Equal("SessionHeartRate", db.Database.GetMigrations().Last().Split('_', 2)[1]);
     }
 
     [Fact]

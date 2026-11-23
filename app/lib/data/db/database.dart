@@ -87,6 +87,13 @@ class WorkoutSessions extends Table with SyncColumns {
   IntColumn get perceivedEffort => integer().nullable()();
   TextColumn get notes => text().withDefault(const Constant(''))();
 
+  /// Average / maximum heart rate (bpm) during the session, read from Health Connect (watch); added in schema v5.
+  IntColumn get avgHeartRate => integer().nullable()();
+  IntColumn get maxHeartRate => integer().nullable()();
+
+  /// When the session was saved to Health Connect (this device only, not synced); added in schema v5.
+  DateTimeColumn get healthExportedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -181,8 +188,9 @@ class AppDatabase extends _$AppDatabase {
 
   /// v1: initial schema. v2: `feedback_entries` table and `planned_workouts.meta_json`.
   /// v3: profile `rest_mode`, `cooldown_stretches` and `bar_weights_json`. v4: profile `muscle_focus_json`.
+  /// v5: session heart rate (`avg_heart_rate`, `max_heart_rate`) and `health_exported_at`.
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   static final _feedbackStatusIndex = Index('idx_feedback_status',
       'CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback_entries (status, deleted)');
@@ -208,6 +216,11 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(profiles, profiles.barWeightsJson);
           }
           if (from < 4) await m.addColumn(profiles, profiles.muscleFocusJson);
+          if (from < 5) {
+            await m.addColumn(workoutSessions, workoutSessions.avgHeartRate);
+            await m.addColumn(workoutSessions, workoutSessions.maxHeartRate);
+            await m.addColumn(workoutSessions, workoutSessions.healthExportedAt);
+          }
         },
       );
 

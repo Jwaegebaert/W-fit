@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.jwaegebaert.wfit"
-    compileSdk = flutter.compileSdkVersion
+    // Health Connect (connect-client 1.2.0-alpha06, used by the health plugin) needs API 37.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -19,7 +20,8 @@ android {
         applicationId = "com.jwaegebaert.wfit"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Health Connect needs Android 8.0 (API 26) or later.
+        minSdk = maxOf(26, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

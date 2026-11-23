@@ -9,6 +9,7 @@ import 'data/repositories/repository.dart';
 import 'domain/catalog.dart';
 import 'domain/progression.dart';
 import 'services/coach_service.dart';
+import 'services/health_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -143,6 +144,12 @@ final allLoggedSetsProvider = FutureProvider<List<LoggedSet>>((ref) async {
 });
 
 final coachServiceProvider = Provider<CoachService>((ref) => CoachService(ref));
+
+/// Health Connect platform bridge (overridden with a fake in tests).
+final healthBridgeProvider = Provider<HealthBridge>((ref) => HealthConnectBridge());
+
+final healthSyncProvider =
+    Provider<HealthSync>((ref) => HealthSync(ref.watch(repositoryProvider), ref.watch(healthBridgeProvider)));
 
 final activeFeedbackProvider =
     StreamProvider<List<FeedbackEntry>>((ref) => ref.watch(repositoryProvider).watchActiveFeedback());

@@ -60,13 +60,13 @@ Future<Set<String>> _indexes(AppDatabase db) async =>
 void main() {
   setUpAll(() => driftRuntimeOptions.dontWarnAboutMultipleDatabases = true);
 
-  test('v1 -> v4 keeps all data and adds feedback_entries, planned_workouts.meta_json and profile settings', () async {
+  test('v1 -> v5 keeps all data and adds feedback_entries, planned_workouts.meta_json and profile settings', () async {
     final db = AppDatabase(NativeDatabase.memory(setup: (raw) => _createV1(raw.execute)));
     addTearDown(db.close);
     final repo = Repository(db);
 
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.read<int>('user_version'), 4);
+    expect(version.read<int>('user_version'), 5);
     await db.validateDatabaseSchema();
 
     // Existing data survives.
@@ -86,6 +86,8 @@ void main() {
     expect(Repository.decodeBlocks(plan.blocksJson).single.items.single.exerciseId, 'leg-press');
     final session = (await repo.sessionById('s1'))!;
     expect(session.rating, 4);
+    expect(session.avgHeartRate, isNull);
+    expect(session.healthExportedAt, isNull);
     final sets = await repo.setsForSession('s1');
     expect(sets.single.rir, 2);
     expect(sets.single.weightKg, 100.0);
@@ -105,7 +107,7 @@ void main() {
     );
   });
 
-  test('migrated schema matches a freshly created v4 database', () async {
+  test('migrated schema matches a freshly created v5 database', () async {
     final migrated = AppDatabase(NativeDatabase.memory(setup: (raw) => _createV1(raw.execute)));
     final fresh = AppDatabase(NativeDatabase.memory());
     addTearDown(migrated.close);

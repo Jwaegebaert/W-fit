@@ -236,6 +236,8 @@ class SyncService {
             rating: Value(_i(r['rating'])),
             perceivedEffort: Value(_i(r['perceivedEffort'])),
             notes: Value(r['notes'] as String? ?? ''),
+            avgHeartRate: Value(_i(r['avgHeartRate'])),
+            maxHeartRate: Value(_i(r['maxHeartRate'])),
             updatedAt: _dt(r['updatedAt']),
             deleted: Value(r['deleted'] as bool? ?? false),
             dirty: const Value(false),
@@ -392,6 +394,8 @@ Map<String, dynamic> sessionToJson(WorkoutSession s) => {
       'rating': s.rating,
       'perceivedEffort': s.perceivedEffort,
       'notes': s.notes,
+      'avgHeartRate': s.avgHeartRate,
+      'maxHeartRate': s.maxHeartRate,
       'updatedAt': _iso(s.updatedAt),
       'deleted': s.deleted,
     };

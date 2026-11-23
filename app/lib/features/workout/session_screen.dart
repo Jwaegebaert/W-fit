@@ -215,6 +215,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     ref.read(occupiedEquipmentProvider.notifier).clear();
     unawaited(ref.read(syncControllerProvider.notifier).syncNow());
     unawaited(ref.read(coachServiceProvider).pregenerateNext());
+    unawaited(ref.read(healthSyncProvider).catchUp()); // save to Health Connect, read the watch's heart rate
     if (!mounted) return;
     await showDialog<void>(
       context: context,
