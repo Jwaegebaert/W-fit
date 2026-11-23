@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../../domain/catalog.dart' show LoadModel;
 import '../db/database.dart';
 import 'api_client.dart';
 
@@ -155,6 +156,9 @@ class SyncService {
               birthYear: Value(_i(p['birthYear'])),
               injuries: Value(p['injuries'] as String? ?? ''),
               notes: Value(p['notes'] as String? ?? ''),
+              restMode: Value(p['restMode'] as String? ?? 'normal'),
+              cooldownStretches: Value(_i(p['cooldownStretches']) ?? 3),
+              barWeightsJson: Value(p['barWeights'] is Map ? jsonEncode(p['barWeights']) : '{}'),
               updatedAt: _dt(p['updatedAt']),
               deleted: Value(p['deleted'] as bool? ?? false),
               dirty: const Value(false),
@@ -292,6 +296,9 @@ Map<String, dynamic> profileToJson(Profile p) => {
       'birthYear': p.birthYear,
       'injuries': p.injuries,
       'notes': p.notes,
+      'restMode': p.restMode,
+      'cooldownStretches': p.cooldownStretches,
+      'barWeights': LoadModel.parseOverrides(p.barWeightsJson),
       'updatedAt': _iso(p.updatedAt),
       'deleted': p.deleted,
     };

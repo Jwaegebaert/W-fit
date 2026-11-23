@@ -41,6 +41,28 @@ public class SyncServiceTests
     }
 
     [Fact]
+    public async Task Profile_training_preferences_round_trip_and_are_clamped()
+    {
+        var response = await Service().SyncAsync(new SyncRequest
+        {
+            Since = null,
+            Changes = new SyncChanges
+            {
+                Profile = new ProfileDto
+                {
+                    Name = "Alex", RestMode = "turbo", CooldownStretches = 9,
+                    BarWeights = new() { ["smith_machine"] = 15, ["barbell"] = 500 }, UpdatedAt = TestEnv.Now,
+                },
+            },
+        }, default);
+
+        var p = response.Changes.Profile!;
+        Assert.Equal("normal", p.RestMode);
+        Assert.Equal(3, p.CooldownStretches);
+        Assert.Equal(new Dictionary<string, double> { ["smith_machine"] = 15 }, p.BarWeights);
+    }
+
+    [Fact]
     public async Task Last_write_wins_by_client_updated_at()
     {
         var id = NewId();

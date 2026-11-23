@@ -204,9 +204,13 @@ Future<void> expectScrollEndClear(WidgetTester tester, {Finder? scrollable, Stri
   state.position.jumpTo(state.position.maxScrollExtent);
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
-  // Lazy lists may grow their extent as items get built.
-  state.position.jumpTo(state.position.maxScrollExtent);
-  await tester.pump();
+  // Lazy lists may grow their extent as items get built: jump until the extent is stable.
+  for (var i = 0; i < 6; i++) {
+    final extent = state.position.maxScrollExtent;
+    state.position.jumpTo(extent);
+    await tester.pump();
+    if (state.position.maxScrollExtent == extent) break;
+  }
   final maxBottom = _lastItemBottom(tester.renderObject(target));
   final limit = overSheet ? safeBottom(tester) : contentLimit(tester);
   state.position.jumpTo(0);

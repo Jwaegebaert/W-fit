@@ -17,6 +17,7 @@ import '../../providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/report_issue_sheet.dart';
 import '../dashboard/dashboard_screen.dart';
+import '../settings/equipment_screen.dart' show showBarWeightDialog;
 import 'swap_sheet.dart';
 import 'workout_timer.dart';
 
@@ -353,7 +354,7 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
       reps = _targetReps;
       _reps[idx].text = '$reps';
     }
-    if (e != null && !e.isWeighted && weight == 0) weight = null;
+    if (e != null && (!_weightColumn(e) || (!e.isWeighted && weight == 0))) weight = null;
     await ref.read(repositoryProvider).logSet(
           id: existing?.id,
           sessionId: widget.sessionId,
@@ -387,21 +388,44 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
           section: widget.section,
           exerciseOrder: widget.order,
           setNumber: setNumber,
-          weightKg: double.tryParse(_weight[idx].text.replaceAll(',', '.')),
+          weightKg: _weightColumn(ref.read(catalogProvider).exercise(widget.item.exerciseId))
+              ? double.tryParse(_weight[idx].text.replaceAll(',', '.'))
+              : null,
           reps: int.tryParse(_reps[idx].text),
           durationSeconds: existing.durationSeconds,
           completed: true,
         );
   }
 
+  /// Work timer for a timed set; per-side exercises run one timer per side before the set is logged.
   void _startWork(int setNumber, String name) {
     final secs = widget.item.durationSeconds ?? 30;
-    ref.read(workoutTimerProvider.notifier).start(
-          name,
-          secs,
-          isWork: true,
-          onDone: () => _toggleSet(setNumber, true, durationSeconds: secs),
-        );
+    final timer = ref.read(workoutTimerProvider.notifier);
+    void log() => _toggleSet(setNumber, true, durationSeconds: secs);
+    if (!_perSide) {
+      timer.start(name, secs, isWork: true, onDone: log);
+      return;
+    }
+    timer.start('$name · side 1', secs, isWork: true, onDone: () {
+      if (mounted) timer.start('$name · side 2', secs, isWork: true, onDone: log);
+    });
+  }
+
+  bool get _perSide =>
+      widget.item.perSide || (ref.read(catalogProvider).exercise(widget.item.exerciseId)?.unilateral ?? false);
+
+  /// Optional extra load (pull-ups, dips): the kg column only shows once asked for or already used.
+  bool _showOptionalWeight = false;
+
+  bool _weightColumn(Exercise? e) {
+    if (e == null) return true;
+    return switch (e.load) {
+      LoadType.none => false,
+      LoadType.optional => _showOptionalWeight ||
+          widget.item.targetWeightKg != null ||
+          widget.logged.any((s) => (s.weightKg ?? 0) > 0),
+      _ => true,
+    };
   }
 
   @override
@@ -431,8 +455,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
                   Text(name, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
                   Text(
-                    '${widget.item.targetLabel}'
-                    '${widget.item.targetWeightKg != null ? ' · ${formatKg(widget.item.targetWeightKg)} kg' : ''}'
+                    '${widget.item.copyWith(perSide: _perSide).targetLabel}'
+                    '${widget.item.targetWeightKg != null ? ' · ${_weightLabel(e, widget.item.targetWeightKg!)}' : ''}'
                     ' · $done/${widget.item.sets} done',
                     style: t.textTheme.bodySmall,
                   ),
@@ -489,6 +513,7 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(tip, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
           ),
+        if (!isTimed && e?.bar != null) _barLine(e!),
         if (!isTimed)
           Padding(
             padding: const EdgeInsets.only(bottom: Gap.xs),
@@ -497,27 +522,76 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
               textAlign: TextAlign.center,
               child: Row(children: [
                 const SizedBox(width: 36, child: Text('Set')),
-                Expanded(child: Text(e?.isWeighted == false ? 'Extra kg' : 'kg')),
-                const SizedBox(width: Gap.sm),
-                const Expanded(child: Text('Reps')),
+                if (_weightColumn(e)) ...[
+                  Expanded(child: Text(_weightHeader(e))),
+                  const SizedBox(width: Gap.sm),
+                ],
+                Expanded(child: Text(_perSide ? 'Reps / side' : 'Reps')),
                 const SizedBox(width: Gap.sm + Gap.tap),
               ]),
             ),
           ),
-        for (var n = 1; n <= _rowCount; n++) isTimed ? _timedRow(n, name) : _repsRow(n),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+        if (isTimed && _perSide)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Gap.xs),
+            child: Text('Each set: ${formatSeconds(widget.item.durationSeconds ?? 30)} per side, the timer runs both.',
+                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+          ),
+        for (var n = 1; n <= _rowCount; n++) isTimed ? _timedRow(n, name) : _repsRow(n, showWeight: _weightColumn(e)),
+        Wrap(spacing: Gap.sm, children: [
+          TextButton.icon(
             onPressed: () => setState(() => _extraSets++),
             icon: const Icon(Icons.add),
             label: const Text('Add set'),
           ),
-        ),
+          if (!isTimed && e?.load == LoadType.optional && !_weightColumn(e))
+            TextButton.icon(
+              onPressed: () => setState(() => _showOptionalWeight = true),
+              icon: const Icon(Icons.fitness_center, size: 18),
+              label: const Text('Add weight'),
+            ),
+        ]),
       ]),
     );
   }
 
-  Widget _repsRow(int n) {
+  String _weightHeader(Exercise? e) => switch (e?.load) {
+        LoadType.assist => 'Assist kg',
+        LoadType.optional => 'Extra kg',
+        _ => e?.bar != null ? 'Plates kg' : 'kg',
+      };
+
+  String _weightLabel(Exercise? e, double kg) => ref.watch(loadModelProvider).weightLabel(e, kg);
+
+  /// Bar exercises: reminds that only plates are logged and shows the bar weight (tap to change it).
+  Widget _barLine(Exercise e) {
+    final t = Theme.of(context);
+    final loads = ref.watch(loadModelProvider);
+    final bar = loads.barWeight(e.bar!);
+    final barName = ref.read(catalogProvider).equipmentById(e.bar!)?.name ?? 'Bar';
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => showBarWeightDialog(context, ref, e.bar!),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: Gap.sm),
+        child: Row(children: [
+          Icon(Icons.horizontal_rule_rounded, size: 18, color: t.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              bar > 0
+                  ? 'Log plates only · ${barName.split(' ').first} bar ${formatKg(bar)} kg is added in your stats'
+                  : 'Log plates only · set your ${barName.toLowerCase()} bar weight (tap)',
+              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          Icon(Icons.edit_outlined, size: 16, color: t.colorScheme.onSurfaceVariant),
+        ]),
+      ),
+    );
+  }
+
+  Widget _repsRow(int n, {required bool showWeight}) {
     final log = _loggedFor(n);
     final done = log?.completed ?? false;
     final s = Theme.of(context).colorScheme;
@@ -535,16 +609,18 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
             child: Text('$n', style: TextStyle(fontSize: 12, color: done ? s.onPrimary : s.onSurface)),
           ),
         ),
-        Expanded(
-          child: TextField(
-            controller: _weight[n - 1],
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textAlign: TextAlign.center,
-            decoration: const InputDecoration(hintText: '0', isDense: true),
-            onChanged: (_) => _updateIfLogged(n),
+        if (showWeight) ...[
+          Expanded(
+            child: TextField(
+              controller: _weight[n - 1],
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(hintText: '0', isDense: true),
+              onChanged: (_) => _updateIfLogged(n),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
+          const SizedBox(width: 8),
+        ],
         Expanded(
           child: TextField(
             controller: _reps[n - 1],

@@ -594,6 +594,8 @@ List<Map<String, dynamic>> exerciseHistoryBrief(
         'exerciseId': g.key,
         'trend': exerciseTrend(g.value).id,
         'lastPerformed': isoDate(g.value.first.first.date),
+        // Logged kg are plates only for bar exercises; barKg is the empty bar on top.
+        if (g.value.first.first.barKg > 0) 'barKg': g.value.first.first.barKg,
         'exposures': [
           for (final x in g.value.take(maxExposures).map(Exposure.new))
             {'date': isoDate(x.date), 'sets': x.setsLabel, 'e1rm': x.e1rm > 0 ? _r1(x.e1rm) : null},

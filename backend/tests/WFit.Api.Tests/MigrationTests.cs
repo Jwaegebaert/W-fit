@@ -17,7 +17,18 @@ public class MigrationTests
     {
         using var db = SqlServerContext();
         Assert.False(db.Database.HasPendingModelChanges(), "Run `dotnet ef migrations add <Name>` – the model differs from the snapshot.");
-        Assert.Equal("CoachV3", db.Database.GetMigrations().Last().Split('_', 2)[1]);
+        Assert.Equal("ProfileTrainingPrefs", db.Database.GetMigrations().Last().Split('_', 2)[1]);
+    }
+
+    [Fact]
+    public void ProfileTrainingPrefs_adds_rest_cooldown_and_bar_weights_with_defaults()
+    {
+        var added = new ProfileTrainingPrefs().UpOperations.OfType<AddColumnOperation>().ToDictionary(o => o.Name);
+
+        Assert.All(added.Values, o => Assert.Equal("Profiles", o.Table));
+        Assert.Equal("normal", added["RestMode"].DefaultValue);
+        Assert.Equal(3, added["CooldownStretches"].DefaultValue);
+        Assert.Equal("{}", added["BarWeightsJson"].DefaultValue);
     }
 
     [Fact]

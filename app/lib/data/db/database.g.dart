@@ -172,6 +172,42 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _restModeMeta = const VerificationMeta(
+    'restMode',
+  );
+  @override
+  late final GeneratedColumn<String> restMode = GeneratedColumn<String>(
+    'rest_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('normal'),
+  );
+  static const VerificationMeta _cooldownStretchesMeta = const VerificationMeta(
+    'cooldownStretches',
+  );
+  @override
+  late final GeneratedColumn<int> cooldownStretches = GeneratedColumn<int>(
+    'cooldown_stretches',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(3),
+  );
+  static const VerificationMeta _barWeightsJsonMeta = const VerificationMeta(
+    'barWeightsJson',
+  );
+  @override
+  late final GeneratedColumn<String> barWeightsJson = GeneratedColumn<String>(
+    'bar_weights_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     updatedAt,
@@ -188,6 +224,9 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     birthYear,
     injuries,
     notes,
+    restMode,
+    cooldownStretches,
+    barWeightsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -293,6 +332,30 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('rest_mode')) {
+      context.handle(
+        _restModeMeta,
+        restMode.isAcceptableOrUnknown(data['rest_mode']!, _restModeMeta),
+      );
+    }
+    if (data.containsKey('cooldown_stretches')) {
+      context.handle(
+        _cooldownStretchesMeta,
+        cooldownStretches.isAcceptableOrUnknown(
+          data['cooldown_stretches']!,
+          _cooldownStretchesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bar_weights_json')) {
+      context.handle(
+        _barWeightsJsonMeta,
+        barWeightsJson.isAcceptableOrUnknown(
+          data['bar_weights_json']!,
+          _barWeightsJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -358,6 +421,18 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       )!,
+      restMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rest_mode'],
+      )!,
+      cooldownStretches: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cooldown_stretches'],
+      )!,
+      barWeightsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bar_weights_json'],
+      )!,
     );
   }
 
@@ -382,6 +457,15 @@ class Profile extends DataClass implements Insertable<Profile> {
   final int? birthYear;
   final String injuries;
   final String notes;
+
+  /// Rest between sets: short | normal | long (see `restScaleFor`); added in schema v3.
+  final String restMode;
+
+  /// Stretches in the cool-down, 0–3 (0 = no cool-down); added in schema v3.
+  final int cooldownStretches;
+
+  /// Empty-bar weights set by the user as JSON ({"smith_machine": 15}); added in schema v3.
+  final String barWeightsJson;
   const Profile({
     required this.updatedAt,
     required this.deleted,
@@ -397,6 +481,9 @@ class Profile extends DataClass implements Insertable<Profile> {
     this.birthYear,
     required this.injuries,
     required this.notes,
+    required this.restMode,
+    required this.cooldownStretches,
+    required this.barWeightsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -419,6 +506,9 @@ class Profile extends DataClass implements Insertable<Profile> {
     }
     map['injuries'] = Variable<String>(injuries);
     map['notes'] = Variable<String>(notes);
+    map['rest_mode'] = Variable<String>(restMode);
+    map['cooldown_stretches'] = Variable<int>(cooldownStretches);
+    map['bar_weights_json'] = Variable<String>(barWeightsJson);
     return map;
   }
 
@@ -442,6 +532,9 @@ class Profile extends DataClass implements Insertable<Profile> {
           : Value(birthYear),
       injuries: Value(injuries),
       notes: Value(notes),
+      restMode: Value(restMode),
+      cooldownStretches: Value(cooldownStretches),
+      barWeightsJson: Value(barWeightsJson),
     );
   }
 
@@ -465,6 +558,9 @@ class Profile extends DataClass implements Insertable<Profile> {
       birthYear: serializer.fromJson<int?>(json['birthYear']),
       injuries: serializer.fromJson<String>(json['injuries']),
       notes: serializer.fromJson<String>(json['notes']),
+      restMode: serializer.fromJson<String>(json['restMode']),
+      cooldownStretches: serializer.fromJson<int>(json['cooldownStretches']),
+      barWeightsJson: serializer.fromJson<String>(json['barWeightsJson']),
     );
   }
   @override
@@ -485,6 +581,9 @@ class Profile extends DataClass implements Insertable<Profile> {
       'birthYear': serializer.toJson<int?>(birthYear),
       'injuries': serializer.toJson<String>(injuries),
       'notes': serializer.toJson<String>(notes),
+      'restMode': serializer.toJson<String>(restMode),
+      'cooldownStretches': serializer.toJson<int>(cooldownStretches),
+      'barWeightsJson': serializer.toJson<String>(barWeightsJson),
     };
   }
 
@@ -503,6 +602,9 @@ class Profile extends DataClass implements Insertable<Profile> {
     Value<int?> birthYear = const Value.absent(),
     String? injuries,
     String? notes,
+    String? restMode,
+    int? cooldownStretches,
+    String? barWeightsJson,
   }) => Profile(
     updatedAt: updatedAt ?? this.updatedAt,
     deleted: deleted ?? this.deleted,
@@ -518,6 +620,9 @@ class Profile extends DataClass implements Insertable<Profile> {
     birthYear: birthYear.present ? birthYear.value : this.birthYear,
     injuries: injuries ?? this.injuries,
     notes: notes ?? this.notes,
+    restMode: restMode ?? this.restMode,
+    cooldownStretches: cooldownStretches ?? this.cooldownStretches,
+    barWeightsJson: barWeightsJson ?? this.barWeightsJson,
   );
   Profile copyWithCompanion(ProfilesCompanion data) {
     return Profile(
@@ -543,6 +648,13 @@ class Profile extends DataClass implements Insertable<Profile> {
       birthYear: data.birthYear.present ? data.birthYear.value : this.birthYear,
       injuries: data.injuries.present ? data.injuries.value : this.injuries,
       notes: data.notes.present ? data.notes.value : this.notes,
+      restMode: data.restMode.present ? data.restMode.value : this.restMode,
+      cooldownStretches: data.cooldownStretches.present
+          ? data.cooldownStretches.value
+          : this.cooldownStretches,
+      barWeightsJson: data.barWeightsJson.present
+          ? data.barWeightsJson.value
+          : this.barWeightsJson,
     );
   }
 
@@ -562,7 +674,10 @@ class Profile extends DataClass implements Insertable<Profile> {
           ..write('heightCm: $heightCm, ')
           ..write('birthYear: $birthYear, ')
           ..write('injuries: $injuries, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('restMode: $restMode, ')
+          ..write('cooldownStretches: $cooldownStretches, ')
+          ..write('barWeightsJson: $barWeightsJson')
           ..write(')'))
         .toString();
   }
@@ -583,6 +698,9 @@ class Profile extends DataClass implements Insertable<Profile> {
     birthYear,
     injuries,
     notes,
+    restMode,
+    cooldownStretches,
+    barWeightsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -601,7 +719,10 @@ class Profile extends DataClass implements Insertable<Profile> {
           other.heightCm == this.heightCm &&
           other.birthYear == this.birthYear &&
           other.injuries == this.injuries &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.restMode == this.restMode &&
+          other.cooldownStretches == this.cooldownStretches &&
+          other.barWeightsJson == this.barWeightsJson);
 }
 
 class ProfilesCompanion extends UpdateCompanion<Profile> {
@@ -619,6 +740,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
   final Value<int?> birthYear;
   final Value<String> injuries;
   final Value<String> notes;
+  final Value<String> restMode;
+  final Value<int> cooldownStretches;
+  final Value<String> barWeightsJson;
   final Value<int> rowid;
   const ProfilesCompanion({
     this.updatedAt = const Value.absent(),
@@ -635,6 +759,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.birthYear = const Value.absent(),
     this.injuries = const Value.absent(),
     this.notes = const Value.absent(),
+    this.restMode = const Value.absent(),
+    this.cooldownStretches = const Value.absent(),
+    this.barWeightsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProfilesCompanion.insert({
@@ -652,6 +779,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.birthYear = const Value.absent(),
     this.injuries = const Value.absent(),
     this.notes = const Value.absent(),
+    this.restMode = const Value.absent(),
+    this.cooldownStretches = const Value.absent(),
+    this.barWeightsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : updatedAt = Value(updatedAt);
   static Insertable<Profile> custom({
@@ -669,6 +799,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Expression<int>? birthYear,
     Expression<String>? injuries,
     Expression<String>? notes,
+    Expression<String>? restMode,
+    Expression<int>? cooldownStretches,
+    Expression<String>? barWeightsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -686,6 +819,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       if (birthYear != null) 'birth_year': birthYear,
       if (injuries != null) 'injuries': injuries,
       if (notes != null) 'notes': notes,
+      if (restMode != null) 'rest_mode': restMode,
+      if (cooldownStretches != null) 'cooldown_stretches': cooldownStretches,
+      if (barWeightsJson != null) 'bar_weights_json': barWeightsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -705,6 +841,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Value<int?>? birthYear,
     Value<String>? injuries,
     Value<String>? notes,
+    Value<String>? restMode,
+    Value<int>? cooldownStretches,
+    Value<String>? barWeightsJson,
     Value<int>? rowid,
   }) {
     return ProfilesCompanion(
@@ -722,6 +861,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       birthYear: birthYear ?? this.birthYear,
       injuries: injuries ?? this.injuries,
       notes: notes ?? this.notes,
+      restMode: restMode ?? this.restMode,
+      cooldownStretches: cooldownStretches ?? this.cooldownStretches,
+      barWeightsJson: barWeightsJson ?? this.barWeightsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -771,6 +913,15 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (restMode.present) {
+      map['rest_mode'] = Variable<String>(restMode.value);
+    }
+    if (cooldownStretches.present) {
+      map['cooldown_stretches'] = Variable<int>(cooldownStretches.value);
+    }
+    if (barWeightsJson.present) {
+      map['bar_weights_json'] = Variable<String>(barWeightsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -794,6 +945,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
           ..write('birthYear: $birthYear, ')
           ..write('injuries: $injuries, ')
           ..write('notes: $notes, ')
+          ..write('restMode: $restMode, ')
+          ..write('cooldownStretches: $cooldownStretches, ')
+          ..write('barWeightsJson: $barWeightsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5836,6 +5990,9 @@ typedef $$ProfilesTableCreateCompanionBuilder =
       Value<int?> birthYear,
       Value<String> injuries,
       Value<String> notes,
+      Value<String> restMode,
+      Value<int> cooldownStretches,
+      Value<String> barWeightsJson,
       Value<int> rowid,
     });
 typedef $$ProfilesTableUpdateCompanionBuilder =
@@ -5854,6 +6011,9 @@ typedef $$ProfilesTableUpdateCompanionBuilder =
       Value<int?> birthYear,
       Value<String> injuries,
       Value<String> notes,
+      Value<String> restMode,
+      Value<int> cooldownStretches,
+      Value<String> barWeightsJson,
       Value<int> rowid,
     });
 
@@ -5933,6 +6093,21 @@ class $$ProfilesTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get restMode => $composableBuilder(
+    column: $table.restMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get cooldownStretches => $composableBuilder(
+    column: $table.cooldownStretches,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barWeightsJson => $composableBuilder(
+    column: $table.barWeightsJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6015,6 +6190,21 @@ class $$ProfilesTableOrderingComposer
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get restMode => $composableBuilder(
+    column: $table.restMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get cooldownStretches => $composableBuilder(
+    column: $table.cooldownStretches,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get barWeightsJson => $composableBuilder(
+    column: $table.barWeightsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProfilesTableAnnotationComposer
@@ -6075,6 +6265,19 @@ class $$ProfilesTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get restMode =>
+      $composableBuilder(column: $table.restMode, builder: (column) => column);
+
+  GeneratedColumn<int> get cooldownStretches => $composableBuilder(
+    column: $table.cooldownStretches,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get barWeightsJson => $composableBuilder(
+    column: $table.barWeightsJson,
+    builder: (column) => column,
+  );
 }
 
 class $$ProfilesTableTableManager
@@ -6119,6 +6322,9 @@ class $$ProfilesTableTableManager
                 Value<int?> birthYear = const Value.absent(),
                 Value<String> injuries = const Value.absent(),
                 Value<String> notes = const Value.absent(),
+                Value<String> restMode = const Value.absent(),
+                Value<int> cooldownStretches = const Value.absent(),
+                Value<String> barWeightsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProfilesCompanion(
                 updatedAt: updatedAt,
@@ -6135,6 +6341,9 @@ class $$ProfilesTableTableManager
                 birthYear: birthYear,
                 injuries: injuries,
                 notes: notes,
+                restMode: restMode,
+                cooldownStretches: cooldownStretches,
+                barWeightsJson: barWeightsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6153,6 +6362,9 @@ class $$ProfilesTableTableManager
                 Value<int?> birthYear = const Value.absent(),
                 Value<String> injuries = const Value.absent(),
                 Value<String> notes = const Value.absent(),
+                Value<String> restMode = const Value.absent(),
+                Value<int> cooldownStretches = const Value.absent(),
+                Value<String> barWeightsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProfilesCompanion.insert(
                 updatedAt: updatedAt,
@@ -6169,6 +6381,9 @@ class $$ProfilesTableTableManager
                 birthYear: birthYear,
                 injuries: injuries,
                 notes: notes,
+                restMode: restMode,
+                cooldownStretches: cooldownStretches,
+                barWeightsJson: barWeightsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

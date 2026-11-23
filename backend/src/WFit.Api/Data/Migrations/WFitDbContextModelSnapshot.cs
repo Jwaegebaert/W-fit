@@ -401,8 +401,20 @@ namespace WFit.Api.Data.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("nvarchar(36)");
 
+                    b.Property<string>("BarWeightsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasDefaultValue("{}");
+
                     b.Property<int?>("BirthYear")
                         .HasColumnType("int");
+
+                    b.Property<int>("CooldownStretches")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(3);
 
                     b.Property<bool>("Deleted")
                         .HasColumnType("bit");
@@ -437,6 +449,13 @@ namespace WFit.Api.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RestMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)")
+                        .HasDefaultValue("normal");
 
                     b.Property<DateTimeOffset>("ServerUpdatedAt")
                         .HasColumnType("datetimeoffset");

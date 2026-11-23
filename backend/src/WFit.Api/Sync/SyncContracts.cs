@@ -19,6 +19,9 @@ public sealed record ProfileDto : ISyncDto
     public int? BirthYear { get; init; }
     public string Injuries { get; init; } = "";
     public string Notes { get; init; } = "";
+    public string RestMode { get; init; } = "normal";
+    public int CooldownStretches { get; init; } = 3;
+    public Dictionary<string, double>? BarWeights { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
     public bool Deleted { get; init; }
 }

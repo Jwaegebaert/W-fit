@@ -10,7 +10,6 @@ import '../../data/repositories/repository.dart';
 import '../../domain/catalog.dart';
 import '../../domain/muscles.dart';
 import '../../domain/plan.dart';
-import '../../domain/progression.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/report_issue_sheet.dart';
@@ -228,7 +227,9 @@ class _PlanItemTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final e = ref.watch(catalogProvider).exercise(item.exerciseId);
-    final weight = item.targetWeightKg != null ? ' · ${formatKg(item.targetWeightKg)} kg' : '';
+    final weight =
+        item.targetWeightKg != null ? ' · ${ref.watch(loadModelProvider).weightLabel(e, item.targetWeightKg!)}' : '';
+    final target = item.copyWith(perSide: item.perSide || (e?.unilateral ?? false)).targetLabel;
     final rest = item.restSeconds > 0 && section != Section.cooldown ? ' · rest ${formatSeconds(item.restSeconds)}' : '';
     return ListTile(
       onTap: () => context.push('/exercise/${item.exerciseId}'),
@@ -237,7 +238,7 @@ class _PlanItemTile extends ConsumerWidget {
       horizontalTitleGap: Gap.md - 4,
       leading: ExerciseAvatar(exercise: e),
       title: Text(e?.name ?? item.exerciseId, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('${item.targetLabel}$weight$rest${item.notes.isNotEmpty ? '\n${item.notes}' : ''}'),
+      subtitle: Text('$target$weight$rest${item.notes.isNotEmpty ? '\n${item.notes}' : ''}'),
       isThreeLine: item.notes.isNotEmpty,
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
         IconButton(tooltip: 'Swap', icon: const Icon(Icons.swap_horiz), onPressed: onSwap),

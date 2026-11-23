@@ -2,7 +2,8 @@ using System.Text.Json;
 
 namespace WFit.Api.Domain;
 
-public sealed record CatalogEquipmentItem(string Id, string Name, string Group, bool AlwaysAvailable, string? Description = null);
+public sealed record CatalogEquipmentItem(
+    string Id, string Name, string Group, bool AlwaysAvailable, string? Description = null, double? BarWeightKg = null);
 
 public sealed record CatalogExerciseItem(
     string Id,
@@ -27,9 +28,16 @@ public sealed record CatalogExerciseItem(
     IReadOnlyList<string> Instructions,
     string? Tip,
     IReadOnlyList<string>? Mistakes = null,
-    IReadOnlyList<string>? Stress = null)
+    IReadOnlyList<string>? Stress = null,
+    string? Load = null,
+    string? Bar = null)
 {
     public const string FloorEquipmentId = "mat";
+
+    /// <summary>weight | optional | assist | none (no kg is logged).</summary>
+    public string LoadType => Load ?? (IncrementKg > 0 ? "weight" : "none");
+
+    public bool IsAssisted => LoadType == "assist";
 
     public bool IsTimed => Measure == Vocab.Measure.Time;
 

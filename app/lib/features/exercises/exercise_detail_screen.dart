@@ -10,11 +10,29 @@ import '../../providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/equipment_sheet.dart';
 import '../../widgets/exercise_visuals.dart';
+import '../settings/equipment_screen.dart' show showBarWeightDialog;
 
 class ExerciseDetailScreen extends ConsumerWidget {
   const ExerciseDetailScreen({super.key, required this.exerciseId});
 
   final String exerciseId;
+
+  /// How weight is logged for [e] (title, explanation); null when it is a plain weight exercise.
+  static (String, String)? _loadNote(Exercise e, WidgetRef ref) {
+    if (e.bar != null) {
+      final bar = ref.watch(loadModelProvider).barWeight(e.bar!);
+      final name = ref.read(catalogProvider).equipmentById(e.bar!)?.name ?? 'Bar';
+      String fmt(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+      return bar > 0
+          ? ('Bar: ${fmt(bar)} kg', 'Log only the plates (both sides together). Your stats add the ${fmt(bar)} kg bar. Tap to change.')
+          : ('Bar weight not set', '$name bars differ per gym. Tap to set it; log only the plates.');
+    }
+    return switch (e.load) {
+      LoadType.assist => ('Assisted machine', 'Log the assistance. More kg makes it easier, so you progress by lowering it.'),
+      LoadType.optional => ('Bodyweight', 'Add extra weight (belt or dumbbell) only once all sets reach the top of the range.'),
+      _ => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,6 +59,20 @@ class ExerciseDetailScreen extends ConsumerWidget {
         ]),
         const SizedBox(height: Gap.md),
         _FactsStrip(exercise: e),
+        if (_loadNote(e, ref) case final note?) ...[
+          const SizedBox(height: Gap.sm),
+          Card(
+            color: s.secondaryContainer,
+            child: ListTile(
+              leading: Icon(e.bar != null ? Icons.horizontal_rule_rounded : Icons.info_outline,
+                  color: s.onSecondaryContainer),
+              title: Text(note.$1, style: TextStyle(color: s.onSecondaryContainer, fontWeight: FontWeight.w700)),
+              subtitle: Text(note.$2, style: TextStyle(color: s.onSecondaryContainer)),
+              trailing: e.bar != null ? Icon(Icons.edit_outlined, color: s.onSecondaryContainer) : null,
+              onTap: e.bar != null ? () => showBarWeightDialog(context, ref, e.bar!) : null,
+            ),
+          ),
+        ],
         const SectionTitle('How to do it'),
         _Steps(e.instructions),
         if (e.tip != null || e.mistakes.isNotEmpty) ...[
@@ -125,7 +157,7 @@ class _FactsStrip extends StatelessWidget {
     final facts = [
       (
         e.isTimed ? '${e.sets} × ${formatSeconds(e.durationSeconds ?? 30)}' : '${e.sets} × $reps',
-        e.isTimed ? 'sets × time' : 'sets × reps',
+        e.isTimed ? (e.unilateral ? 'time per side' : 'sets × time') : (e.unilateral ? 'reps per side' : 'sets × reps'),
       ),
       (e.rest == 0 ? 'None' : formatSeconds(e.rest), 'rest'),
       (

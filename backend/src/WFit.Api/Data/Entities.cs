@@ -25,6 +25,15 @@ public sealed class Profile : SyncEntity
     public int? BirthYear { get; set; }
     public string Injuries { get; set; } = "";
     public string Notes { get; set; } = "";
+
+    /// <summary>Rest between sets: short | normal | long.</summary>
+    public string RestMode { get; set; } = "normal";
+
+    /// <summary>Cool-down stretches, 0-3.</summary>
+    public int CooldownStretches { get; set; } = 3;
+
+    /// <summary>User-set empty-bar weights as JSON ({"smith_machine":15}).</summary>
+    public string BarWeightsJson { get; set; } = "{}";
 }
 
 public sealed class EquipmentStatus : SyncEntity

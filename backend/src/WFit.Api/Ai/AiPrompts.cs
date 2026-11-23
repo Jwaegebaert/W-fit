@@ -19,6 +19,9 @@ public static class AiPrompts
         You are W-fit's head coach: an elite, evidence-based strength & hypertrophy coach for one athlete (data in the JSON).
         Primary goal: balanced strength and muscle across all tracked muscles. Badminton is secondary: at most 1 power/plyometric
         exercise per session (early, low volume); mobility/stability drills in the warm-up are welcome.
+        Loads: kg is what the athlete logs. "bar" exercises: kg = plates only (both sides together); exerciseHistory.barKg is
+        the empty bar on top - never add it to targetWeightKg. "assist" exercises: kg = machine assistance, less is harder
+        (progress = -1 increment, too_hard = +1). No "inc" = no load: targetWeightKg null. "perSide": reps/seconds per side.
         """;
 
     private const string Safety = """
@@ -51,8 +54,9 @@ public static class AiPrompts
         5. Use exerciseFeedback, session notes, rating/effort and userNote (high effort or low rating -> no load jumps).
         6. Shape: warmup ~8 min (1 easy cardio + 2-3 activation/mobility drills for today's muscles); main 4-7 exercises (power
            first if any, heavy compounds 6-10 reps, other compounds 8-12, isolation 10-15); core ~6 min (2 different patterns)
-           only if includeCore; cooldown 2-3 stretches. candidates.flex (other splits, for priority muscles): at most 1, as a short accessory, only when today's split can't cover the priority. Time per exercise ~ sets x (40 s + rest) + 60 s; estimatedMinutes <=
-           sessionMinutes. Rest: compounds 120-180 s, isolation 60-90 s, power 90-120 s, warm-up/cooldown 0-30 s. Max 1 floor
+           only if includeCore; cooldown exactly brief.profile.cooldownStretches stretches (0 = omit the block; default 3). candidates.flex (other splits, for priority muscles): at most 1, as a short accessory, only when today's split can't cover the priority. Time per exercise ~ sets x (40 s + rest) + 60 s (perSide: 80 s); estimatedMinutes <=
+           sessionMinutes. Rest: compounds 120-180 s, isolation 60-90 s, power 90-120 s, warm-up/cooldown 0-30 s; x0.7 if
+           brief.profile.restMode is short, x1.3 if long. Max 1 floor
            exercise ("floor") per warmup/core/cooldown block. Rep items: repMin/repMax, durationSeconds null; timed items:
            durationSeconds, reps null.
 
@@ -134,6 +138,9 @@ public static class AiPrompts
         else if (e.RepMin is { } min) view["reps"] = $"{min}-{e.RepMax ?? min}";
         view["rest"] = e.Rest;
         if (e.IncrementKg > 0) view["inc"] = e.IncrementKg;
+        if (e.Unilateral) view["perSide"] = true;
+        if (e.IsAssisted) view["assist"] = true;
+        if (e.Bar is not null) view["bar"] = true;
         if (e.Difficulty > 1) view["difficulty"] = e.Difficulty;
         var verdict = limits.Evaluate(e);
         if (verdict.Effect == LimitationEffect.Penalised) view["caution"] = verdict.Reason;

@@ -23,6 +23,15 @@ class Profiles extends Table with SyncColumns {
   TextColumn get injuries => text().withDefault(const Constant(''))();
   TextColumn get notes => text().withDefault(const Constant(''))();
 
+  /// Rest between sets: short | normal | long (see `restScaleFor`); added in schema v3.
+  TextColumn get restMode => text().withDefault(const Constant('normal'))();
+
+  /// Stretches in the cool-down, 0–3 (0 = no cool-down); added in schema v3.
+  IntColumn get cooldownStretches => integer().withDefault(const Constant(3))();
+
+  /// Empty-bar weights set by the user as JSON ({"smith_machine": 15}); added in schema v3.
+  TextColumn get barWeightsJson => text().withDefault(const Constant('{}'))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -168,8 +177,9 @@ class AppDatabase extends _$AppDatabase {
   static QueryExecutor _open() => driftDatabase(name: 'wfit');
 
   /// v1: initial schema. v2: `feedback_entries` table and `planned_workouts.meta_json`.
+  /// v3: profile `rest_mode`, `cooldown_stretches` and `bar_weights_json`.
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   static final _feedbackStatusIndex = Index('idx_feedback_status',
       'CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback_entries (status, deleted)');
@@ -188,6 +198,11 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(feedbackEntries);
             await m.createIndex(_feedbackStatusIndex);
             await m.addColumn(plannedWorkouts, plannedWorkouts.metaJson);
+          }
+          if (from < 3) {
+            await m.addColumn(profiles, profiles.restMode);
+            await m.addColumn(profiles, profiles.cooldownStretches);
+            await m.addColumn(profiles, profiles.barWeightsJson);
           }
         },
       );

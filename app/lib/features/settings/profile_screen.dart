@@ -26,6 +26,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   double _minutes = 60;
   bool _core = true;
   String _experience = 'beginner';
+  String _restMode = 'normal';
+  int _cooldown = 3;
   bool _loaded = false;
 
   void _load(Profile p) {
@@ -40,6 +42,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _minutes = p.sessionMinutes.toDouble();
     _core = p.includeCore;
     _experience = p.experience;
+    _restMode = p.restMode;
+    _cooldown = p.cooldownStretches.clamp(0, 3);
   }
 
   @override
@@ -55,6 +59,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       showSnack(context, 'Pick at least one training day.');
       return;
     }
+    final before = await ref.read(repositoryProvider).getProfile();
     await ref.read(repositoryProvider).saveProfile(ProfilesCompanion(
           name: Value(_name.text.trim()),
           goals: Value(_goals.text.trim()),
@@ -65,7 +70,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           sessionMinutes: Value(_minutes.round()),
           includeCore: Value(_core),
           experience: Value(_experience),
+          restMode: Value(_restMode),
+          cooldownStretches: Value(_cooldown),
         ));
+    await ref
+        .read(coachServiceProvider)
+        .applyTrainingPrefs(oldRestMode: before.restMode, oldCooldownStretches: before.cooldownStretches);
     ref.invalidate(nextPlanProvider);
     ref.read(syncControllerProvider.notifier).syncNow();
     if (mounted) {
@@ -111,6 +121,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           title: const Text('Include abs / core block'),
           value: _core,
           onChanged: (v) => setState(() => _core = v),
+        ),
+        const SectionTitle('Rest between sets'),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'short', label: FittedBox(fit: BoxFit.scaleDown, child: Text('Short'))),
+            ButtonSegment(value: 'normal', label: FittedBox(fit: BoxFit.scaleDown, child: Text('Normal'))),
+            ButtonSegment(value: 'long', label: FittedBox(fit: BoxFit.scaleDown, child: Text('Long'))),
+          ],
+          selected: {_restMode},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) => setState(() => _restMode = s.first),
+        ),
+        const SizedBox(height: Gap.sm),
+        Text(
+          switch (_restMode) {
+            'short' => 'About 30 % less rest. Sessions get shorter or fit more work; heavy lifts may feel harder.',
+            'long' => 'About 30 % more rest for full recovery between heavy sets.',
+            _ => 'Rest as programmed: 2–3 min on heavy lifts, 1–1.5 min on isolation work.',
+          },
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SectionTitle('Cool-down stretches'),
+        SegmentedButton<int>(
+          segments: const [
+            ButtonSegment(value: 0, label: FittedBox(fit: BoxFit.scaleDown, child: Text('Off'))),
+            ButtonSegment(value: 1, label: Text('1')),
+            ButtonSegment(value: 2, label: Text('2')),
+            ButtonSegment(value: 3, label: Text('3')),
+          ],
+          selected: {_cooldown},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) => setState(() => _cooldown = s.first),
         ),
         const SectionTitle('Experience'),
         SegmentedButton<String>(

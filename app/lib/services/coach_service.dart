@@ -111,6 +111,8 @@ class CoachSnapshot {
         occupiedEquipment: occupied,
         preferences: preferences,
         experience: profile.experience,
+        restScale: restScaleFor(profile.restMode),
+        cooldownStretches: profile.cooldownStretches,
         limitations: policy,
         program: program,
         balance: balance,
@@ -243,6 +245,8 @@ class CoachService {
         'goals': clip(p.goals, 500),
         'sessionMinutes': p.sessionMinutes,
         'includeCore': p.includeCore,
+        'restMode': p.restMode,
+        'cooldownStretches': p.cooldownStretches,
         'trainingDays': parseDays(p.trainingDays),
         'age': p.birthYear == null ? null : s.date.year - p.birthYear!,
         'heightCm': p.heightCm,
@@ -354,6 +358,39 @@ class CoachService {
     return id;
   }
 
+  /// After the "Rest between sets" or "Cool-down" setting changed: rescales the rest of every open plan and rebuilds
+  /// its cool-down with the new number of stretches. Other exercises (also AI-chosen ones) stay as they are.
+  Future<void> applyTrainingPrefs({required String oldRestMode, required int oldCooldownStretches}) async {
+    final profile = await _repo.getProfile();
+    final ratio = restScaleFor(profile.restMode) / restScaleFor(oldRestMode);
+    final cooldownChanged = profile.cooldownStretches != oldCooldownStretches;
+    if (ratio == 1 && !cooldownChanged) return;
+    int rescale(int rest, Section section) {
+      if (ratio == 1 || rest <= 0) return rest;
+      final r = (rest * ratio / 5).round() * 5;
+      return section == Section.main ? r.clamp(30, 240) : r.clamp(0, 180);
+    }
+
+    for (final p in await _repo.plannedHistory(from: DateTime.now())) {
+      if (p.status != 'planned' || !await _isOpen(p.id)) continue;
+      final date = parseDateKey(p.date);
+      final day = DayType.parse(p.dayType);
+      final blocks = [
+        for (final b in Repository.decodeBlocks(p.blocksJson))
+          if (!cooldownChanged || b.section != Section.cooldown)
+            PlanBlock(section: b.section, items: [
+              for (final i in b.items) i.copyWith(restSeconds: rescale(i.restSeconds, b.section)),
+            ]),
+      ];
+      if (cooldownChanged) {
+        final draft = _draft(await snapshot(date: date, day: day), day, const {});
+        blocks.addAll(draft.blocks.where((b) => b.section == Section.cooldown));
+      }
+      await _repo.updatePlannedBlocks(p.id, blocks);
+    }
+    _syncSoon();
+  }
+
   /// A plan that can still be changed: planned, not deleted and not being trained right now.
   Future<bool> _isOpen(String plannedId) async {
     final p = await _repo.plannedById(plannedId);
@@ -374,10 +411,16 @@ class CoachService {
         final e = s.catalog.exercise(i.exerciseId);
         if (e == null || s.policy.excludes(e)) continue;
         final h = s.history[e.id] ?? const [];
-        items.add(i.targetWeightKg == null && e.isWeighted && h.isNotEmpty
-            ? i.copyWith(
+        final item = i.copyWith(perSide: e.unilateral);
+        items.add(item.targetWeightKg == null && e.isWeighted && h.isNotEmpty
+            ? item.copyWith(
                 targetWeightKg: adviseProgression(e, h, repMin: i.repMin, repMax: i.repMax, deload: deload).weightKg)
-            : i);
+            : item);
+      }
+      // The cool-down follows the athlete's setting (0 = no cool-down block).
+      if (b.section == Section.cooldown) {
+        final n = s.profile.cooldownStretches.clamp(0, RuleEngine.cooldownSize);
+        if (items.length > n) items.removeRange(n, items.length);
       }
       if (items.isNotEmpty) blocks.add(PlanBlock(section: b.section, items: items));
     }
@@ -645,6 +688,7 @@ class CoachService {
               repMax: e.isTimed ? null : (s['repMax'] as num?)?.toInt() ?? e.repMax,
               durationSeconds: e.durationSeconds,
               restSeconds: (s['restSeconds'] as num?)?.toInt() ?? e.rest,
+              perSide: e.unilateral,
             ),
           ),
     ];

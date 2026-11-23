@@ -13,6 +13,7 @@ class PlanItem {
     required this.restSeconds,
     this.targetWeightKg,
     this.notes = '',
+    this.perSide = false,
   });
 
   factory PlanItem.fromJson(Map<String, dynamic> j) => PlanItem(
@@ -24,6 +25,7 @@ class PlanItem {
         restSeconds: (j['restSeconds'] as num?)?.toInt() ?? 60,
         targetWeightKg: (j['targetWeightKg'] as num?)?.toDouble(),
         notes: j['notes'] as String? ?? '',
+        perSide: j['perSide'] as bool? ?? false,
       );
 
   factory PlanItem.fromExercise(Exercise e, {double? targetWeightKg, String notes = ''}) => PlanItem(
@@ -35,6 +37,7 @@ class PlanItem {
         restSeconds: e.rest,
         targetWeightKg: targetWeightKg,
         notes: notes,
+        perSide: e.unilateral,
       );
 
   final String exerciseId;
@@ -46,12 +49,16 @@ class PlanItem {
   final double? targetWeightKg;
   final String notes;
 
+  /// Reps / seconds count per side (unilateral exercise): every set covers both sides.
+  final bool perSide;
+
   bool get isTimed => durationSeconds != null && repMin == null;
 
   String get targetLabel {
-    if (isTimed) return '$sets × ${formatSeconds(durationSeconds!)}';
+    final side = perSide ? ' / side' : '';
+    if (isTimed) return '$sets × ${formatSeconds(durationSeconds!)}$side';
     final reps = repMin == repMax || repMax == null ? '${repMin ?? '-'}' : '$repMin–$repMax';
-    return '$sets × $reps';
+    return '$sets × $reps$side';
   }
 
   PlanItem copyWith({
@@ -64,6 +71,7 @@ class PlanItem {
     double? targetWeightKg,
     bool clearWeight = false,
     String? notes,
+    bool? perSide,
   }) =>
       PlanItem(
         exerciseId: exerciseId ?? this.exerciseId,
@@ -74,6 +82,7 @@ class PlanItem {
         restSeconds: restSeconds ?? this.restSeconds,
         targetWeightKg: clearWeight ? null : (targetWeightKg ?? this.targetWeightKg),
         notes: notes ?? this.notes,
+        perSide: perSide ?? this.perSide,
       );
 
   Map<String, dynamic> toJson() => {
@@ -85,11 +94,13 @@ class PlanItem {
         'restSeconds': restSeconds,
         'targetWeightKg': targetWeightKg,
         'notes': notes,
+        if (perSide) 'perSide': true,
       };
 
-  /// Estimated seconds this item takes, including rest and setup.
+  /// Estimated seconds this item takes, including rest and setup. Per-side timed holds run twice (their duration is
+  /// per side); rep sets keep the 40 s average either way – it already covers a one-sided set of 8–15 reps.
   int estimateSeconds() {
-    final work = durationSeconds ?? 40;
+    final work = isTimed ? (durationSeconds ?? 30) * (perSide ? 2 : 1) : 40;
     final setup = isTimed ? 15 : 60;
     return sets * (work + restSeconds) + setup;
   }
@@ -216,6 +227,13 @@ class PlanMeta {
 
   String encode() => jsonEncode(toJson());
 }
+
+/// Rest multiplier for the profile's "Rest between sets" setting (short | normal | long).
+double restScaleFor(String mode) => switch (mode) {
+      'short' => 0.7,
+      'long' => 1.3,
+      _ => 1.0,
+    };
 
 int estimateMinutes(List<PlanBlock> blocks) {
   final seconds = blocks.expand((b) => b.items).fold<int>(0, (s, i) => s + i.estimateSeconds());

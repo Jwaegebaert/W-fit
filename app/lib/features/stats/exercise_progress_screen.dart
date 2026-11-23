@@ -39,11 +39,11 @@ class ExerciseProgressScreen extends ConsumerWidget {
           }
           final points = sessions.values.toList();
           final labels = points.map((p) => DateFormat('d/M').format(p.first.date.toLocal())).toList();
-          final weighted = sets.any((s) => (s.weightKg ?? 0) > 0);
+          final weighted = sets.any((s) => (s.loadKg ?? 0) > 0);
           final e1rm = points
-              .map((p) => p.map((s) => estimatedOneRepMax(s.weightKg ?? 0, s.reps ?? 0)).fold<double>(0, math.max))
+              .map((p) => p.map((s) => estimatedOneRepMax(s.loadKg ?? 0, s.reps ?? 0)).fold<double>(0, math.max))
               .toList();
-          final top = points.map((p) => p.map((s) => s.weightKg ?? 0).fold<double>(0, math.max)).toList();
+          final top = points.map((p) => p.map((s) => s.loadKg ?? 0).fold<double>(0, math.max)).toList();
           final volume = points.map((p) => p.fold<double>(0, (a, s) => a + s.volume)).toList();
           final reps = points.map((p) => p.map((s) => (s.reps ?? 0).toDouble()).fold<double>(0, math.max)).toList();
           final best = computeBests(sets)[exerciseId];
@@ -96,7 +96,7 @@ class ExerciseProgressScreen extends ConsumerWidget {
                     dense: true,
                     title: Text(DateFormat('EEE d MMM yyyy').format(p.first.date.toLocal())),
                     subtitle: Text(p
-                        .map((s) => weighted ? '${formatKg(s.weightKg)}×${s.reps}' : '${s.reps ?? formatKgOrDash(s.durationSeconds)}')
+                        .map((s) => weighted ? '${formatKg(s.loadKg)}×${s.reps}' : '${s.reps ?? formatKgOrDash(s.durationSeconds)}')
                         .join('  ')),
                   ),
               ]),

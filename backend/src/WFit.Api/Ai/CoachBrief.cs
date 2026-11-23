@@ -28,6 +28,12 @@ public sealed record BriefProfile
     public string? Goals { get; init; }
     public double? SessionMinutes { get; init; }
     public bool? IncludeCore { get; init; }
+
+    /// <summary>Rest between sets: short (x0.7) | normal | long (x1.3).</summary>
+    public string? RestMode { get; init; }
+
+    /// <summary>Cool-down stretches wanted, 0-3 (0 = no cool-down block).</summary>
+    public double? CooldownStretches { get; init; }
     public List<double>? TrainingDays { get; init; }
     public double? Age { get; init; }
     public double? HeightCm { get; init; }
@@ -124,6 +130,9 @@ public sealed record BriefExerciseHistory
     public string? ExerciseId { get; init; }
     public string? Trend { get; init; }
     public string? LastPerformed { get; init; }
+
+    /// <summary>Empty-bar weight on top of the logged kg (bar exercises log plates only).</summary>
+    public double? BarKg { get; init; }
     public List<BriefExposure?>? Exposures { get; init; }
 }
 
@@ -183,6 +192,8 @@ public static class CoachBriefRules
                 ? p with
                 {
                     Experience = Short(p.Experience, 16),
+                    RestMode = p.RestMode is "short" or "long" ? p.RestMode : "normal",
+                    CooldownStretches = p.CooldownStretches is { } c ? Math.Clamp(Math.Round(c), 0, 3) : null,
                     Goals = Short(p.Goals, MaxNote),
                     TrainingDays = p.TrainingDays?.Take(7).ToList(),
                     Injuries = Short(p.Injuries, 1000),
@@ -226,6 +237,7 @@ public static class CoachBriefRules
                 .Select(h => h with
                 {
                     ExerciseId = Short(h.ExerciseId, 64), Trend = Short(h.Trend, 16), LastPerformed = Short(h.LastPerformed, 10),
+                    BarKg = h.BarKg is { } bar ? Math.Clamp(bar, 0, 60) : null,
                     Exposures = h.Exposures?.OfType<BriefExposure>().Take(MaxExposures)
                         .Select(x => x with { Date = Short(x.Date, 10), Sets = Short(x.Sets, 200) }).ToList<BriefExposure?>(),
                 }).ToList<BriefExerciseHistory?>(),

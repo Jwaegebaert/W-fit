@@ -19,7 +19,21 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// Overridden in main() with the catalog loaded from assets.
 final catalogProvider = Provider<Catalog>((ref) => throw UnimplementedError('catalog not loaded'));
 
-final repositoryProvider = Provider<Repository>((ref) => Repository(ref.watch(databaseProvider)));
+final repositoryProvider = Provider<Repository>((ref) {
+  Catalog? catalog;
+  try {
+    catalog = ref.watch(catalogProvider);
+  } catch (_) {
+    catalog = null; // Storage-only tests run without a catalog (no bar weights then).
+  }
+  return Repository(ref.watch(databaseProvider), catalog: catalog);
+});
+
+/// Bar weights (catalog defaults + the user's overrides) for turning logged plates into real load.
+final loadModelProvider = Provider<LoadModel>((ref) => LoadModel(
+      ref.watch(catalogProvider),
+      LoadModel.parseOverrides(ref.watch(profileProvider).value?.barWeightsJson),
+    ));
 
 final apiConfigStoreProvider = Provider<ApiConfigStore>((ref) => ApiConfigStore());
 
@@ -124,6 +138,7 @@ final bodyMetricsProvider =
 /// All completed sets; recomputed whenever the list of finished sessions changes.
 final allLoggedSetsProvider = FutureProvider<List<LoggedSet>>((ref) async {
   await ref.watch(completedSessionsProvider.future);
+  ref.watch(loadModelProvider); // bar weights changed → recompute loads
   return ref.read(repositoryProvider).loggedSets();
 });
 

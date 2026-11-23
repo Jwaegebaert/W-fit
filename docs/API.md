@@ -31,6 +31,9 @@ Every synced record has `updatedAt` (client clock, last-write-wins) and `deleted
   "goals": "lean, strong, flexible, badminton performance",
   "trainingDays": [1,3,5],          // ISO weekday 1=Mon..7=Sun
   "sessionMinutes": 60, "includeCore": true,
+  "restMode": "normal",          // short (x0.7) | normal | long (x1.3) rest between sets
+  "cooldownStretches": 3,         // 0-3; 0 = no cool-down block
+  "barWeights": { "smith_machine": 15 },  // user-set empty-bar kg (max 10, 0-60 kg); bar exercises log plates only
   "heightCm": 180, "birthYear": 1995, "injuries": "", "notes": "",
   "updatedAt": "...", "deleted": false }
 

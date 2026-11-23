@@ -78,9 +78,9 @@ void main() {
       !isMachine(e) && (e.equipment.any(freeWeights.contains) || e.equipment.every(bodyweightGear.contains));
   final main = catalog.exercises.where(isMain).toList();
 
-  group('catalog v3 structure', () {
-    test('version 3 with unique kebab-case ids and every v2 id kept', () {
-      expect(catalog.version, 3);
+  group('catalog structure', () {
+    test('version 4 with unique kebab-case ids and every v2 id kept', () {
+      expect(catalog.version, 4);
       final ids = catalog.exercises.map((e) => e.id).toList();
       expect(ids.toSet().length, ids.length, reason: 'duplicate exercise ids');
       for (final id in ids) {
@@ -264,6 +264,47 @@ void main() {
       double share(Iterable<Exercise> list) => list.where((e) => media.containsKey(e.id)).length / list.length;
       expect(share(main), greaterThanOrEqualTo(0.75), reason: 'main lifts with photos');
       expect(share(catalog.exercises), greaterThanOrEqualTo(0.75), reason: 'all exercises with photos');
+    });
+  });
+
+  group('load logging (v4)', () {
+    test('every exercise declares how weight is logged, consistent with its increment', () {
+      for (final e in catalog.exercises) {
+        switch (e.load) {
+          case LoadType.weight || LoadType.assist:
+            expect(e.incrementKg, greaterThan(0), reason: '${e.id}: ${e.load.name} needs an increment');
+          case LoadType.none || LoadType.optional:
+            expect(e.incrementKg, 0, reason: '${e.id}: ${e.load.name} has no increment');
+        }
+      }
+      expect(catalog.exercises.where((e) => e.isAssisted).map((e) => e.id), unorderedEquals(['assisted-pull-up', 'assisted-dip']));
+      expect(catalog.exercises.where((e) => e.load == LoadType.optional).map((e) => e.id),
+          containsAll(['pull-up', 'chin-up', 'bar-dip']));
+      // Stretches, warm-up drills and planks never ask for kg.
+      for (final e in catalog.exercises.where((e) => e.category == 'cooldown' || e.id.contains('plank'))) {
+        expect(e.logsWeight, isFalse, reason: e.id);
+      }
+    });
+
+    test('bar exercises name bar equipment they use; bars have a default weight', () {
+      final bars = {for (final eq in catalog.equipment) if (eq.hasBar) eq.id: eq.barWeightKg};
+      expect(bars, {'barbell': 20.0, 'ez_bar': 10.0, 'trap_bar': 25.0, 'smith_machine': 0.0});
+      final withBar = catalog.exercises.where((e) => e.bar != null).toList();
+      expect(withBar.length, greaterThanOrEqualTo(30));
+      for (final e in withBar) {
+        expect(bars.keys, contains(e.bar), reason: e.id);
+        expect(e.equipment, contains(e.bar), reason: e.id);
+        expect(e.load, LoadType.weight, reason: e.id);
+      }
+      for (final id in ['landmine-press', 't-bar-row', 'inverted-row']) {
+        expect(catalog.exercise(id)!.bar, isNull, reason: '$id: only one bar end / bodyweight');
+      }
+    });
+
+    test('one-sided timed exercises store their time per side', () {
+      for (final e in catalog.exercises.where((e) => e.unilateral && e.isTimed)) {
+        expect(e.durationSeconds, lessThanOrEqualTo(45), reason: '${e.id}: per-side hold');
+      }
     });
   });
 }

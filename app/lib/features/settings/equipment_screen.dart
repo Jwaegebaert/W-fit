@@ -2,7 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/equipment_presets.dart';
+import '../../domain/progression.dart' show formatKg;
 import '../../providers.dart';
+
+/// Lets the user set the empty-bar weight of [equipmentId] (e.g. their gym's Smith machine).
+Future<void> showBarWeightDialog(BuildContext context, WidgetRef ref, String equipmentId) async {
+  final catalog = ref.read(catalogProvider);
+  final equipment = catalog.equipmentById(equipmentId);
+  if (equipment == null) return;
+  final current = ref.read(loadModelProvider).barWeight(equipmentId);
+  final controller = TextEditingController(text: current > 0 ? formatKg(current) : '');
+  final kg = await showDialog<double>(
+    context: context,
+    builder: (context) {
+      void submit() {
+        final v = double.tryParse(controller.text.replaceAll(',', '.'));
+        if (v != null && v >= 0 && v <= 60) Navigator.pop(context, v);
+      }
+
+      return AlertDialog(
+        title: Text('${equipment.name}: bar weight'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            equipmentId == 'smith_machine'
+                ? 'Smith machine bars differ per gym (often 10–20 kg; some are counterbalanced). Check the label on '
+                    'the machine.'
+                : 'Standard: ${formatKg(equipment.barWeightKg)} kg. Change it if your gym\'s bar is different.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Empty bar', suffixText: 'kg'),
+            onSubmitted: (_) => submit(),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: submit, child: const Text('Save')),
+        ],
+      );
+    },
+  );
+  controller.dispose();
+  if (kg == null) return;
+  await ref.read(repositoryProvider).setBarWeight(equipmentId, kg);
+  ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
+}
 
 class EquipmentScreen extends ConsumerWidget {
   const EquipmentScreen({super.key});
@@ -49,6 +97,7 @@ class EquipmentScreen extends ConsumerWidget {
     final catalog = ref.watch(catalogProvider);
     final status = ref.watch(equipmentProvider).value ?? const {};
     final repo = ref.read(repositoryProvider);
+    final loads = ref.watch(loadModelProvider);
     final t = Theme.of(context);
 
     return Scaffold(
@@ -96,6 +145,30 @@ class EquipmentScreen extends ConsumerWidget {
                 style: TextStyle(color: t.colorScheme.onSecondaryContainer),
               ),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+            child: Text('Bar weights', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+          ),
+          Card(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                child: Text(
+                  'For bar exercises you log only the plates. Statistics add the empty bar shown here.',
+                  style: t.textTheme.bodySmall,
+                ),
+              ),
+              for (final e in catalog.equipment.where((e) => e.hasBar))
+                ListTile(
+                  title: Text(e.name),
+                  trailing: Text(
+                    loads.barWeight(e.id) > 0 ? '${formatKg(loads.barWeight(e.id))} kg' : 'Not set',
+                    style: t.textTheme.titleSmall,
+                  ),
+                  onTap: () => showBarWeightDialog(context, ref, e.id),
+                ),
+            ]),
           ),
           for (final g in _groups.entries) ...[
             Padding(

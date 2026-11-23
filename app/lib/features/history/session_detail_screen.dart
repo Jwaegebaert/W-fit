@@ -61,7 +61,9 @@ class SessionDetailScreen extends ConsumerWidget {
           for (final s in sets.where((s) => s.completed)) {
             byExercise.putIfAbsent('${s.exerciseOrder}|${s.exerciseId}', () => []).add(s);
           }
-          final volume = sets.where((s) => s.completed).fold<double>(0, (a, s) => a + (s.weightKg ?? 0) * (s.reps ?? 0));
+          final loads = ref.watch(loadModelProvider);
+          double? load(SetLog s) => loads.totalKg(s.exerciseId, s.weightKg);
+          final volume = sets.where((s) => s.completed).fold<double>(0, (a, s) => a + (load(s) ?? 0) * (s.reps ?? 0));
           final t = Theme.of(context);
           return ListView(padding: pagePadding(context), children: [
             Text(session.title, style: t.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
@@ -113,7 +115,7 @@ class SessionDetailScreen extends ConsumerWidget {
                               visualDensity: VisualDensity.compact,
                               label: Text(s.durationSeconds != null && s.reps == null
                                   ? formatSeconds(s.durationSeconds!)
-                                  : '${s.weightKg != null && s.weightKg! > 0 ? '${formatKg(s.weightKg)} kg × ' : ''}${s.reps ?? '-'}'),
+                                  : '${(load(s) ?? 0) > 0 ? '${formatKg(load(s))} kg × ' : s.weightKg != null && s.weightKg! > 0 ? '${formatKg(s.weightKg)} kg assist × ' : ''}${s.reps ?? '-'}'),
                             ),
                         ]),
                       ]),

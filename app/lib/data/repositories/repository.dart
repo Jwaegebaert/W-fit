@@ -24,9 +24,12 @@ List<int> parseDays(String csv) =>
 
 /// All local persistence. Every mutation stamps `updatedAt` and marks the row dirty for sync.
 class Repository {
-  Repository(this.db);
+  Repository(this.db, {this.catalog});
 
   final AppDatabase db;
+
+  /// Used to add bar weights to logged sets; optional so storage tests can run without it.
+  final Catalog? catalog;
 
   DateTime get _now => DateTime.now().toUtc();
 
@@ -51,6 +54,13 @@ class Repository {
     await getProfile();
     await (db.update(db.profiles)..where((t) => t.id.equals('me')))
         .write(p.copyWith(updatedAt: Value(_now), dirty: const Value(true)));
+  }
+
+  /// Stores the user's empty-bar weight for [equipmentId] in the profile (synced with it).
+  Future<void> setBarWeight(String equipmentId, double kg) async {
+    final current = Map<String, double>.of(LoadModel.parseOverrides((await getProfile()).barWeightsJson));
+    current[equipmentId] = kg;
+    await saveProfile(ProfilesCompanion(barWeightsJson: Value(jsonEncode(current))));
   }
 
   // ---------------- equipment ----------------
@@ -319,6 +329,7 @@ class Repository {
       OrderingTerm.asc(db.setLogs.setNumber),
     ]);
     final rows = await q.get();
+    final loads = await loadModel();
     return rows.map((r) {
       final s = r.readTable(db.setLogs);
       final w = r.readTable(db.workoutSessions);
@@ -332,8 +343,17 @@ class Repository {
         completed: s.completed,
         section: s.section,
         rir: s.rir,
+        barKg: loads?.barKgFor(s.exerciseId) ?? 0,
+        assisted: loads?.isAssisted(s.exerciseId) ?? false,
       );
     }).toList();
+  }
+
+  /// Bar weights (catalog defaults + the user's overrides) and assisted machines; null without a catalog.
+  Future<LoadModel?> loadModel() async {
+    final c = catalog;
+    if (c == null) return null;
+    return LoadModel(c, LoadModel.parseOverrides((await getProfile()).barWeightsJson));
   }
 
   /// Sets for one exercise grouped by session, most recent first.

@@ -34,7 +34,8 @@ public static class SyncMapper
     {
         Id = e.Id, Name = e.Name, Experience = e.Experience, Goals = e.Goals, TrainingDays = [.. e.TrainingDays],
         SessionMinutes = e.SessionMinutes, IncludeCore = e.IncludeCore, HeightCm = e.HeightCm, BirthYear = e.BirthYear,
-        Injuries = e.Injuries, Notes = e.Notes, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+        Injuries = e.Injuries, Notes = e.Notes, RestMode = e.RestMode, CooldownStretches = e.CooldownStretches,
+        BarWeights = ParseBarWeights(e.BarWeightsJson), UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
     };
 
     public static EquipmentStatusDto ToDto(this EquipmentStatus e) => new()
@@ -93,6 +94,27 @@ public static class SyncMapper
         e.BirthYear = d.BirthYear;
         e.Injuries = Trunc(d.Injuries, Len.Text);
         e.Notes = Trunc(d.Notes, Len.Text);
+        e.RestMode = d.RestMode is "short" or "long" ? d.RestMode : "normal";
+        e.CooldownStretches = Math.Clamp(d.CooldownStretches, 0, 3);
+        e.BarWeightsJson = JsonSerializer.Serialize(CleanBarWeights(d.BarWeights), JsonDefaults.Options);
+    }
+
+    /// <summary>Bar weights keyed by equipment id (max 10 entries, 0-60 kg).</summary>
+    public static Dictionary<string, double> CleanBarWeights(Dictionary<string, double>? weights) =>
+        (weights ?? []).Where(kv => kv.Key.Length is > 0 and <= 40 && kv.Value is >= 0 and <= 60)
+            .Take(10).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    public static Dictionary<string, double> ParseBarWeights(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            return CleanBarWeights(JsonSerializer.Deserialize<Dictionary<string, double>>(json, JsonDefaults.Options));
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     public static void Apply(this EquipmentStatus e, EquipmentStatusDto d) => e.Available = d.Available;

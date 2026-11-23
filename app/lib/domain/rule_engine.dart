@@ -30,6 +30,8 @@ class TrainingContext {
     this.occupiedEquipment = const {},
     this.preferences = const {},
     this.experience = 'beginner',
+    this.restScale = 1.0,
+    this.cooldownStretches = RuleEngine.cooldownSize,
     this.recentExerciseIds = const {},
     this.limitations = const LimitationPolicy.empty(),
     this.feedback = const {},
@@ -50,6 +52,15 @@ class TrainingContext {
   /// exerciseId → liked | neutral | disliked | banned
   final Map<String, String> preferences;
   final String experience;
+
+  /// Multiplier for every rest period (profile "Rest between sets", see [restScaleFor]).
+  final double restScale;
+
+  /// Stretches in the cool-down (0 = no cool-down block), capped at [RuleEngine.cooldownSize].
+  final int cooldownStretches;
+
+  /// [seconds] of rest scaled by [restScale], rounded to 5 s. Zero stays zero.
+  int scaleRest(int seconds) => seconds <= 0 || restScale == 1.0 ? seconds : math.max(5, (seconds * restScale / 5).round() * 5);
 
   /// Legacy continuity hint (exercises used recently for the same day type). Ignored when [program] is given,
   /// because the program history then drives continuity and rotation.
@@ -98,6 +109,8 @@ class TrainingContext {
         occupiedEquipment: occupiedEquipment ?? this.occupiedEquipment,
         preferences: preferences ?? this.preferences,
         experience: experience,
+        restScale: restScale,
+        cooldownStretches: cooldownStretches,
         recentExerciseIds: recentExerciseIds ?? this.recentExerciseIds,
         limitations: limitations ?? this.limitations,
         feedback: feedback ?? this.feedback,
@@ -354,6 +367,7 @@ class RuleEngine {
           restSeconds: item.restSeconds,
           targetWeightKg: weight,
           notes: item.notes,
+          perSide: c.unilateral,
         ));
         changes.add(PlanChange(from: e.id, to: c.id, reason: reason));
       }
@@ -413,6 +427,7 @@ class _Pick {
         restSeconds: rest,
         targetWeightKg: weight,
         notes: notes,
+        perSide: exercise.unilateral,
       );
 }
 
@@ -685,7 +700,7 @@ class _PlanBuilder {
       p.repMin = lo;
       p.repMax = hi;
     }
-    p.rest = scheme.restFor(e);
+    p.rest = ctx.scaleRest(scheme.restFor(e));
     p.notes = switch (p.role) {
       SlotRole.anchor => deload ? 'Anchor · deload: lighter, crisp reps' : 'Anchor · progress this lift all block',
       SlotRole.flex => 'Extra ${prettyMuscle(p.flexMuscle ?? '').toLowerCase()} work',
@@ -953,7 +968,7 @@ class _PlanBuilder {
 
   List<Exercise> _cooldown() {
     final items = <Exercise>[];
-    for (var i = 0; i < RuleEngine.cooldownSize; i++) {
+    for (var i = 0; i < ctx.cooldownStretches.clamp(0, RuleEngine.cooldownSize); i++) {
       final pick = _bestForBlock(
         (e) => e.category == 'cooldown' && e.fitsDay(day),
         items,
@@ -999,6 +1014,12 @@ class _PlanBuilder {
     return s.isFinite ? s : 1;
   }
 
+  /// Catalog prescription for warm-up / core / cool-down items, with the athlete's rest preference applied.
+  PlanItem _item(Exercise e) {
+    final item = PlanItem.fromExercise(e);
+    return item.copyWith(restSeconds: ctx.scaleRest(item.restSeconds));
+  }
+
   // ------------------------------------------------------------------ assembly
   GeneratedWorkout build() {
     _buildMain();
@@ -1007,12 +1028,12 @@ class _PlanBuilder {
     for (final p in picks) {
       _assignWeight(p);
     }
-    final warmup = _warmup().map(PlanItem.fromExercise).toList();
+    final warmup = _warmup().map(_item).toList();
     // Core: two exercises × 2 sets cover abs / obliques / lower back across three sessions a week.
     final core = includeCore
-        ? _core().map((e) => PlanItem.fromExercise(e).copyWith(sets: math.min(e.sets, 2))).toList()
+        ? _core().map((e) => _item(e).copyWith(sets: math.min(e.sets, 2))).toList()
         : <PlanItem>[];
-    final cooldown = _cooldown().map(PlanItem.fromExercise).toList();
+    final cooldown = _cooldown().map(_item).toList();
 
     // Order: power → anchor → secondary → accessories → flex.
     const order = {SlotRole.power: 0, SlotRole.anchor: 1, SlotRole.secondary: 2, SlotRole.accessory: 3, SlotRole.flex: 4};
@@ -1100,7 +1121,7 @@ class _PlanBuilder {
       PlanBlock(section: Section.warmup, items: warmup),
       PlanBlock(section: Section.main, items: main),
       if (core.isNotEmpty) PlanBlock(section: Section.core, items: core),
-      PlanBlock(section: Section.cooldown, items: cooldown),
+      if (cooldown.isNotEmpty) PlanBlock(section: Section.cooldown, items: cooldown),
     ];
 
     final rationale = _rationale();

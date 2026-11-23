@@ -40,6 +40,9 @@ public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbC
             e.Property(x => x.Goals).HasMaxLength(Len.Goals);
             e.Property(x => x.Injuries).HasMaxLength(Len.Text);
             e.Property(x => x.Notes).HasMaxLength(Len.Text);
+            e.Property(x => x.RestMode).HasMaxLength(Len.Code).HasDefaultValue("normal");
+            e.Property(x => x.CooldownStretches).HasDefaultValue(3);
+            e.Property(x => x.BarWeightsJson).HasMaxLength(Len.Text).HasDefaultValue("{}");
             Sync(e);
         });
 

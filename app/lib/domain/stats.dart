@@ -44,15 +44,15 @@ Map<String, ExerciseBest> computeBests(Iterable<LoggedSet> sets) {
   for (final s in sets) {
     if (!s.completed || (s.reps ?? 0) <= 0) continue;
     final b = bests.putIfAbsent(s.exerciseId, () => ExerciseBest(s.exerciseId));
-    final w = s.weightKg ?? 0;
-    if (b.heaviest == null || w > (b.heaviest!.weightKg ?? 0)) b.heaviest = s;
+    final w = s.loadKg ?? 0;
+    if (b.heaviest == null || w > (b.heaviest!.loadKg ?? 0)) b.heaviest = s;
     final e1 = estimatedOneRepMax(w, s.reps!);
     if (e1 > b.bestE1rm) {
       b.bestE1rm = e1;
       b.bestE1rmSet = s;
     }
     if (b.mostReps == null ||
-        (w >= (b.mostReps!.weightKg ?? 0) && s.reps! > b.mostReps!.reps!)) {
+        (w >= (b.mostReps!.loadKg ?? 0) && s.reps! > b.mostReps!.reps!)) {
       b.mostReps = s;
     }
   }
@@ -68,8 +68,8 @@ List<PersonalRecord> detectPrs(List<LoggedSet> session, Iterable<LoggedSet> prev
     final prev = before[entry.key];
     if (prev == null) continue; // first time is a baseline, not a PR
     final cur = entry.value;
-    final curW = cur.heaviest?.weightKg ?? 0;
-    final prevW = prev.heaviest?.weightKg ?? 0;
+    final curW = cur.heaviest?.loadKg ?? 0;
+    final prevW = prev.heaviest?.loadKg ?? 0;
     if (curW > 0 && curW > prevW) {
       prs.add(PersonalRecord(
         exerciseId: entry.key,
@@ -85,7 +85,7 @@ List<PersonalRecord> detectPrs(List<LoggedSet> session, Iterable<LoggedSet> prev
         type: PrType.e1rm,
         value: cur.bestE1rm,
         date: cur.bestE1rmSet!.date,
-        weightKg: cur.bestE1rmSet!.weightKg,
+        weightKg: cur.bestE1rmSet!.loadKg,
         reps: cur.bestE1rmSet!.reps,
       ));
     } else if (curW == 0 && prevW == 0 && (cur.mostReps?.reps ?? 0) > (prev.mostReps?.reps ?? 0)) {

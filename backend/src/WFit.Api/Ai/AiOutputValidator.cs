@@ -118,7 +118,7 @@ public static class AiOutputValidator
             RepMax = repMax,
             DurationSeconds = duration,
             RestSeconds = ClampRest(item.RestSeconds, section),
-            TargetWeightKg = exercise.IsTimed ? null : ClampWeight(item.TargetWeightKg),
+            TargetWeightKg = exercise.IsTimed || exercise.LoadType == "none" ? null : ClampWeight(item.TargetWeightKg),
             Notes = SyncMapper.Trunc(item.Notes?.Trim(), MaxNoteLength),
         };
     }
