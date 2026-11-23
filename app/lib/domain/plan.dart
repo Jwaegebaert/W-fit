@@ -228,6 +228,25 @@ class PlanMeta {
   String encode() => jsonEncode(toJson());
 }
 
+/// Plans made before catalog v4 stored one-sided stretches as the total for both sides (60 s = 30 s per side) and the
+/// suitcase carry as 40 s; the catalog and the timer now count per side. Returns [blocks] with those old times
+/// converted, or null when nothing needs converting.
+List<PlanBlock>? convertLegacyHolds(List<PlanBlock> blocks, Catalog catalog) {
+  var changed = false;
+  PlanItem convert(PlanItem i) {
+    final e = catalog.exercise(i.exerciseId);
+    final now = e?.durationSeconds;
+    if (e == null || now == null || !e.unilateral || !e.isTimed) return i;
+    final legacy = e.category == 'cooldown' ? now * 2 : (e.id == 'suitcase-carry' ? 40 : null);
+    if (legacy == null || i.durationSeconds != legacy) return i;
+    changed = true;
+    return i.copyWith(durationSeconds: now, perSide: true);
+  }
+
+  final out = [for (final b in blocks) PlanBlock(section: b.section, items: b.items.map(convert).toList())];
+  return changed ? out : null;
+}
+
 /// Rest multiplier for the profile's "Rest between sets" setting (short | normal | long).
 double restScaleFor(String mode) => switch (mode) {
       'short' => 0.7,

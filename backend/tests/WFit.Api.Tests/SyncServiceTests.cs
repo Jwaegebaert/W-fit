@@ -192,13 +192,14 @@ public class SyncServiceTests
         {
             Id = id, Date = new DateOnly(2026, 11, 4), DayType = "push", Title = "Push day", Source = "rules", Status = "planned",
             EstimatedMinutes = 58, CoachNote = "Go.", UpdatedAt = TestEnv.Now,
-            Blocks = [new WorkoutBlockDto { Section = "warmup", Items = [new WorkoutItemDto { ExerciseId = "rowing-easy", Sets = 1, DurationSeconds = 300 }] }],
+            Blocks = [new WorkoutBlockDto { Section = "warmup", Items = [new WorkoutItemDto { ExerciseId = "rowing-easy", Sets = 1, DurationSeconds = 300, PerSide = true }] }],
         };
 
         var response = await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { PlannedWorkouts = [dto] } }, default);
 
         var pulled = response.Changes.PlannedWorkouts.Single();
         Assert.Equal("rowing-easy", pulled.Blocks.Single().Items.Single().ExerciseId);
+        Assert.True(pulled.Blocks.Single().Items.Single().PerSide); // the app's per-side marker survives the round trip
         Assert.Equal(300, pulled.Blocks[0].Items[0].DurationSeconds);
     }
 

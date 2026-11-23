@@ -66,6 +66,13 @@ class TrainingContext {
   /// [e] trains a muscle marked "light" as a primary mover.
   bool trainsLight(Exercise e) => e.primary.any(focus.isLight);
 
+  /// A barbell / Smith lift for a "light" muscle: only used when nothing else fits.
+  bool lightMisfit(Exercise e) => e.bar != null && trainsLight(e);
+
+  /// "Go light on quads and glutes" for the muscles of [e] marked light.
+  String lightReason(Exercise e) =>
+      'Go light on ${e.primary.where(focus.isLight).map((m) => prettyMuscle(m).toLowerCase()).join(' and ')}';
+
   /// [seconds] of rest scaled by [restScale], rounded to 5 s. Zero stays zero.
   int scaleRest(int seconds) => seconds <= 0 || restScale == 1.0 ? seconds : math.max(5, (seconds * restScale / 5).round() * 5);
 
@@ -395,6 +402,94 @@ class RuleEngine {
     return PlanAdjustment(blocks: out, changes: changes);
   }
 
+  /// Applies the "go light" setting to an existing plan (one the coach wrote, or a missed plan that moves to a new
+  /// date): barbell / Smith lifts for light muscles are replaced where possible and heavy rep ranges become 10–15.
+  /// Everything else stays as it is. Safe to apply more than once.
+  PlanAdjustment applyLight(List<PlanBlock> blocks, DayType day) {
+    if (ctx.focus.light.isEmpty) return PlanAdjustment(blocks: blocks, changes: const []);
+    final used = {for (final b in blocks) ...b.items.map((i) => i.exerciseId)};
+    final changes = <PlanChange>[];
+    PlanItem lighten(PlanItem item, Exercise e, {required bool swapped}) {
+      final heavy = (item.repMin ?? 10) < 10;
+      if (!swapped && !heavy) return item;
+      final lo = math.max(item.repMin ?? 10, 10);
+      final hi = math.max(item.repMax ?? 15, heavy ? 15 : lo);
+      final history = _historyFor(e.id, ctx.program);
+      final weight = e.isWeighted && history.isNotEmpty
+          ? adviseProgression(e, history, repMin: lo, repMax: hi, deload: ctx.program?.deload ?? false, light: true).weightKg
+          : null;
+      return item.copyWith(repMin: lo, repMax: hi, targetWeightKg: weight, clearWeight: weight == null);
+    }
+
+    final out = [
+      for (final block in blocks)
+        if (block.section != Section.main)
+          block
+        else
+          PlanBlock(
+            section: block.section,
+            items: [
+              for (final item in block.items)
+                () {
+                  final e = ctx.catalog.exercise(item.exerciseId);
+                  if (e == null || e.category != 'strength' || item.isTimed || !ctx.trainsLight(e)) return item;
+                  if (!ctx.lightMisfit(e)) return lighten(item, e, swapped: false);
+                  final c = rankSwaps(e, exclude: used, day: day, limit: 40)
+                      .map((s) => s.exercise)
+                      .where((x) =>
+                          x.category == 'strength' &&
+                          x.bar == null &&
+                          !x.isTimed &&
+                          x.fitsDay(day) &&
+                          x.primary.any(e.primary.contains) &&
+                          ctx.limitations.penalty(x) < LimitationPolicy.mildRegionPenalty)
+                      .firstOrNull;
+                  if (c == null) return lighten(item, e, swapped: false);
+                  used.add(c.id);
+                  changes.add(PlanChange(from: e.id, to: c.id, reason: ctx.lightReason(e)));
+                  return lighten(
+                    item.copyWith(exerciseId: c.id, perSide: c.unilateral, notes: '', clearWeight: true),
+                    c,
+                    swapped: true,
+                  );
+                }(),
+            ],
+          ),
+    ];
+    return PlanAdjustment(blocks: out, changes: changes);
+  }
+
+  /// Follows a changed Less / Normal / More level in an existing plan: one set fewer (min 2) on exercises for a muscle
+  /// that got less focus, one set more (within the caps) on the first exercise for a muscle that got more.
+  List<PlanBlock> applyFocusLevels(List<PlanBlock> blocks, {required MuscleFocus before, required MuscleFocus after}) {
+    int delta(String m) => after.levelOf(m).index - before.levelOf(m).index;
+    final boosted = <String>{};
+    return [
+      for (final block in blocks)
+        if (block.section != Section.main)
+          block
+        else
+          PlanBlock(
+            section: block.section,
+            items: [
+              for (final item in block.items)
+                () {
+                  final e = ctx.catalog.exercise(item.exerciseId);
+                  if (e == null || e.category != 'strength') return item;
+                  if (e.primary.any((m) => delta(m) < 0)) {
+                    return item.copyWith(sets: item.sets > 2 ? item.sets - 1 : item.sets);
+                  }
+                  final up = e.primary.where((m) => delta(m) > 0 && !boosted.contains(m)).toList();
+                  final cap = e.compound ? maxSetsCompound : maxSetsIsolation;
+                  if (up.isEmpty || item.sets >= cap) return item;
+                  boosted.addAll(up);
+                  return item.copyWith(sets: item.sets + 1);
+                }(),
+            ],
+          ),
+    ];
+  }
+
   String _ineligibleReason(Exercise e) {
     if (ctx.preferences[e.id] == 'banned') return 'Banned exercise';
     final missing = e.equipment.where((id) => !ctx.isEquipmentUsable(id)).toList();
@@ -632,6 +727,9 @@ class _PlanBuilder {
   }
 
   Exercise? _best(Iterable<Exercise> candidates, double Function(Exercise) score) {
+    // "Go light": barbell / Smith lifts for a light muscle only when nothing else is left.
+    final fitting = candidates.where((e) => !ctx.lightMisfit(e));
+    if (ctx.focus.light.isNotEmpty && fitting.isNotEmpty) candidates = fitting;
     Exercise? best;
     var bestScore = double.negativeInfinity;
     for (final e in candidates) {
@@ -658,18 +756,24 @@ class _PlanBuilder {
     final candidates = catalog.exercises.where((e) => _usable(e) && e.fitsDay(day) && _matches(e, slot)).toList();
     if (candidates.isEmpty) return null;
     final label = slot.role == SlotRole.anchor ? 'Anchor' : slot.label;
+    // A running lift gives way to "go light" as soon as the slot has an alternative.
+    bool misfit(Exercise e) => ctx.lightMisfit(e) && candidates.any((c) => !ctx.lightMisfit(c) && _clean(c));
 
     // Continuity within the block (same day type and variant).
     final cont = _slotHistory(index, _sameVariant);
     if (cont != null) {
       final e = catalog.exercise(cont)!;
-      if (candidates.contains(e) && _clean(e) && !_wantsEasier(e, candidates)) {
+      if (candidates.contains(e) && _clean(e) && !_wantsEasier(e, candidates) && !misfit(e)) {
         return _Pick(slot, e);
       }
       final pick = _best(candidates.where((c) => c.id != cont), (c) => _slotScore(c, slot));
       if (pick != null) {
         final why = ctx.limitations.reason(e) ??
-            (_wantsEasier(e, candidates) ? 'felt too hard' : _ineligibleWhy(e));
+            (misfit(e)
+                ? ctx.lightReason(e)
+                : _wantsEasier(e, candidates)
+                    ? 'felt too hard'
+                    : _ineligibleWhy(e));
         _limitLines.add('$label: ${pick.name} instead of ${e.name} – ${why[0].toLowerCase()}${why.substring(1)}');
         return _Pick(slot, pick);
       }
@@ -683,14 +787,16 @@ class _PlanBuilder {
         final trend = trends[prev];
         final stalled = trend == ExerciseTrend.stalled || trend == ExerciseTrend.regressing;
         final blocks = _anchorBlocks(prev, index);
-        if (candidates.contains(e) && _clean(e) && !stalled && blocks < 2) {
+        if (candidates.contains(e) && _clean(e) && !stalled && blocks < 2 && !misfit(e)) {
           _anchorLines.add('Anchor ${e.name} kept for block ${state.blockNumber}: still progressing');
           return _Pick(slot, e);
         }
         final alternatives = candidates.where((c) => c.id != prev).toList();
         final pick = _best(alternatives.isEmpty ? candidates : alternatives, (c) => _slotScore(c, slot) + _similarity(c, e));
         if (pick != null && pick.id != prev) {
-          final why = stalled
+          final why = misfit(e)
+              ? ctx.lightReason(e).toLowerCase()
+              : stalled
               ? '${trend!.id} on ${e.name}'
               : blocks >= 2
                   ? '${e.name} done for $blocks blocks'
@@ -768,6 +874,7 @@ class _PlanBuilder {
         deload: deload,
         incrementSteps: steps,
         holdOnStruggle: p.role == SlotRole.anchor,
+        light: ctx.trainsLight(e),
       ).weightKg;
       return;
     }
@@ -1083,8 +1190,10 @@ class _PlanBuilder {
     final out = <(String, double)>[];
     for (final m in trackedMuscleInfo.where((m) => m.group == group)) {
       if ((balance?.isHigh(m.id) ?? false) || ctx.focus.levelOf(m.id) == FocusLevel.less) continue;
-      final more = ctx.focus.levelOf(m.id) == FocusLevel.more ? 1.0 : 0.0; // "more" muscles go first while they are under
-      out.add((m.id, _deficit(m.id) + more + 2 * (balance?.priority(m.id)?.score ?? 0)));
+      final need = _deficit(m.id);
+      // "More" muscles go first, but only while they are under their (raised) target.
+      final more = need > 0 && ctx.focus.levelOf(m.id) == FocusLevel.more ? 1.0 : 0.0;
+      out.add((m.id, need + more + 2 * (balance?.priority(m.id)?.score ?? 0)));
     }
     out.sort((a, b) => b.$2.compareTo(a.$2));
     return [for (final (m, score) in out) if (score > 0) m];
@@ -1142,10 +1251,19 @@ class _PlanBuilder {
     if (what.isNotEmpty) _otherLines.add('Extra time ($sessionMinutes min): ${what.join('; ')}');
     final left = ((target - total()) / 60).round();
     if (left >= RuleEngine.fillThresholdSeconds ~/ 60) {
-      _otherLines.add('About $left min to spare: today\'s muscles are already at their weekly target, so more sets would '
-          'mostly add fatigue. Finish early or add mobility work.');
+      final under = _fillMuscles().where((m) => _deficit(m) > 0).map((m) => prettyMuscle(m).toLowerCase()).toList();
+      final limited = added.length >= RuleEngine.maxFillExercises || plusOne.length >= RuleEngine.maxFillSets;
+      _otherLines.add(under.isEmpty
+          ? 'About $left min to spare: today\'s muscles are already at their weekly target, so more sets would mostly '
+              'add fatigue. Finish early or add mobility work.'
+          : limited
+              ? 'About $left min to spare: the limit for extra work in one session is reached. '
+                  '${_capitalizeList(under)} can still use more.'
+              : 'About $left min to spare: ${under.take(3).join(', ')} can use more, but nothing suitable is left today.');
     }
   }
+
+  static String _capitalizeList(List<String> names) => RuleEngine._capitalize(names.take(3).join(', '));
 
   /// Catalog prescription for warm-up / core / cool-down items, with the athlete's rest preference applied.
   PlanItem _item(Exercise e) {

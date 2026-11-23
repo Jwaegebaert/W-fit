@@ -82,6 +82,8 @@ String rirPhrase(int rir) => rir == 1 ? '1–2 reps in reserve' : '$rir reps in 
 /// * [targetRir] – adds reps-in-reserve guidance to the message.
 /// * [holdOnStruggle] – keep the weight instead of the ~10 % reset after two sessions below the range (used for
 ///   anchor lifts inside a block, where the deload / next block handles resets).
+/// * [light] – the athlete's "go light" setting: a weight last used below [repMin] is too heavy for the light rep
+///   range and is replaced by one for ~12 easy reps.
 ProgressionAdvice adviseProgression(
   Exercise e,
   List<List<LoggedSet>> history, {
@@ -91,12 +93,22 @@ ProgressionAdvice adviseProgression(
   int incrementSteps = 0,
   int? targetRir,
   bool holdOnStruggle = false,
+  bool light = false,
 }) {
   final base = _baseAdvice(e, history, repMin: repMin, repMax: repMax, holdOnStruggle: holdOnStruggle);
   final lo = repMin ?? e.repMin ?? 8;
   var weight = base.weightKg;
   var reps = base.targetReps;
   var message = base.message;
+
+  if (light && weight != null) {
+    final easy = _lightWeight(e, history, lo);
+    if (easy != null && (e.isAssisted ? easy > weight : easy < weight)) {
+      weight = easy;
+      reps = lo;
+      message = 'Go light: ${_fmt(easy)} kg${e.isAssisted ? ' assistance' : ''} for $lo+ easy reps.';
+    }
+  }
 
   // Assisted machines run the other way: more assistance kg = easier.
   final dir = e.isAssisted ? -1 : 1;
@@ -131,6 +143,25 @@ ProgressionAdvice adviseProgression(
   }
 
   return ProgressionAdvice(weightKg: weight, targetReps: reps, message: message, lastSummary: base.lastSummary);
+}
+
+/// Weight for ~12 reps with 3 in reserve when the last session stayed below [lo] reps; null when the last weight
+/// already suits the range (normal progression applies). Bar exercises: computed on plates + bar, returned as plates.
+double? _lightWeight(Exercise e, List<List<LoggedSet>> history, int lo) {
+  final last = history
+      .map((s) => s.where((x) => x.completed && (x.reps ?? 0) > 0 && x.weightKg != null).toList())
+      .where((s) => s.isNotEmpty)
+      .firstOrNull;
+  if (last == null || last.every((x) => x.reps! >= lo)) return null;
+  if (e.isAssisted) return last.map((x) => x.weightKg!).reduce(math.max) + e.incrementKg;
+  var oneRm = 0.0;
+  for (final x in last) {
+    oneRm = math.max(oneRm, estimatedOneRepMax(x.loadKg ?? 0, x.reps!));
+  }
+  if (oneRm <= 0) return null;
+  // Epley for 15 reps (12 + 3 in reserve).
+  final plates = oneRm / 1.5 - last.first.barKg;
+  return math.max(0.0, roundToStep(plates, e.incrementKg));
 }
 
 ProgressionAdvice _baseAdvice(

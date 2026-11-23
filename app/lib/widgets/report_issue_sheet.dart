@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../domain/muscles.dart';
 import '../domain/plan.dart';
+import '../features/dashboard/dashboard_screen.dart' show nextPlanProvider;
 import '../providers.dart';
 import '../services/coach_service.dart';
 import 'common.dart';
@@ -124,7 +125,9 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
 
   Future<void> _decide(FocusChange c, bool accept) async {
     setState(() => _decided[c.muscle] = accept);
-    if (accept) await ref.read(coachServiceProvider).acceptFocusChange(c);
+    if (!accept) return;
+    await ref.read(coachServiceProvider).acceptFocusChange(c);
+    ref.invalidate(nextPlanProvider); // the open plans changed
   }
 
   @override

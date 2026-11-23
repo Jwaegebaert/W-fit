@@ -54,7 +54,8 @@ Every synced record has `updatedAt` (client clock, last-write-wins) and `deleted
     { "section": "warmup",                                 // warmup|main|core|cooldown
       "items": [
         { "exerciseId": "rowing-easy", "sets": 1, "repMin": null, "repMax": null,
-          "durationSeconds": 300, "restSeconds": 0, "targetWeightKg": null, "notes": "" }
+          "durationSeconds": 300, "restSeconds": 0, "targetWeightKg": null, "notes": "",
+          "perSide": false }   // optional; reps / seconds count per side (set by the app)
       ] }
   ],
   // PlanMeta serialized as a JSON object string, ≤ 8000 chars (null / invalid / too long ⇒ stored as "{}").

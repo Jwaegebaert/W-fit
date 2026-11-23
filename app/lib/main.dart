@@ -39,6 +39,7 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
       ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
     });
     ref.read(healthSyncProvider).catchUp();
+    ref.read(coachServiceProvider).convertLegacyPlans();
   }
 
   @override

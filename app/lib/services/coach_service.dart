@@ -338,6 +338,24 @@ class CoachService {
     return (await _repo.plannedById(id))!;
   }
 
+  static const _legacyHoldsKey = 'legacy_holds_converted';
+
+  /// Once per device: converts the one-sided hold times of open plans made before catalog v4 (`convertLegacyHolds`).
+  /// A one-off, because a later plan may ask for a longer hold on purpose. Never throws.
+  Future<void> convertLegacyPlans() async {
+    try {
+      if (await _repo.db.getValue(_legacyHoldsKey) != null) return;
+      for (final p in await _repo.plannedHistory(from: addDays(dateOnly(DateTime.now()), -carryForwardDays))) {
+        if (p.status != 'planned') continue;
+        final blocks = convertLegacyHolds(Repository.decodeBlocks(p.blocksJson), _catalog);
+        if (blocks != null) await _repo.updatePlannedBlocks(p.id, blocks);
+      }
+      await _repo.db.setValue(_legacyHoldsKey, '1');
+    } catch (_) {
+      // Best effort; retried on the next start.
+    }
+  }
+
   /// Missed plans older than this are not carried forward (the program has moved on).
   static const int carryForwardDays = 10;
 
@@ -351,6 +369,10 @@ class CoachService {
     final rationale = [line, ...meta.rationale.where((l) => !l.startsWith('Moved from'))].take(6).toList();
     await _repo.movePlanned(missed.id, date, metaJson: meta.copyWith(rationale: rationale).encode());
     await _adjustOpenPlans(); // limitations or equipment may have changed since it was planned
+    final moved = (await _repo.plannedById(missed.id))!;
+    final day = DayType.parse(moved.dayType);
+    final engine = RuleEngine((await snapshot(date: date, day: day)).context());
+    await _saveAdjusted(moved, engine.applyLight(Repository.decodeBlocks(moved.blocksJson), day)); // so may the focus
     _syncSoon();
     return _repo.plannedById(missed.id);
   }
@@ -408,8 +430,11 @@ class CoachService {
       },
     });
     final w = res['workout'] as Map<String, dynamic>;
-    final meta = _meta(w['meta']);
-    final blocks = _cleanBlocks(w['blocks'], snap, deload: meta.deload);
+    final aiMeta = _meta(w['meta']);
+    final adj = RuleEngine(snap.context(occupied: occupied))
+        .applyLight(_cleanBlocks(w['blocks'], snap, deload: aiMeta.deload), dayType);
+    final blocks = adj.blocks;
+    final meta = aiMeta.withChanges(adj.changes);
     if (!blocks.any((b) => b.section == Section.main)) {
       throw ApiException('ai_unavailable', 'The AI coach returned an unusable workout.');
     }
@@ -462,15 +487,24 @@ class CoachService {
     _syncSoon();
   }
 
-  /// Saves a new muscle focus (settings screen or an accepted coach suggestion) and rebuilds the open rule-engine
-  /// plans so they follow it; AI-refined plans keep their exercises (the next refinement uses the new focus).
+  /// Saves a new muscle focus (settings screen or an accepted coach suggestion) and applies it to every open plan:
+  /// rule-engine plans are rebuilt, coach-refined plans keep the coach's choices and only change where the focus asks
+  /// for it (`RuleEngine.applyFocusLevels` / `applyLight`).
   Future<void> saveMuscleFocus(MuscleFocus focus) async {
+    final before = MuscleFocus.decode((await _repo.getProfile()).muscleFocusJson);
     await _repo.saveProfile(ProfilesCompanion(muscleFocusJson: Value(focus.encode())));
     for (final p in await _repo.plannedHistory(from: DateTime.now())) {
-      if (p.source != 'rules' || !await _isOpen(p.id)) continue;
+      if (!await _isOpen(p.id)) continue;
       final date = parseDateKey(p.date);
       final day = DayType.parse(p.dayType);
-      final w = _draft(await snapshot(date: date, day: day), day, ref.read(occupiedEquipmentProvider));
+      final snap = await snapshot(date: date, day: day);
+      if (p.source != 'rules') {
+        final engine = RuleEngine(snap.context());
+        final levelled = engine.applyFocusLevels(Repository.decodeBlocks(p.blocksJson), before: before, after: focus);
+        await _saveAdjusted(p, engine.applyLight(levelled, day));
+        continue;
+      }
+      final w = _draft(snap, day, ref.read(occupiedEquipmentProvider));
       await _repo.savePlanned(
         id: p.id,
         date: date,
@@ -484,6 +518,16 @@ class CoachService {
       );
     }
     _syncSoon();
+  }
+
+  /// Stores [adj] on [p] when it changed anything.
+  Future<void> _saveAdjusted(PlannedWorkout p, PlanAdjustment adj) async {
+    if (jsonEncode(adj.blocks.map((b) => b.toJson()).toList()) ==
+        jsonEncode(Repository.decodeBlocks(p.blocksJson).map((b) => b.toJson()).toList())) {
+      return;
+    }
+    await _repo.updatePlannedBlocks(p.id, adj.blocks,
+        metaJson: PlanMeta.decode(p.metaJson).withChanges(adj.changes).encode());
   }
 
   Future<void> acceptFocusChange(FocusChange change) async =>
@@ -512,7 +556,9 @@ class CoachService {
         final item = i.copyWith(perSide: e.unilateral);
         items.add(item.targetWeightKg == null && e.isWeighted && h.isNotEmpty
             ? item.copyWith(
-                targetWeightKg: adviseProgression(e, h, repMin: i.repMin, repMax: i.repMax, deload: deload).weightKg)
+                targetWeightKg: adviseProgression(e, h,
+                        repMin: i.repMin, repMax: i.repMax, deload: deload, light: s.context().trainsLight(e))
+                    .weightKg)
             : item);
       }
       // The cool-down follows the athlete's setting (0 = no cool-down block).
@@ -657,8 +703,15 @@ class CoachService {
       if (await _applyCoachFeedback(res['feedback'])) await _adjustOpenPlans();
       final plan = res['plan'];
       if (open && plan is Map<String, dynamic>) {
-        final meta = _meta(plan['meta']);
-        final blocks = _cleanBlocks(plan['blocks'], await snapshot(date: date, day: day), deload: meta.deload);
+        final aiMeta = _meta(plan['meta']);
+        final now = await snapshot(date: date, day: day);
+        final cleaned = _cleanBlocks(plan['blocks'], now, deload: aiMeta.deload);
+        // Not during the workout: exercises may already be logged.
+        final adj = inSession
+            ? PlanAdjustment(blocks: cleaned, changes: const [])
+            : RuleEngine(now.context()).applyLight(cleaned, day!);
+        final blocks = adj.blocks;
+        final meta = aiMeta.withChanges(adj.changes);
         final current = await _repo.plannedById(target.id);
         if (blocks.any((b) => b.section == Section.main) && current != null && current.status == 'planned') {
           await _repo.savePlanned(
@@ -732,7 +785,9 @@ class CoachService {
     final e = _catalog.exercise(exerciseId);
     if (e == null) return const ProgressionAdvice(message: '');
     final history = await _repo.exerciseHistory(exerciseId, excludeSessionId: excludeSessionId);
-    return adviseProgression(e, history, repMin: item.repMin, repMax: item.repMax);
+    final focus = MuscleFocus.decode((await _repo.getProfile()).muscleFocusJson);
+    return adviseProgression(e, history,
+        repMin: item.repMin, repMax: item.repMax, light: e.primary.any(focus.isLight));
   }
 
   Future<List<SwapSuggestion>> ruleSwaps(

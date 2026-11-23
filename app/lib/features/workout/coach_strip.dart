@@ -44,6 +44,8 @@ class CoachStrip extends StatefulWidget {
 class _CoachStripState extends State<CoachStrip> {
   bool _open = false;
 
+  bool get _focusSwap => widget.change?.reason.startsWith('Go light') ?? false;
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
@@ -96,7 +98,8 @@ class _CoachStripState extends State<CoachStrip> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if (coachy) ...[
-                    _Badge(label: 'Coach', color: s.tertiary),
+                    // Swaps made by the "go light" setting are the athlete's own choice, not the coach's.
+                    _Badge(label: coachNote || !_focusSwap ? 'Coach' : 'Focus', color: s.tertiary),
                     const SizedBox(width: 6),
                   ],
                   Expanded(

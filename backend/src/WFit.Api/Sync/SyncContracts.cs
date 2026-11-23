@@ -61,6 +61,9 @@ public sealed record WorkoutItemDto
     public int RestSeconds { get; init; }
     public double? TargetWeightKg { get; init; }
     public string Notes { get; init; } = "";
+
+    /// <summary>Reps / seconds count per side (set by the app; null when unknown).</summary>
+    public bool? PerSide { get; init; }
 }
 
 public sealed record WorkoutBlockDto

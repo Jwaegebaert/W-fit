@@ -8,7 +8,7 @@ import '../../widgets/common.dart';
 import '../dashboard/dashboard_screen.dart';
 
 /// Per muscle: Less / Normal / More (scales its weekly target band) and "Go light" (no heavy loading).
-/// Changes are saved straight away and rebuild the open rule-engine plans.
+/// Changes are saved straight away and applied to every open plan (see `CoachService.saveMuscleFocus`).
 class MuscleFocusScreen extends ConsumerStatefulWidget {
   const MuscleFocusScreen({super.key});
 
@@ -55,8 +55,9 @@ class _MuscleFocusScreenState extends ConsumerState<MuscleFocusScreen> {
             padding: const EdgeInsets.all(14),
             child: Text(
               'Less lowers a muscle\'s weekly target (no extra work for it), More raises it. Go light keeps that muscle '
-              'away from heavy sets: 10–15 reps and machines or cables instead of barbell lifts. You can also ask the '
-              'coach ("go easy on my shoulders") and save its suggestion.',
+              'away from heavy sets: 10–15 reps and, where the exercise has an alternative, no barbell or Smith lifts. '
+              'Changes apply to your planned workouts, except one you are doing right now. You can also ask the coach '
+              '("go easy on my shoulders") and save its suggestion.',
               style: TextStyle(color: t.colorScheme.onSecondaryContainer),
             ),
           ),
