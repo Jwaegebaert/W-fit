@@ -63,12 +63,12 @@ class StatsScreen extends ConsumerWidget {
             ]),
             const SizedBox(height: Gap.item),
             StatRow(children: [
-              StatTile(label: 'week streak', value: '$streak', icon: Icons.local_fire_department, color: Colors.orange.shade700),
+              StatTile(label: 'week streak', value: '$streak', icon: Icons.local_fire_department, color: t.colorScheme.gold),
               StatTile(
                   label: 'exercises tracked',
                   value: '${bests.length}',
                   icon: Icons.emoji_events_outlined,
-                  color: Colors.amber.shade700),
+                  color: t.colorScheme.gold),
             ]),
             SectionTitle('Consistency', trailing: Text('target $target / week', style: t.textTheme.bodySmall)),
             Card(

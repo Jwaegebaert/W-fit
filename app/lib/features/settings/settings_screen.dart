@@ -24,7 +24,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(padding: pagePadding(context), children: [
-        const SectionTitle('Training'),
+        const SectionTitle('Training', padding: SectionTitle.first),
         Card(
           child: Column(children: [
             ListTile(

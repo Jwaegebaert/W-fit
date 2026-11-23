@@ -12,11 +12,11 @@ import '../../domain/training_load.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
 
-/// Status colours shared by the balance views: under target amber, on target primary, above target purple.
+/// Status colours shared by the balance views: under target orange, on target primary, above target purple.
 Color volumeColor(VolumeStatus status, ColorScheme s) => switch (status) {
-      VolumeStatus.under => Colors.amber.shade700,
+      VolumeStatus.under => s.attention,
       VolumeStatus.ok => s.primary,
-      VolumeStatus.high => Colors.deepPurple.shade300,
+      VolumeStatus.high => s.brightness == Brightness.dark ? Colors.deepPurple.shade200 : Colors.deepPurple.shade400,
     };
 
 /// Colour of [sets] effective sets against [target] (empty-cell colour when nothing was logged).
@@ -92,7 +92,7 @@ class _FocusCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: Gap.sm),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Icon(Icons.flag_rounded, size: 20, color: Colors.amber.shade700),
+                Icon(Icons.flag_rounded, size: 20, color: t.colorScheme.attention),
                 const SizedBox(width: Gap.sm),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -183,8 +183,10 @@ class _VolumeBar extends StatelessWidget {
                   top: 3,
                   bottom: 3,
                   child: DecoratedBox(
-                    decoration:
-                        BoxDecoration(color: volumeColor(m.status, s), borderRadius: BorderRadius.circular(3)),
+                    // The bar shows this week, so its colour does too (the status also looks at last week).
+                    decoration: BoxDecoration(
+                        color: bandColor(m.thisWeek, MuscleTarget(m.targetMin, m.targetMax), s),
+                        borderRadius: BorderRadius.circular(3)),
                   ),
                 ),
               ]);
@@ -294,7 +296,7 @@ class _DistributionCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: SizedBox(
                 height: 14,
-                child: Row(children: [
+                child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   for (final g in MuscleGroup.values)
                     if ((share[g] ?? 0) > 0)
                       Expanded(flex: (share[g]! * 1000).round(), child: ColoredBox(color: _groupColor(g, s))),
@@ -337,7 +339,7 @@ class _RecentCard extends StatelessWidget {
               '${m.label} · ${switch (m.daysSinceTrained) { null => '–', 0 => 'today', final d => '${d}d' }}',
               color: switch (m.daysSinceTrained) {
                 null => s.onSurfaceVariant,
-                final d when d > 7 => Colors.amber.shade800,
+                final d when d > 7 => s.attention,
                 _ => s.primary,
               },
             ),
@@ -390,7 +392,7 @@ class BalanceSummaryCard extends ConsumerWidget {
               Text('All muscles on track', style: t.textTheme.bodySmall)
             else
               Wrap(spacing: 6, runSpacing: 6, children: [
-                for (final m in under.take(5)) Pill(m.label, color: Colors.amber.shade800),
+                for (final m in under.take(5)) Pill(m.label, color: s.attention),
                 if (under.length > 5) Pill('+${under.length - 5}', color: s.onSurfaceVariant),
               ]),
           ]),

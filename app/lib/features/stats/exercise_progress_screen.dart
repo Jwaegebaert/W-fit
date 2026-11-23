@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/theme.dart';
 import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
@@ -58,7 +59,7 @@ class ExerciseProgressScreen extends ConsumerWidget {
                 label: weighted ? 'best e1RM' : 'best reps',
                 value: weighted ? '${formatKg(best?.bestE1rm)} kg' : '${best?.mostReps?.reps ?? 0}',
                 icon: Icons.emoji_events_outlined,
-                color: Colors.amber.shade700,
+                color: t.colorScheme.gold,
               ),
               StatTile(
                 label: 'since first session',

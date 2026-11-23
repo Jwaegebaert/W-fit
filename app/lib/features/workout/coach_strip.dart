@@ -139,13 +139,13 @@ class _CoachStripState extends State<CoachStrip> {
     final advice = widget.advice;
     final weight = item.targetWeightKg ?? advice?.weightKg;
     final side = item.perSide || (widget.exercise?.unilateral ?? false) ? ' / side' : '';
+    // The same number the reps field shows and a tick logs.
+    final reps = advice?.targetReps ?? item.repMax ?? item.repMin;
     final aim = item.isTimed
         ? '${formatSeconds(item.durationSeconds ?? 30)}$side'
-        : advice?.targetReps != null
-            ? '${advice!.targetReps} reps$side'
-            : item.repMin == null
-                ? ''
-                : '${item.repMin == item.repMax || item.repMax == null ? item.repMin : '${item.repMin}–${item.repMax}'} reps$side';
+        : reps == null
+            ? ''
+            : '$reps reps$side';
     return [
       if (advice?.lastSummary case final last?) _Chip(label: 'Last', value: last),
       if (weight != null) _Chip(label: 'Today', value: widget.loads.weightLabel(widget.exercise, weight), strong: true),

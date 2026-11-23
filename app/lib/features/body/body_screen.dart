@@ -191,8 +191,12 @@ class _BodyFormState extends ConsumerState<_BodyForm> {
               tooltip: 'Delete entry',
               icon: const Icon(Icons.delete_outline),
               onPressed: () async {
-                await ref.read(repositoryProvider).deleteBodyMetric(widget.existing!.id);
+                final repo = ref.read(repositoryProvider);
+                final messenger = ScaffoldMessenger.of(context);
+                final entry = widget.existing!;
+                await repo.deleteBodyMetric(entry.id);
                 if (context.mounted) Navigator.pop(context);
+                showUndo(messenger, 'Entry deleted', () => repo.saveBodyMetric(entry.toCompanion(false)));
               },
             ),
         ]),

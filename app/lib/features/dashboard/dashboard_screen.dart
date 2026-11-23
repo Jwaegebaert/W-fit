@@ -143,7 +143,7 @@ class _CheckInCards extends ConsumerWidget {
     final t = Theme.of(context);
     final catalog = ref.watch(catalogProvider);
     final coach = ref.read(coachServiceProvider);
-    return Column(children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       for (final f in due.take(2))
         Card(
           margin: const EdgeInsets.only(top: Gap.md),
@@ -186,7 +186,7 @@ class _HeroCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Theme.of(context);
     final day = DayType.parse(plan.dayType);
-    final color = day.color(t.colorScheme);
+    const color = BrandColors.hero;
     final date = parseDateKey(plan.date);
     final isToday = dateKey(date) == dateKey(DateTime.now());
     final blocks = Repository.decodeBlocks(plan.blocksJson);
@@ -200,7 +200,7 @@ class _HeroCard extends ConsumerWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [color, Color.lerp(color, Colors.black, 0.35)!],
+          colors: [color, Color.lerp(color, Colors.black, 0.3)!],
         ),
       ),
       padding: const EdgeInsets.all(20),
@@ -285,7 +285,7 @@ class _HeroChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(Gap.sm)),
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Gap.sm)),
         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12)),
       );
 }
@@ -337,7 +337,7 @@ class _WeekCard extends ConsumerWidget {
             const SizedBox(width: 16),
             Column(children: [
               Row(children: [
-                Icon(Icons.local_fire_department, color: Colors.orange.shade600),
+                Icon(Icons.local_fire_department, color: t.colorScheme.gold),
                 Text('$streak', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
               ]),
               Text('week streak', style: t.textTheme.bodySmall),

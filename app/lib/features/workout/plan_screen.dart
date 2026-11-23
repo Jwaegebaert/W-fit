@@ -32,7 +32,15 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
   Future<void> _regenerate({required bool ai, DayType? day}) async {
     final plan = await ref.read(repositoryProvider).plannedById(_id);
-    if (plan == null) return;
+    if (plan == null || !mounted) return;
+    if (!ai) {
+      final ok = await confirmDestructive(context,
+          title: day == null ? 'Rebuild this plan?' : 'Switch to ${day.label} day?',
+          message: 'The current plan is replaced, with the swaps and coach changes in it.',
+          action: day == null ? 'Rebuild' : 'Switch',
+          cancel: 'Keep plan');
+      if (!ok || !mounted) return;
+    }
     String note = '';
     if (ai) {
       final input = await _askNote();
@@ -94,7 +102,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(plan.title),
+        toolbarHeight: AppBarTitle.toolbarHeight,
+        title: Text(plan.title, style: const TextStyle(fontSize: 16), maxLines: 2),
         actions: [
           PopupMenuButton<String>(
             enabled: !_busy,
@@ -183,7 +192,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                         excludeIds: usedIds,
                       ),
                       onRemove: blocks[b].items.length > 1
-                          ? () => ref.read(coachServiceProvider).removeItem(plan.id, b, i)
+                          ? () => _remove(plan, blocks, b, i)
                           : null,
                       onReport: () =>
                           showReportIssueSheet(context, exerciseId: blocks[b].items[i].exerciseId, plannedId: plan.id),
@@ -207,6 +216,14 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _remove(PlannedWorkout plan, List<PlanBlock> blocks, int b, int i) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = ref.read(repositoryProvider);
+    final name = ref.read(catalogProvider).exerciseName(blocks[b].items[i].exerciseId);
+    await ref.read(coachServiceProvider).removeItem(plan.id, b, i);
+    showUndo(messenger, '$name removed', () => repo.updatePlannedBlocks(plan.id, blocks));
   }
 
   Future<void> _start(PlannedWorkout plan) async {
@@ -275,7 +292,7 @@ class _WhyCard extends ConsumerWidget {
             if (meta.program.isNotEmpty) Pill(meta.program, icon: Icons.timeline),
             if (meta.deload) Pill('Deload week', icon: Icons.battery_charging_full, color: t.colorScheme.tertiary),
             for (final m in meta.focus)
-              Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), icon: Icons.center_focus_strong, color: Colors.amber.shade800),
+              Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), icon: Icons.center_focus_strong, color: t.colorScheme.primary),
           ]),
           for (final r in meta.rationale)
             Padding(

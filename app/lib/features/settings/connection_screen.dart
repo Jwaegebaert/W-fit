@@ -19,6 +19,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   bool _testing = false;
   bool _obscure = true;
   String? _result;
+  bool _failed = false;
   Map<String, dynamic>? _usage;
 
   @override
@@ -31,6 +32,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
   Future<void> _test({bool save = false}) async {
     setState(() {
       _testing = true;
+      _failed = false;
       _result = null;
     });
     final config = ApiConfig(baseUrl: _url.text.trim(), apiKey: _key.text.trim());
@@ -47,7 +49,10 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         _result = save ? 'Connected and saved. Syncing…' : 'Connection OK';
       });
     } on ApiException catch (e) {
-      setState(() => _result = e.message);
+      setState(() {
+        _failed = true;
+        _result = e.message;
+      });
     } finally {
       if (mounted) setState(() => _testing = false);
     }
@@ -58,6 +63,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     _url.clear();
     _key.clear();
     setState(() {
+      _failed = false;
       _result = 'Disconnected – the app keeps working offline.';
       _usage = null;
     });
@@ -97,6 +103,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           decoration: InputDecoration(
             labelText: 'API key',
             suffixIcon: IconButton(
+              tooltip: _obscure ? 'Show key' : 'Hide key',
               icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _obscure = !_obscure),
             ),
@@ -119,7 +126,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
         ]),
         if (_result != null) ...[
           const SizedBox(height: 12),
-          Text(_result!, style: TextStyle(color: _result!.startsWith('Conn') ? t.colorScheme.primary : t.colorScheme.error)),
+          Text(_result!, style: TextStyle(color: _failed ? t.colorScheme.error : t.colorScheme.primary)),
         ],
         if (_usage != null) ...[
           const SectionTitle('AI usage'),

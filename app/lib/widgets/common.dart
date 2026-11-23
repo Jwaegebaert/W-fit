@@ -9,6 +9,9 @@ import 'exercise_visuals.dart';
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing, this.padding = const EdgeInsets.fromLTRB(4, 20, 4, 8)});
 
+  /// Padding for a title that opens a page, right under the app bar.
+  static const first = EdgeInsets.fromLTRB(4, 4, 4, 8);
+
   final String text;
   final Widget? trailing;
   final EdgeInsets padding;
@@ -179,11 +182,49 @@ class Pill extends StatelessWidget {
   }
 }
 
-void showSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
-}
+void showSnack(BuildContext context, String message) => _snack(ScaffoldMessenger.of(context), SnackBar(content: Text(message)));
+
+/// Reports a removal that took effect at once and can be taken back. Takes the messenger because the page or sheet that
+/// removed something may already be closing.
+void showUndo(ScaffoldMessengerState messenger, String message, VoidCallback onUndo) => _snack(
+    messenger,
+    SnackBar(
+      content: Text(message),
+      action: SnackBarAction(label: 'Undo', onPressed: onUndo),
+      persist: false,
+    ));
+
+void _snack(ScaffoldMessengerState messenger, SnackBar bar) => messenger
+  ..hideCurrentSnackBar()
+  ..showSnackBar(bar);
+
+/// Asks before something is deleted or replaced, with a red confirm button. True when confirmed.
+Future<bool> confirmDestructive(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String action,
+  String cancel = 'Cancel',
+}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final s = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(cancel)),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: s.error, foregroundColor: s.onError),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action),
+            ),
+          ],
+        );
+      },
+    ) ??
+    false;
 
 /// Padding for the scrollable body of a page without sticky bottom UI: [base] (default [Gap.page]) plus the
 /// system navigation bar height, so the last item can scroll clear of Android's nav bar in edge-to-edge mode.
@@ -197,10 +238,12 @@ EdgeInsets pagePadding(BuildContext context, [EdgeInsets base = Gap.page]) =>
 EdgeInsets sheetPadding(BuildContext context) => Gap.sheet.copyWith(
     bottom: Gap.sheet.bottom + MediaQuery.paddingOf(context).bottom + MediaQuery.viewInsetsOf(context).bottom);
 
-/// Shows a modal bottom sheet with the app defaults: scroll-controlled, below the status bar, drag handle.
+/// Shows a modal bottom sheet with the app defaults: scroll-controlled, below the status bar, drag handle, over the
+/// tab bar.
 /// Pad the content with [sheetPadding] so its last button stays above the navigation bar and keyboard.
 Future<T?> showAppSheet<T>(BuildContext context, {required WidgetBuilder builder}) =>
-    showModalBottomSheet<T>(context: context, isScrollControlled: true, useSafeArea: true, builder: builder);
+    showModalBottomSheet<T>(
+        context: context, isScrollControlled: true, useSafeArea: true, useRootNavigator: true, builder: builder);
 
 /// Sticky bottom actions (primary button, timers, …). Use it as `Scaffold.bottomNavigationBar`, never as
 /// `Scaffold.bottomSheet`: the scaffold strips the bottom inset from bottom sheets, which pushes them behind the
@@ -236,7 +279,7 @@ class AppBarTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      Text(title, style: const TextStyle(fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
       DefaultTextStyle.merge(
         style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
         maxLines: 1,

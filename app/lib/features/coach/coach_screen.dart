@@ -106,31 +106,16 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
       body: RefreshIndicator(
         onRefresh: () => _load(),
         child: ListView(padding: pagePadding(context), children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(Gap.radius),
-              gradient: LinearGradient(colors: [t.colorScheme.primary, t.colorScheme.tertiary]),
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.auto_awesome, color: t.colorScheme.gold),
+              title: const Text('Your training coach', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(i == null
+                  ? 'Analysing your training…'
+                  : i.source == 'ai'
+                      ? 'AI insights${i.generatedAt != null ? ' · ${DateFormat('d MMM HH:mm').format(i.generatedAt!.toLocal())}' : ''}'
+                      : 'On-device insights'),
             ),
-            child: Row(children: [
-              const Icon(Icons.auto_awesome, color: Colors.white, size: 36),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Your training coach',
-                      style: t.textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 4),
-                  Text(
-                    i == null
-                        ? 'Analysing your training…'
-                        : i.source == 'ai'
-                            ? 'AI insights${i.generatedAt != null ? ' · ${DateFormat('d MMM HH:mm').format(i.generatedAt!.toLocal())}' : ''}'
-                            : 'On-device insights',
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                ]),
-              ),
-            ]),
           ),
           if (_notice != null)
             Padding(
@@ -164,7 +149,7 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
               Card(
                 child: Column(children: [
                   for (final r in i.recommendations)
-                    ListTile(leading: Icon(Icons.lightbulb_outline, color: Colors.amber.shade700), title: Text(r)),
+                    ListTile(leading: Icon(Icons.lightbulb_outline, color: t.colorScheme.gold), title: Text(r)),
                 ]),
               ),
             ],

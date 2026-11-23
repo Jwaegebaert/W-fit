@@ -11,45 +11,67 @@ Future<void> showBarWeightDialog(BuildContext context, WidgetRef ref, String equ
   final equipment = catalog.equipmentById(equipmentId);
   if (equipment == null) return;
   final current = ref.read(loadModelProvider).barWeight(equipmentId);
-  final controller = TextEditingController(text: current > 0 ? formatKg(current) : '');
   final kg = await showDialog<double>(
     context: context,
-    builder: (context) {
-      void submit() {
-        final v = double.tryParse(controller.text.replaceAll(',', '.'));
-        if (v != null && v >= 0 && v <= 60) Navigator.pop(context, v);
-      }
+    builder: (_) => _BarWeightDialog(
+      title: '${equipment.name}: bar weight',
+      hint: equipmentId == 'smith_machine'
+          ? 'Smith machine bars differ per gym (often 10–20 kg; some are counterbalanced). Check the label on '
+              'the machine.'
+          : 'Standard: ${formatKg(equipment.barWeightKg)} kg. Change it if your gym\'s bar is different.',
+      current: current,
+    ),
+  );
+  if (kg == null) return;
+  await ref.read(repositoryProvider).setBarWeight(equipmentId, kg);
+  ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
+}
 
-      return AlertDialog(
-        title: Text('${equipment.name}: bar weight'),
+/// Owns its text controller, so the field stays valid while the dialog animates out.
+class _BarWeightDialog extends StatefulWidget {
+  const _BarWeightDialog({required this.title, required this.hint, required this.current});
+
+  final String title;
+  final String hint;
+  final double current;
+
+  @override
+  State<_BarWeightDialog> createState() => _BarWeightDialogState();
+}
+
+class _BarWeightDialogState extends State<_BarWeightDialog> {
+  late final _controller = TextEditingController(text: widget.current > 0 ? formatKg(widget.current) : '');
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final v = double.tryParse(_controller.text.replaceAll(',', '.'));
+    if (v != null && v >= 0 && v <= 60) Navigator.pop(context, v);
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text(widget.title),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            equipmentId == 'smith_machine'
-                ? 'Smith machine bars differ per gym (often 10–20 kg; some are counterbalanced). Check the label on '
-                    'the machine.'
-                : 'Standard: ${formatKg(equipment.barWeightKg)} kg. Change it if your gym\'s bar is different.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text(widget.hint, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 12),
           TextField(
-            controller: controller,
+            controller: _controller,
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(labelText: 'Empty bar', suffixText: 'kg'),
-            onSubmitted: (_) => submit(),
+            onSubmitted: (_) => _submit(),
           ),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: submit, child: const Text('Save')),
+          FilledButton(onPressed: _submit, child: const Text('Save')),
         ],
       );
-    },
-  );
-  controller.dispose();
-  if (kg == null) return;
-  await ref.read(repositoryProvider).setBarWeight(equipmentId, kg);
-  ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
 }
 
 class EquipmentScreen extends ConsumerWidget {

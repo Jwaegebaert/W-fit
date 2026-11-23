@@ -198,6 +198,7 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
           if (!k.needsExercise || exercise != null)
             ChoiceChip(
               avatar: Icon(k.icon, size: 18),
+              showCheckmark: false,
               label: Text(k.label),
               selected: _kind == k,
               onSelected: (_) => setState(() {
@@ -262,7 +263,8 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
         maxLines: 4,
         maxLength: 500,
         onChanged: (_) => setState(() {}),
-        decoration: const InputDecoration(hintText: 'Anything the coach should know (optional)'),
+        decoration: InputDecoration(
+            hintText: _kind == _Kind.note ? 'What should the coach know?' : 'Anything the coach should know (optional)'),
       ),
       const SizedBox(height: Gap.sm),
       FilledButton.icon(

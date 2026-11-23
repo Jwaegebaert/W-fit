@@ -17,6 +17,9 @@ class BrandColors {
   static const ink = Color(0xFF0E1513);
   /// Off-white light surface.
   static const mist = Color(0xFFF6FAF8);
+  /// Background of the Today card, dark enough for white text in both themes (≥ 4.5:1 for all its text).
+  static const hero = Color(0xFF075A4E);
+
   /// Restrained accent for highlights / personal records.
   static const gold = Color(0xFFE8A93A);
 }
@@ -90,7 +93,8 @@ class AppTheme {
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         centerTitle: false,
-        titleTextStyle: base.textTheme.titleLarge?.copyWith(color: scheme.onSurface),
+        // Sizes are only filled in by Theme.of, so styles built here must state theirs.
+        titleTextStyle: base.textTheme.titleLarge?.copyWith(color: scheme.onSurface, fontSize: 20),
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
@@ -126,7 +130,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surfaceContainer,
         indicatorColor: scheme.primaryContainer,
-        labelTextStyle: WidgetStatePropertyAll(base.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600)),
+        labelTextStyle: WidgetStatePropertyAll(base.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 12)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(showDragHandle: true),
       snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
@@ -149,6 +153,15 @@ class Gap {
   static const double fabClearance = 88;
   static const sheet = EdgeInsets.fromLTRB(20, 0, 20, 24);
   static const bar = EdgeInsets.fromLTRB(16, 10, 16, 10);
+}
+
+/// Status colours that stay readable as text on cards and tinted pills in both themes.
+extension StatusColors on ColorScheme {
+  /// Needs a look: behind target, sets left open, a running work timer.
+  Color get attention => _tone(this, const Color(0xFF9A4300), const Color(0xFFF5A65B));
+
+  /// Records, streaks and the coach.
+  Color get gold => tertiary;
 }
 
 extension SectionStyle on Section {

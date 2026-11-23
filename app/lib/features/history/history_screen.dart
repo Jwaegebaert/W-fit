@@ -40,8 +40,8 @@ class HistoryScreen extends ConsumerWidget {
             groups.putIfAbsent(DateFormat('MMMM yyyy').format(s.startedAt.toLocal()), () => []).add(s);
           }
           return ListView(padding: pagePadding(context), children: [
-            for (final g in groups.entries) ...[
-              SectionTitle(g.key),
+            for (final (i, g) in groups.entries.indexed) ...[
+              i == 0 ? SectionTitle(g.key, padding: SectionTitle.first) : SectionTitle(g.key),
               for (final s in g.value)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -60,12 +60,6 @@ class HistoryScreen extends ConsumerWidget {
                         '${bySession[s.id]?.$1 ?? 0} sets · ${formatKg(bySession[s.id]?.$2 ?? 0)} kg',
                       ),
                       isThreeLine: true,
-                      trailing: s.rating == null
-                          ? null
-                          : Row(mainAxisSize: MainAxisSize.min, children: [
-                              Icon(Icons.star_rounded, color: Colors.amber.shade600, size: 18),
-                              Text('${s.rating}'),
-                            ]),
                     ),
                   ),
                 ),

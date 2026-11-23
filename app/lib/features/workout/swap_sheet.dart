@@ -91,7 +91,7 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
   @override
   void initState() {
     super.initState();
-    _selectedEquipment = _original.equipment.toSet();
+    _selectedEquipment = _defaultEquipment();
     _refreshRules();
   }
 
@@ -99,6 +99,13 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
   void dispose() {
     _note.dispose();
     super.dispose();
+  }
+
+  /// Busy equipment is only avoided today, so all of it is preselected. "Not in my gym" changes every future plan: with
+  /// more than one piece the user says which.
+  Set<String> _defaultEquipment() {
+    final gear = _original.equipment.toSet();
+    return _reason == SwapReason.unavailable && gear.length > 1 ? {} : gear;
   }
 
   Future<void> _refreshRules() async {
@@ -151,12 +158,10 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
     await _commitEquipmentContext();
     if (_reason == SwapReason.preference && _neverAgain) {
       await ref.read(repositoryProvider).setPreference(widget.exerciseId, 'banned');
-    } else if (_reason == SwapReason.preference) {
-      await ref.read(repositoryProvider).setPreference(widget.exerciseId, 'disliked');
     }
     await ref.read(coachServiceProvider).applySwap(widget.plannedId, widget.blockIndex, widget.itemIndex, s);
     if (!mounted) return;
-    if (_reason == SwapReason.unavailable) {
+    if (_reason == SwapReason.unavailable && _selectedEquipment.isNotEmpty) {
       showSnack(context, 'Saved: future workouts will avoid that equipment.');
     }
     ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
@@ -176,7 +181,7 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
       children: [
         Text('Swap ${original.name}', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),
-        Text('Targets ${original.primary.map(prettyMuscle).join(', ').toLowerCase()} · ${original.pattern.replaceAll('_', ' ')}',
+        Text('Targets ${original.primary.map(prettyMuscle).join(', ').toLowerCase()}',
             style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, c) {
@@ -194,7 +199,10 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
             selected: {_reason},
             showSelectedIcon: false,
             onSelectionChanged: (s) {
-              setState(() => _reason = s.first);
+              setState(() {
+                _reason = s.first;
+                _selectedEquipment = _defaultEquipment();
+              });
               _refreshRules();
             },
           );
@@ -204,7 +212,7 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
           Text(
             _reason == SwapReason.occupied
                 ? 'Which equipment is busy? It will be avoided for the rest of this workout.'
-                : 'Which equipment does your gym not have? It will be removed from future plans (you can undo in Settings).',
+                : 'Select what your gym does not have. It is left out of all future plans (undo in Settings).',
             style: t.textTheme.bodySmall,
           ),
           const SizedBox(height: 8),
@@ -226,7 +234,7 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
             value: _neverAgain,
             onChanged: (v) => setState(() => _neverAgain = v ?? false),
             title: const Text("Don't suggest this exercise again"),
-            subtitle: const Text('Otherwise it is just marked as less preferred.'),
+            subtitle: const Text('Otherwise the swap is for this workout only.'),
           ),
         const SizedBox(height: 8),
         if (aiConfigured) ...[
@@ -260,7 +268,8 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
         if (_rules.isEmpty)
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('No equivalent exercise fits your available equipment. Try another reason or equipment.'),
+            child: Text('Nothing similar fits right now. Unavailable equipment, excluded exercises and active injuries are '
+                'left out.'),
           ),
         for (final s in _rules) _SuggestionTile(suggestion: s, onTap: () => _apply(s)),
       ],

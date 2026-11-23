@@ -787,7 +787,8 @@ class CoachService {
     final history = await _repo.exerciseHistory(exerciseId, excludeSessionId: excludeSessionId);
     final focus = MuscleFocus.decode((await _repo.getProfile()).muscleFocusJson);
     return adviseProgression(e, history,
-        repMin: item.repMin, repMax: item.repMax, light: e.primary.any(focus.isLight));
+            repMin: item.repMin, repMax: item.repMax, light: e.primary.any(focus.isLight))
+        .forPlanWeight(item.targetWeightKg, repMin: item.repMin, assisted: e.isAssisted);
   }
 
   Future<List<SwapSuggestion>> ruleSwaps(

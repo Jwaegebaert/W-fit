@@ -62,6 +62,20 @@ double roundToStep(double value, double step) {
 class ProgressionAdvice {
   const ProgressionAdvice({this.weightKg, this.targetReps, required this.message, this.lastSummary});
 
+  /// The advice for a plan that prescribes [planKg] itself (coach, deload, go light). When that differs from the weight
+  /// advised here, its reps and wording no longer fit, so the aim becomes the bottom of the range ([repMin]).
+  ProgressionAdvice forPlanWeight(double? planKg, {required int? repMin, required bool assisted}) {
+    final own = weightKg;
+    if (planKg == null || own == null || repMin == null || (planKg - own).abs() < 0.01) return this;
+    final heavier = assisted ? planKg < own : planKg > own;
+    return ProgressionAdvice(
+      weightKg: planKg,
+      targetReps: repMin,
+      message: heavier ? 'A step up from last time – aim for $repMin good reps.' : 'Lighter today – $repMin controlled reps.',
+      lastSummary: lastSummary,
+    );
+  }
+
   final double? weightKg;
   final int? targetReps;
   final String message;

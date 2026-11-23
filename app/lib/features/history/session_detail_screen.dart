@@ -33,17 +33,9 @@ class SessionDetailScreen extends ConsumerWidget {
             tooltip: 'Delete',
             icon: const Icon(Icons.delete_outline),
             onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (c) => AlertDialog(
-                  title: const Text('Delete this workout?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                    FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
-                  ],
-                ),
-              );
-              if (ok == true) {
+              final ok = await confirmDestructive(context,
+                  title: 'Delete this workout?', message: 'All its sets are removed from your history.', action: 'Delete');
+              if (ok) {
                 await ref.read(repositoryProvider).discardSession(sessionId);
                 ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
                 if (context.mounted) context.pop();
@@ -84,13 +76,13 @@ class SessionDetailScreen extends ConsumerWidget {
                 StatTile(label: 'max heart rate', value: '${session.maxHeartRate ?? '–'} bpm', icon: Icons.favorite_border_rounded),
               ]),
             ],
-            if (session.rating != null || session.perceivedEffort != null || session.notes.isNotEmpty) ...[
+            if (session.perceivedEffort != null || session.notes.isNotEmpty) ...[
               const SizedBox(height: 12),
               Card(
                 child: ListTile(
-                  leading: Icon(Icons.star_rounded, color: Colors.amber.shade600),
-                  title: Text('Rating ${session.rating ?? '–'}/5 · Effort ${session.perceivedEffort ?? '–'}/10'),
-                  subtitle: session.notes.isEmpty ? null : Text(session.notes),
+                  leading: Icon(session.perceivedEffort == null ? Icons.notes_rounded : Icons.speed_rounded),
+                  title: Text(session.perceivedEffort == null ? session.notes : 'Effort ${session.perceivedEffort}/10'),
+                  subtitle: session.perceivedEffort == null || session.notes.isEmpty ? null : Text(session.notes),
                 ),
               ),
             ],
