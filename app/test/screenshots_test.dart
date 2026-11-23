@@ -8,6 +8,7 @@ import 'package:wfit/features/workout/session_screen.dart';
 import 'package:wfit/features/workout/workout_timer.dart';
 import 'package:wfit/providers.dart';
 
+import 'health_service_test.dart' show FakeHealthBridge;
 import 'ux_helpers.dart';
 
 /// Visual review harness: writes PNGs of every screen (with simulated Android system bars drawn on top) to
@@ -33,6 +34,7 @@ void main() {
       final boundaryKey = GlobalKey();
       final container = await pumpWFit(
         tester,
+        health: FakeHealthBridge(),
         wrap: (app) => RepaintBoundary(
           key: boundaryKey,
           child: Directionality(
@@ -117,6 +119,7 @@ void main() {
       await settle(tester);
 
       await seedHistory(tester, container);
+          await pumpUntil(tester, () => container.read(healthSyncProvider).setEnabled(true));
       final sets = await pumpUntil(tester, () => container.read(repositoryProvider).loggedSets());
       final weightedId = sets.firstWhere((s) => (s.weightKg ?? 0) > 0).exerciseId;
       final sessionId = sets.first.sessionId;
@@ -135,6 +138,9 @@ void main() {
         ('/settings/profile', '30-profile'),
         ('/settings/equipment', '31-equipment'),
         ('/settings/connection', '32-connection'),
+        ('/settings/focus', '32b-focus'),
+        ('/settings/health', '32c-health'),
+        ('/settings/health/send', '32d-health-send'),
       ];
       for (final (route, name) in dark ? routes.take(4) : routes) {
         await go(tester, route);

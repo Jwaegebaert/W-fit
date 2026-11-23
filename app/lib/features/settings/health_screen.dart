@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import '../../providers.dart';
@@ -65,8 +66,8 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
           return;
         }
         await sync.setEnabled(true);
-        final n = await sync.catchUp();
-        if (mounted) showSnack(context, n == 0 ? 'Connected' : 'Connected · $n recent workout${n == 1 ? '' : 's'} updated');
+        final r = await sync.catchUp();
+        if (mounted) showSnack(context, r.changed + r.failed == 0 ? 'Connected' : 'Connected · ${_describe(r)}');
       } else {
         await sync.setEnabled(false);
       }
@@ -78,11 +79,21 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
 
   Future<void> _syncNow() async {
     setState(() => _busy = true);
-    final n = await ref.read(healthSyncProvider).catchUp();
+    final r = await ref.read(healthSyncProvider).catchUp();
     if (mounted) {
       setState(() => _busy = false);
-      showSnack(context, n == 0 ? 'Up to date' : '$n workout${n == 1 ? '' : 's'} updated');
+      showSnack(context, _describe(r));
     }
+  }
+
+  static String _describe(HealthSyncResult r) {
+    if (r.unavailable) return 'Health Connect can\'t be used right now.';
+    String n(int count) => '$count workout${count == 1 ? '' : 's'}';
+    return [
+      if (r.changed > 0) '${n(r.changed)} updated',
+      if (r.failed > 0) 'Health Connect did not accept ${n(r.failed)}',
+      if (r.changed + r.failed == 0) 'Nothing new',
+    ].join(' · ');
   }
 
   @override
@@ -104,9 +115,9 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Text(
-              'W-fit talks to Samsung Health through Health Connect. Finished workouts are saved as strength '
-              'training, and the heart rate your watch recorded during a workout shows up in its history. '
-              'Heart rate can arrive a few minutes after the watch syncs.',
+              'W-fit talks to Samsung Health through Health Connect. Finished workouts are saved there as strength '
+              'training for Samsung Health to pick up, and the heart rate your watch recorded during a workout shows up '
+              'in its history. Heart rate can arrive a while after the workout.',
               style: TextStyle(color: t.colorScheme.onSecondaryContainer),
             ),
           ),
@@ -166,11 +177,22 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
               icon: const Icon(Icons.sync),
               label: const Text('Check recent workouts now'),
             ),
+            const SizedBox(height: Gap.sm),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.send_rounded),
+                title: const Text('Send workouts'),
+                subtitle: const Text('Pick past workouts, or send one again that Samsung Health missed.'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/health/send'),
+              ),
+            ),
           ],
           const SectionTitle('In Samsung Health'),
           Text(
-            'Open Samsung Health → Settings → Health Connect and allow Samsung Health to share heart rate and '
-            'exercise. Without that, Health Connect has no watch data for W-fit to read.',
+            'Open Samsung Health → Settings → Health Connect and allow heart rate and exercise, both reading and '
+            'writing. A workout saved before that may be skipped: send it again, then pull down on the Samsung Health '
+            'home screen.',
             style: t.textTheme.bodySmall,
           ),
         ],

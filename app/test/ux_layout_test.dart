@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wfit/features/workout/workout_timer.dart';
 import 'package:wfit/providers.dart';
 
+import 'health_service_test.dart' show FakeHealthBridge;
 import 'ux_helpers.dart';
 
 /// Layout checks on small and tall Android phones in edge-to-edge mode (status bar 24dp, 3-button nav bar 48dp),
@@ -19,7 +20,7 @@ void main() {
       group('$name text x$scale', () {
         testWidgets('empty states, plan, live session, swap sheet and finish', (tester) async {
           setUpDevice(tester, size: size, textScale: scale);
-          final container = await pumpWFit(tester);
+          final container = await pumpWFit(tester, health: FakeHealthBridge());
 
           Future<void> check(String screen) async {
             expect(tester.takeException(), isNull, reason: screen);
@@ -111,8 +112,9 @@ void main() {
 
         testWidgets('screens with training history', (tester) async {
           setUpDevice(tester, size: size, textScale: scale);
-          final container = await pumpWFit(tester);
+          final container = await pumpWFit(tester, health: FakeHealthBridge());
           await seedHistory(tester, container);
+          await pumpUntil(tester, () => container.read(healthSyncProvider).setEnabled(true));
           final sets = await pumpUntil(tester, () => container.read(repositoryProvider).loggedSets());
           final weightedId = sets.firstWhere((s) => (s.weightKg ?? 0) > 0).exerciseId;
           final sessionId = sets.first.sessionId;
@@ -132,6 +134,9 @@ void main() {
             '/settings/profile',
             '/settings/equipment',
             '/settings/connection',
+            '/settings/focus',
+            '/settings/health',
+            '/settings/health/send',
           ];
           for (final route in routes) {
             await go(tester, route);

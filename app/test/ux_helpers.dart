@@ -15,6 +15,7 @@ import 'package:wfit/domain/catalog.dart';
 import 'package:wfit/features/dashboard/dashboard_screen.dart';
 import 'package:wfit/main.dart';
 import 'package:wfit/providers.dart';
+import 'package:wfit/services/health_service.dart' show HealthBridge;
 import 'package:wfit/router.dart';
 import 'package:wfit/widgets/common.dart';
 
@@ -81,7 +82,12 @@ void setUpDevice(WidgetTester tester, {required Size size, double dpr = 2.75, do
 }
 
 /// Pumps the full app on an in-memory database and returns its provider container.
-Future<ProviderContainer> pumpWFit(WidgetTester tester, {AppDatabase? db, Widget Function(Widget app)? wrap}) async {
+Future<ProviderContainer> pumpWFit(
+  WidgetTester tester, {
+  AppDatabase? db,
+  Widget Function(Widget app)? wrap,
+  HealthBridge? health,
+}) async {
   await initializeDateFormatting();
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
   final database = db ?? AppDatabase(NativeDatabase.memory());
@@ -90,6 +96,7 @@ Future<ProviderContainer> pumpWFit(WidgetTester tester, {AppDatabase? db, Widget
     overrides: [
       catalogProvider.overrideWithValue(loadTestCatalog()),
       databaseProvider.overrideWithValue(database),
+      if (health != null) healthBridgeProvider.overrideWithValue(health),
     ],
     child: wrap == null ? app : wrap(app),
   ));

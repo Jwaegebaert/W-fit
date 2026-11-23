@@ -33,8 +33,15 @@ abstract class HealthBridge {
   /// Shows Health Connect's permission dialog; true when every permission was granted.
   Future<bool> requestAccess();
 
-  /// Writes a strength-training session. [id] makes rewrites replace instead of duplicate.
-  Future<bool> writeWorkout({required String id, required DateTime start, required DateTime end, required String title});
+  /// Writes a strength-training session; true when Health Connect accepted it. [id] makes a rewrite replace the earlier
+  /// record instead of adding a copy, and a higher [version] makes it count as updated.
+  Future<bool> writeWorkout({
+    required String id,
+    required DateTime start,
+    required DateTime end,
+    required String title,
+    required int version,
+  });
 
   /// Heart-rate samples between [start] and [end], from any source (e.g. Samsung Health / Galaxy Watch).
   Future<List<HeartRateSample>> heartRate(DateTime start, DateTime end);
@@ -88,6 +95,7 @@ class HealthConnectBridge implements HealthBridge {
     required DateTime start,
     required DateTime end,
     required String title,
+    required int version,
   }) async {
     final health = await _ready();
     Future<bool> write(HealthWorkoutActivityType type) => health.writeWorkoutData(
@@ -97,14 +105,15 @@ class HealthConnectBridge implements HealthBridge {
           title: title,
           recordingMethod: RecordingMethod.manual,
           clientRecordId: 'wfit-$id',
-          clientRecordVersion: 1,
+          clientRecordVersion: version.toDouble(),
           startZoneOffset: start.toLocal().timeZoneOffset,
           endZoneOffset: end.toLocal().timeZoneOffset,
         );
     try {
       return await write(HealthWorkoutActivityType.STRENGTH_TRAINING);
-    } on HealthException {
-      return write(HealthWorkoutActivityType.WEIGHTLIFTING); // older Health Connect without strength training
+    } on HealthException catch (e) {
+      if (e.errorCode != HealthErrorCode.notSupported) rethrow;
+      return write(HealthWorkoutActivityType.WEIGHTLIFTING); // no strength training on this platform
     }
   }
 
@@ -128,7 +137,18 @@ class HeartRateSummary {
   final int samples;
 }
 
-/// Saves finished workouts to Health Connect (so they appear in Samsung Health) and reads the watch's heart rate
+/// Outcome of a Health Connect pass: sessions that changed, and workouts Health Connect did not accept.
+class HealthSyncResult {
+  const HealthSyncResult({this.changed = 0, this.failed = 0, this.unavailable = false});
+
+  final int changed;
+  final int failed;
+
+  /// Health Connect could not be used (not enabled, not available or no access): nothing was tried.
+  final bool unavailable;
+}
+
+/// Saves finished workouts to Health Connect (Samsung Health can import them) and reads the watch's heart rate
 /// for each session. Opt-in (Settings → Samsung Health); does nothing until enabled and granted. Never throws.
 class HealthSync {
   HealthSync(this.repo, this.bridge);
@@ -156,47 +176,87 @@ class HealthSync {
     return HeartRateSummary(avg.round(), bpm.reduce((a, b) => a > b ? a : b).round(), bpm.length);
   }
 
-  /// Exports [s] (once) and fills its heart rate when available. Returns true when something changed.
-  Future<bool> process(WorkoutSession s) async {
+  /// Writes [s] to Health Connect; true when accepted. [again] writes it as an updated record: the copy already there is
+  /// replaced and apps that import from Health Connect see a new change.
+  Future<bool> _export(WorkoutSession s, {bool again = false}) async {
     final end = s.endedAt;
     if (end == null) return false;
-    var changed = false;
-    if (s.healthExportedAt == null) {
-      final ok = await bridge.writeWorkout(id: s.id, start: s.startedAt, end: end, title: s.title);
-      if (ok) {
-        await repo.markHealthExported(s.id);
-        changed = true;
-      }
+    try {
+      final ok = await bridge.writeWorkout(
+        id: s.id,
+        start: s.startedAt,
+        end: end,
+        title: s.title,
+        version: again ? DateTime.now().millisecondsSinceEpoch : 1,
+      );
+      if (ok) await repo.markHealthExported(s.id);
+      return ok;
+    } catch (e) {
+      debugPrint('Health Connect: workout ${s.id} not saved ($e)');
+      return false;
     }
-    if (s.avgHeartRate == null) {
-      final hr = summarize(await bridge.heartRate(s.startedAt, end));
-      if (hr != null) {
-        await repo.setSessionHeartRate(s.id, avg: hr.avg, max: hr.max);
-        changed = true;
-      }
-    }
-    return changed;
   }
 
-  /// Runs [process] for recent sessions that still miss an export or heart rate (after a workout, on app start /
-  /// resume). Returns how many sessions changed.
-  Future<int> catchUp({DateTime? now}) async {
+  /// Fills the heart rate of [s] when Health Connect has enough readings; true when it changed.
+  Future<bool> _readHeartRate(WorkoutSession s) async {
+    final end = s.endedAt;
+    if (end == null || s.avgHeartRate != null) return false;
     try {
-      if (!await isEnabled()) return 0;
-      if (await bridge.availability() != HealthAvailability.available || !await bridge.hasAccess()) return 0;
-      final since = (now ?? DateTime.now()).toUtc().subtract(const Duration(days: retryDays));
-      var n = 0;
-      for (final s in await repo.sessionsForHealth(since)) {
-        try {
-          if (await process(s)) n++;
-        } catch (e) {
-          debugPrint('Health Connect: session ${s.id} skipped ($e)');
-        }
+      final hr = summarize(await bridge.heartRate(s.startedAt, end));
+      if (hr == null) return false;
+      await repo.setSessionHeartRate(s.id, avg: hr.avg, max: hr.max);
+      return true;
+    } catch (e) {
+      debugPrint('Health Connect: no heart rate for ${s.id} ($e)');
+      return false;
+    }
+  }
+
+  Future<bool> _usable() async =>
+      await bridge.availability() == HealthAvailability.available && await bridge.hasAccess();
+
+  /// Writes the chosen [sessions] to Health Connect, also when they were sent before, and looks for their heart rate.
+  /// [onResult] reports every workout as it is done. Never throws.
+  Future<HealthSyncResult> send(
+    Iterable<WorkoutSession> sessions, {
+    void Function(String sessionId, bool saved)? onResult,
+  }) async {
+    try {
+      if (!await isEnabled() || !await _usable()) return const HealthSyncResult(unavailable: true);
+      var changed = 0, failed = 0;
+      for (final s in sessions) {
+        final saved = await _export(s, again: true);
+        saved ? changed++ : failed++;
+        onResult?.call(s.id, saved);
+        await _readHeartRate(s);
       }
-      return n;
+      return HealthSyncResult(changed: changed, failed: failed);
     } catch (e) {
       debugPrint('Health Connect unavailable: $e');
-      return 0;
+      return const HealthSyncResult(unavailable: true);
+    }
+  }
+
+  /// Saves recent sessions that were not exported yet and fills missing heart rates (after a workout, on app start /
+  /// resume). Never throws.
+  Future<HealthSyncResult> catchUp({DateTime? now}) async {
+    try {
+      if (!await isEnabled() || !await _usable()) return const HealthSyncResult(unavailable: true);
+      final since = (now ?? DateTime.now()).toUtc().subtract(const Duration(days: retryDays));
+      var changed = 0, failed = 0;
+      for (final s in await repo.sessionsForHealth(since)) {
+        var exported = false;
+        if (s.healthExportedAt == null) {
+          exported = await _export(s);
+          if (!exported) failed++;
+        }
+        final heartRate = await _readHeartRate(s);
+        if (exported || heartRate) changed++;
+      }
+      return HealthSyncResult(changed: changed, failed: failed);
+    } catch (e) {
+      debugPrint('Health Connect unavailable: $e');
+      return const HealthSyncResult(unavailable: true);
     }
   }
 }
