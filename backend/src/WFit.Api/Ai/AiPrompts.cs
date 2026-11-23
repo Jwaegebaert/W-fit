@@ -22,6 +22,9 @@ public static class AiPrompts
         Loads: kg is what the athlete logs. "bar" exercises: kg = plates only (both sides together); exerciseHistory.barKg is
         the empty bar on top - never add it to targetWeightKg. "assist" exercises: kg = machine assistance, less is harder
         (progress = -1 increment, too_hard = +1). No "inc" = no load: targetWeightKg null. "perSide": reps/seconds per side.
+        brief.profile.muscleFocus (the athlete's own choice; balance targets already reflect it): "less" = no extra work for
+        that muscle, trim it first; "more" = prioritise it; "light" = no heavy loading for it: 10-15 reps, machines/cables,
+        no barbell lift as its main exercise.
         """;
 
     private const string Safety = """
@@ -59,6 +62,10 @@ public static class AiPrompts
            brief.profile.restMode is short, x1.3 if long. Max 1 floor
            exercise ("floor") per warmup/core/cooldown block. Rep items: repMin/repMax, durationSeconds null; timed items:
            durationSeconds, reps null.
+        7. Spare time (draft well under sessionMinutes): never fill it by raising reps, hold times or rest. First add 1-3
+           accessories from candidates for today's muscles furthest below the middle of their band (balance.muscles), then
+           +1 set where a muscle is still under (max 4 sets compound, 3 isolation). If today's muscles are already at target,
+           leave the time unused and say so in rationale - extra volume would mostly add fatigue.
 
         """ + Safety + """
 
@@ -89,6 +96,9 @@ public static class AiPrompts
            change; changes lists replacements. If nothing in the plan must change, plan = null.
         3. reply: 1-3 sentences, empathetic and practical: what changed and what to do now (pain: stop that exercise, keep any
            pain <= 3/10 while training).
+        4. focusChanges: only when the athlete asks for a lasting change for a muscle ("less shoulders", "more glutes",
+           "go easy on my lower back"): muscle, level less|normal|more, light (true = avoid heavy loading), short reason. It is
+           saved to their settings only after they accept, so mention it in reply as a suggestion. Otherwise [].
 
         """ + Safety + """
 

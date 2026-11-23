@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/repositories/repository.dart';
+import '../../domain/muscles.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
 
@@ -39,6 +40,13 @@ class SettingsScreen extends ConsumerWidget {
               subtitle: Text(unavailable == 0 ? 'Everything available' : '$unavailable unavailable'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/settings/equipment'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.tune_rounded),
+              title: const Text('Muscle focus'),
+              subtitle: Text(_focusSummary(MuscleFocus.decode(profile?.muscleFocusJson))),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/settings/focus'),
             ),
             ListTile(
               leading: const Icon(Icons.menu_book_outlined),
@@ -89,4 +97,17 @@ class SettingsScreen extends ConsumerWidget {
       ]),
     );
   }
+}
+
+/// "Less: shoulders · More: glutes · Light: lower back", or a default line.
+String _focusSummary(MuscleFocus f) {
+  if (f.isEmpty) return 'All muscles normal';
+  String names(Iterable<String> ids) => ids.map((m) => trackedMuscles[m]?.label.toLowerCase() ?? m).join(', ');
+  final less = [for (final m in trackedMuscleInfo) if (f.levelOf(m.id) == FocusLevel.less) m.id];
+  final more = [for (final m in trackedMuscleInfo) if (f.levelOf(m.id) == FocusLevel.more) m.id];
+  return [
+    if (less.isNotEmpty) 'Less: ${names(less)}',
+    if (more.isNotEmpty) 'More: ${names(more)}',
+    if (f.light.isNotEmpty) 'Light: ${names(f.light)}',
+  ].join(' · ');
 }

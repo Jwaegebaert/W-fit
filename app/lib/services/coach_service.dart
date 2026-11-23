@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/api/api_client.dart';
@@ -113,6 +114,7 @@ class CoachSnapshot {
         experience: profile.experience,
         restScale: restScaleFor(profile.restMode),
         cooldownStretches: profile.cooldownStretches,
+        focus: MuscleFocus.decode(profile.muscleFocusJson),
         limitations: policy,
         program: program,
         balance: balance,
@@ -128,7 +130,41 @@ class IssueOutcome {
 
   final String feedbackId;
   final List<PlanChange> changes;
-  final Future<String>? coachReply;
+  final Future<CoachReview>? coachReply;
+}
+
+/// A lasting muscle-focus change the coach proposes; saved only when the athlete accepts it.
+class FocusChange {
+  const FocusChange({required this.muscle, required this.level, required this.light, this.reason = ''});
+
+  factory FocusChange.fromJson(Map<String, dynamic> j) => FocusChange(
+        muscle: j['muscle'] as String,
+        level: FocusLevel.parse(j['level'] as String?),
+        light: j['light'] as bool? ?? false,
+        reason: j['reason'] as String? ?? '',
+      );
+
+  final String muscle;
+  final FocusLevel level;
+  final bool light;
+  final String reason;
+
+  /// "Shoulders: less, go light".
+  String get label {
+    final parts = [if (level != FocusLevel.normal) level.label.toLowerCase(), if (light) 'go light'];
+    return '${prettyMuscle(muscle)}: ${parts.isEmpty ? 'back to normal' : parts.join(', ')}';
+  }
+
+  /// [focus] with this change applied.
+  MuscleFocus applyTo(MuscleFocus focus) => focus.withLevel(muscle, level).withLight(muscle, light);
+}
+
+/// The coach's answer to a report: a short reply and optional focus suggestions.
+class CoachReview {
+  const CoachReview(this.reply, [this.focusChanges = const []]);
+
+  final String reply;
+  final List<FocusChange> focusChanges;
 }
 
 /// Coordinates the training engine, the feedback memory and the optional (stateless) AI backend.
@@ -189,10 +225,11 @@ class CoachService {
     final trends = exerciseTrends(sets, excludeSessionIds: pre.deloadSessionIds);
     final program = computeProgramState(infos, now: planDate, day: day, trends: trends, catalog: catalog);
     final weeks = weeklyMuscleVolume(sets, catalog, weeks: 8, now: planDate);
+    final profile = await _repo.getProfile();
     return CoachSnapshot(
       date: planDate,
       catalog: catalog,
-      profile: await _repo.getProfile(),
+      profile: profile,
       equipment: await _repo.getEquipment(),
       preferences: await _repo.getPreferences(),
       feedback: records,
@@ -202,7 +239,8 @@ class CoachService {
       bodyWeightKg: await _repo.latestBodyWeight(),
       program: program,
       weeks: weeks,
-      balance: analyzeBalance(weeks, sets, catalog, now: planDate, deloadWeeks: program.deloadWeekStarts),
+      balance: analyzeBalance(weeks, sets, catalog,
+          now: planDate, deloadWeeks: program.deloadWeekStarts, focus: MuscleFocus.decode(profile.muscleFocusJson)),
       policy: LimitationPolicy.fromFeedback(records, catalog, now: planDate),
       trends: trends,
       history: groupHistory(sets),
@@ -247,6 +285,7 @@ class CoachService {
         'includeCore': p.includeCore,
         'restMode': p.restMode,
         'cooldownStretches': p.cooldownStretches,
+        'muscleFocus': MuscleFocus.decode(p.muscleFocusJson).toJson(),
         'trainingDays': parseDays(p.trainingDays),
         'age': p.birthYear == null ? null : s.date.year - p.birthYear!,
         'heightCm': p.heightCm,
@@ -391,6 +430,33 @@ class CoachService {
     _syncSoon();
   }
 
+  /// Saves a new muscle focus (settings screen or an accepted coach suggestion) and rebuilds the open rule-engine
+  /// plans so they follow it; AI-refined plans keep their exercises (the next refinement uses the new focus).
+  Future<void> saveMuscleFocus(MuscleFocus focus) async {
+    await _repo.saveProfile(ProfilesCompanion(muscleFocusJson: Value(focus.encode())));
+    for (final p in await _repo.plannedHistory(from: DateTime.now())) {
+      if (p.source != 'rules' || !await _isOpen(p.id)) continue;
+      final date = parseDateKey(p.date);
+      final day = DayType.parse(p.dayType);
+      final w = _draft(await snapshot(date: date, day: day), day, ref.read(occupiedEquipmentProvider));
+      await _repo.savePlanned(
+        id: p.id,
+        date: date,
+        day: day,
+        title: w.title,
+        source: 'rules',
+        coachNote: w.coachNote,
+        blocks: w.blocks,
+        estimatedMinutes: w.estimatedMinutes,
+        metaJson: w.meta.encode(),
+      );
+    }
+    _syncSoon();
+  }
+
+  Future<void> acceptFocusChange(FocusChange change) async =>
+      saveMuscleFocus(change.applyTo(MuscleFocus.decode((await _repo.getProfile()).muscleFocusJson)));
+
   /// A plan that can still be changed: planned, not deleted and not being trained right now.
   Future<bool> _isOpen(String plannedId) async {
     final p = await _repo.plannedById(plannedId);
@@ -526,7 +592,7 @@ class CoachService {
     return [for (final c in all) if (seen.add('${c.from}>${c.to}')) c];
   }
 
-  Future<String> _coachReview({
+  Future<CoachReview> _coachReview({
     required String message,
     String? exerciseId,
     String? plannedId,
@@ -577,11 +643,16 @@ class CoachService {
       }
       _syncSoon();
       final reply = (res['reply'] as String? ?? '').trim();
-      return reply.isEmpty ? 'Your coach reviewed the report.' : reply;
+      final current = MuscleFocus.decode((await _repo.getProfile()).muscleFocusJson);
+      final focus = [
+        for (final c in (res['focusChanges'] as List? ?? const []).whereType<Map<String, dynamic>>())
+          if (trackedMuscles.containsKey(c['muscle'])) FocusChange.fromJson(c),
+      ].where((c) => c.applyTo(current).encode() != current.encode()).toList();
+      return CoachReview(reply.isEmpty ? 'Your coach reviewed the report.' : reply, focus);
     } on ApiException catch (e) {
-      return 'The coach could not review this right now (${e.message}). Your plans were already adjusted.';
+      return CoachReview('The coach could not review this right now (${e.message}). Your plans were already adjusted.');
     } catch (_) {
-      return 'The coach could not review this right now. Your plans were already adjusted.';
+      return const CoachReview('The coach could not review this right now. Your plans were already adjusted.');
     }
   }
 

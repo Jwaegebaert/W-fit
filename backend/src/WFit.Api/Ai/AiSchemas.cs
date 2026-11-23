@@ -25,11 +25,19 @@ public static class AiSchemas
         JsonNode plan = ids.Count == 0
             ? Type("null")
             : new JsonObject { ["anyOf"] = new JsonArray(WorkoutObject(ids), Type("null")) };
+        var focusChange = Obj(new()
+        {
+            ["muscle"] = Enum([.. Anatomy.TrackedMuscles.Select(m => m.Id)]),
+            ["level"] = Enum([.. AiOutputValidator.FocusLevels]),
+            ["light"] = Type("boolean"),
+            ["reason"] = Type("string"),
+        });
         return Obj(new()
         {
             ["reply"] = Type("string"),
             ["feedback"] = ArrayOf(feedback),
             ["plan"] = plan,
+            ["focusChanges"] = ArrayOf(focusChange),
         }).ToJsonString();
     }
 

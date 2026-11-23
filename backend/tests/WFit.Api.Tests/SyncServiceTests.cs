@@ -51,7 +51,9 @@ public class SyncServiceTests
                 Profile = new ProfileDto
                 {
                     Name = "Alex", RestMode = "turbo", CooldownStretches = 9,
-                    BarWeights = new() { ["smith_machine"] = 15, ["barbell"] = 500 }, UpdatedAt = TestEnv.Now,
+                    BarWeights = new() { ["smith_machine"] = 15, ["barbell"] = 500 },
+                    MuscleFocus = new MuscleFocusDto { Less = ["side_delts", "neck"], More = ["glutes", "side_delts"], Light = ["lower_back"] },
+                    UpdatedAt = TestEnv.Now,
                 },
             },
         }, default);
@@ -60,6 +62,9 @@ public class SyncServiceTests
         Assert.Equal("normal", p.RestMode);
         Assert.Equal(3, p.CooldownStretches);
         Assert.Equal(new Dictionary<string, double> { ["smith_machine"] = 15 }, p.BarWeights);
+        Assert.Empty(p.MuscleFocus!.Less); // "neck" is not tracked, side_delts moved to more
+        Assert.Equal(["glutes", "side_delts"], p.MuscleFocus.More);
+        Assert.Equal(["lower_back"], p.MuscleFocus.Light);
     }
 
     [Fact]

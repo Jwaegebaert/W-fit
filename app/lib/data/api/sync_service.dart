@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../domain/catalog.dart' show LoadModel;
+import '../../domain/muscles.dart' show MuscleFocus;
 import '../db/database.dart';
 import 'api_client.dart';
 
@@ -159,6 +160,7 @@ class SyncService {
               restMode: Value(p['restMode'] as String? ?? 'normal'),
               cooldownStretches: Value(_i(p['cooldownStretches']) ?? 3),
               barWeightsJson: Value(p['barWeights'] is Map ? jsonEncode(p['barWeights']) : '{}'),
+              muscleFocusJson: Value(p['muscleFocus'] is Map ? jsonEncode(p['muscleFocus']) : '{}'),
               updatedAt: _dt(p['updatedAt']),
               deleted: Value(p['deleted'] as bool? ?? false),
               dirty: const Value(false),
@@ -299,6 +301,7 @@ Map<String, dynamic> profileToJson(Profile p) => {
       'restMode': p.restMode,
       'cooldownStretches': p.cooldownStretches,
       'barWeights': LoadModel.parseOverrides(p.barWeightsJson),
+      'muscleFocus': MuscleFocus.decode(p.muscleFocusJson).toJson(),
       'updatedAt': _iso(p.updatedAt),
       'deleted': p.deleted,
     };

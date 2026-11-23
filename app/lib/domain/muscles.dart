@@ -2,6 +2,8 @@
 /// the AI coach brief and the UI. The backend mirrors these lists in `WFit.Api.Domain.Anatomy`.
 library;
 
+import 'dart:convert';
+
 /// Weight of a set for a secondary muscle when counting effective (fractional) sets.
 /// Fractional counting follows Pelland et al. 2024 (indirect work counts roughly half a set).
 const double secondarySetWeight = 0.5;
@@ -67,6 +69,84 @@ const List<MuscleInfo> trackedMuscleInfo = [
 ];
 
 final Map<String, MuscleInfo> trackedMuscles = {for (final m in trackedMuscleInfo) m.id: m};
+
+/// How much attention a muscle gets, chosen by the athlete (Settings → Muscle focus) or proposed by the coach.
+enum FocusLevel {
+  less('Less'),
+  normal('Normal'),
+  more('More');
+
+  const FocusLevel(this.label);
+  final String label;
+
+  static FocusLevel parse(String? v) => values.where((l) => l.name == v).firstOrNull ?? FocusLevel.normal;
+}
+
+/// The athlete's muscle focus: [levels] scale a muscle's weekly band (less ≈ 60–70 %, more ≈ 115–125 %); [light]
+/// muscles avoid heavy loading (higher reps, machines and cables rather than barbell lifts).
+///
+/// Stored as `{"less":[...],"more":[...],"light":[...]}` in the profile (`muscleFocusJson`) and sent in the brief.
+class MuscleFocus {
+  const MuscleFocus({this.levels = const {}, this.light = const {}});
+
+  factory MuscleFocus.fromJson(Map<String, dynamic> j) {
+    List<String> ids(String key) =>
+        (j[key] as List? ?? const []).whereType<String>().where(trackedMuscles.containsKey).toList();
+    return MuscleFocus(
+      levels: {
+        for (final m in ids('less')) m: FocusLevel.less,
+        for (final m in ids('more')) m: FocusLevel.more, // "more" wins when both are listed
+      },
+      light: ids('light').toSet(),
+    );
+  }
+
+  static MuscleFocus decode(String? json) {
+    if (json == null || json.trim().isEmpty) return none;
+    try {
+      final v = jsonDecode(json);
+      return v is Map ? MuscleFocus.fromJson(v.cast<String, dynamic>()) : none;
+    } on FormatException {
+      return none;
+    }
+  }
+
+  static const none = MuscleFocus();
+
+  final Map<String, FocusLevel> levels;
+  final Set<String> light;
+
+  bool get isEmpty => levels.values.every((l) => l == FocusLevel.normal) && light.isEmpty;
+
+  FocusLevel levelOf(String muscle) => levels[muscle] ?? FocusLevel.normal;
+  bool isLight(String muscle) => light.contains(muscle);
+
+  /// Weekly band for [muscle] after the focus setting.
+  MuscleTarget targetFor(String muscle) {
+    final base = trackedMuscles[muscle]?.target ?? const MuscleTarget(0, 0);
+    return switch (levelOf(muscle)) {
+      FocusLevel.less => MuscleTarget(base.min * 0.6, base.max * 0.7),
+      FocusLevel.more => MuscleTarget(base.min * 1.25, base.max * 1.15),
+      FocusLevel.normal => base,
+    };
+  }
+
+  MuscleFocus withLevel(String muscle, FocusLevel level) =>
+      MuscleFocus(levels: {...levels, muscle: level}..removeWhere((_, l) => l == FocusLevel.normal), light: light);
+
+  MuscleFocus withLight(String muscle, bool on) =>
+      MuscleFocus(levels: levels, light: on ? {...light, muscle} : ({...light}..remove(muscle)));
+
+  List<String> _with(FocusLevel l) => [for (final m in trackedMuscleInfo) if (levelOf(m.id) == l) m.id];
+
+  Map<String, dynamic> toJson() => {
+        'less': _with(FocusLevel.less),
+        'more': _with(FocusLevel.more),
+        'light': [for (final m in trackedMuscleInfo) if (light.contains(m.id)) m.id],
+      };
+
+  String encode() => jsonEncode(toJson());
+}
 
 /// Valid values for catalog `primary` / `secondary`: the tracked muscles plus mobility / prehab targets that are
 /// shown on exercise screens but not volume-balanced.

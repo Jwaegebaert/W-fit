@@ -35,7 +35,8 @@ public static class SyncMapper
         Id = e.Id, Name = e.Name, Experience = e.Experience, Goals = e.Goals, TrainingDays = [.. e.TrainingDays],
         SessionMinutes = e.SessionMinutes, IncludeCore = e.IncludeCore, HeightCm = e.HeightCm, BirthYear = e.BirthYear,
         Injuries = e.Injuries, Notes = e.Notes, RestMode = e.RestMode, CooldownStretches = e.CooldownStretches,
-        BarWeights = ParseBarWeights(e.BarWeightsJson), UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
+        BarWeights = ParseBarWeights(e.BarWeightsJson), MuscleFocus = ParseMuscleFocus(e.MuscleFocusJson),
+        UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
     };
 
     public static EquipmentStatusDto ToDto(this EquipmentStatus e) => new()
@@ -97,6 +98,28 @@ public static class SyncMapper
         e.RestMode = d.RestMode is "short" or "long" ? d.RestMode : "normal";
         e.CooldownStretches = Math.Clamp(d.CooldownStretches, 0, 3);
         e.BarWeightsJson = JsonSerializer.Serialize(CleanBarWeights(d.BarWeights), JsonDefaults.Options);
+        e.MuscleFocusJson = JsonSerializer.Serialize(CleanMuscleFocus(d.MuscleFocus), JsonDefaults.Options);
+    }
+
+    /// <summary>Tracked muscles only; a muscle is either less or more (more wins), light is independent.</summary>
+    public static MuscleFocusDto CleanMuscleFocus(MuscleFocusDto? f)
+    {
+        List<string> clean(List<string>? ids) => (ids ?? []).Where(Domain.Anatomy.TrackedMuscleIds.Contains).Distinct().Order().ToList();
+        var more = clean(f?.More);
+        return new MuscleFocusDto { Less = clean(f?.Less).Except(more).ToList(), More = more, Light = clean(f?.Light) };
+    }
+
+    public static MuscleFocusDto ParseMuscleFocus(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new MuscleFocusDto();
+        try
+        {
+            return CleanMuscleFocus(JsonSerializer.Deserialize<MuscleFocusDto>(json, JsonDefaults.Options));
+        }
+        catch (JsonException)
+        {
+            return new MuscleFocusDto();
+        }
     }
 
     /// <summary>Bar weights keyed by equipment id (max 10 entries, 0-60 kg).</summary>

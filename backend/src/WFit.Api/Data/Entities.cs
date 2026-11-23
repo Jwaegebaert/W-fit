@@ -34,6 +34,9 @@ public sealed class Profile : SyncEntity
 
     /// <summary>User-set empty-bar weights as JSON ({"smith_machine":15}).</summary>
     public string BarWeightsJson { get; set; } = "{}";
+
+    /// <summary>Muscle focus as JSON ({"less":[...],"more":[...],"light":[...]}).</summary>
+    public string MuscleFocusJson { get; set; } = "{}";
 }
 
 public sealed class EquipmentStatus : SyncEntity

@@ -208,6 +208,18 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     requiredDuringInsert: false,
     defaultValue: const Constant('{}'),
   );
+  static const VerificationMeta _muscleFocusJsonMeta = const VerificationMeta(
+    'muscleFocusJson',
+  );
+  @override
+  late final GeneratedColumn<String> muscleFocusJson = GeneratedColumn<String>(
+    'muscle_focus_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     updatedAt,
@@ -227,6 +239,7 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     restMode,
     cooldownStretches,
     barWeightsJson,
+    muscleFocusJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -356,6 +369,15 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         ),
       );
     }
+    if (data.containsKey('muscle_focus_json')) {
+      context.handle(
+        _muscleFocusJsonMeta,
+        muscleFocusJson.isAcceptableOrUnknown(
+          data['muscle_focus_json']!,
+          _muscleFocusJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -433,6 +455,10 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         DriftSqlType.string,
         data['${effectivePrefix}bar_weights_json'],
       )!,
+      muscleFocusJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}muscle_focus_json'],
+      )!,
     );
   }
 
@@ -466,6 +492,9 @@ class Profile extends DataClass implements Insertable<Profile> {
 
   /// Empty-bar weights set by the user as JSON ({"smith_machine": 15}); added in schema v3.
   final String barWeightsJson;
+
+  /// Muscle focus as JSON ({"less":[...],"more":[...],"light":[...]}, see `MuscleFocus`); added in schema v4.
+  final String muscleFocusJson;
   const Profile({
     required this.updatedAt,
     required this.deleted,
@@ -484,6 +513,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     required this.restMode,
     required this.cooldownStretches,
     required this.barWeightsJson,
+    required this.muscleFocusJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -509,6 +539,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     map['rest_mode'] = Variable<String>(restMode);
     map['cooldown_stretches'] = Variable<int>(cooldownStretches);
     map['bar_weights_json'] = Variable<String>(barWeightsJson);
+    map['muscle_focus_json'] = Variable<String>(muscleFocusJson);
     return map;
   }
 
@@ -535,6 +566,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       restMode: Value(restMode),
       cooldownStretches: Value(cooldownStretches),
       barWeightsJson: Value(barWeightsJson),
+      muscleFocusJson: Value(muscleFocusJson),
     );
   }
 
@@ -561,6 +593,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       restMode: serializer.fromJson<String>(json['restMode']),
       cooldownStretches: serializer.fromJson<int>(json['cooldownStretches']),
       barWeightsJson: serializer.fromJson<String>(json['barWeightsJson']),
+      muscleFocusJson: serializer.fromJson<String>(json['muscleFocusJson']),
     );
   }
   @override
@@ -584,6 +617,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       'restMode': serializer.toJson<String>(restMode),
       'cooldownStretches': serializer.toJson<int>(cooldownStretches),
       'barWeightsJson': serializer.toJson<String>(barWeightsJson),
+      'muscleFocusJson': serializer.toJson<String>(muscleFocusJson),
     };
   }
 
@@ -605,6 +639,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     String? restMode,
     int? cooldownStretches,
     String? barWeightsJson,
+    String? muscleFocusJson,
   }) => Profile(
     updatedAt: updatedAt ?? this.updatedAt,
     deleted: deleted ?? this.deleted,
@@ -623,6 +658,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     restMode: restMode ?? this.restMode,
     cooldownStretches: cooldownStretches ?? this.cooldownStretches,
     barWeightsJson: barWeightsJson ?? this.barWeightsJson,
+    muscleFocusJson: muscleFocusJson ?? this.muscleFocusJson,
   );
   Profile copyWithCompanion(ProfilesCompanion data) {
     return Profile(
@@ -655,6 +691,9 @@ class Profile extends DataClass implements Insertable<Profile> {
       barWeightsJson: data.barWeightsJson.present
           ? data.barWeightsJson.value
           : this.barWeightsJson,
+      muscleFocusJson: data.muscleFocusJson.present
+          ? data.muscleFocusJson.value
+          : this.muscleFocusJson,
     );
   }
 
@@ -677,7 +716,8 @@ class Profile extends DataClass implements Insertable<Profile> {
           ..write('notes: $notes, ')
           ..write('restMode: $restMode, ')
           ..write('cooldownStretches: $cooldownStretches, ')
-          ..write('barWeightsJson: $barWeightsJson')
+          ..write('barWeightsJson: $barWeightsJson, ')
+          ..write('muscleFocusJson: $muscleFocusJson')
           ..write(')'))
         .toString();
   }
@@ -701,6 +741,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     restMode,
     cooldownStretches,
     barWeightsJson,
+    muscleFocusJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -722,7 +763,8 @@ class Profile extends DataClass implements Insertable<Profile> {
           other.notes == this.notes &&
           other.restMode == this.restMode &&
           other.cooldownStretches == this.cooldownStretches &&
-          other.barWeightsJson == this.barWeightsJson);
+          other.barWeightsJson == this.barWeightsJson &&
+          other.muscleFocusJson == this.muscleFocusJson);
 }
 
 class ProfilesCompanion extends UpdateCompanion<Profile> {
@@ -743,6 +785,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
   final Value<String> restMode;
   final Value<int> cooldownStretches;
   final Value<String> barWeightsJson;
+  final Value<String> muscleFocusJson;
   final Value<int> rowid;
   const ProfilesCompanion({
     this.updatedAt = const Value.absent(),
@@ -762,6 +805,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.restMode = const Value.absent(),
     this.cooldownStretches = const Value.absent(),
     this.barWeightsJson = const Value.absent(),
+    this.muscleFocusJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProfilesCompanion.insert({
@@ -782,6 +826,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.restMode = const Value.absent(),
     this.cooldownStretches = const Value.absent(),
     this.barWeightsJson = const Value.absent(),
+    this.muscleFocusJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : updatedAt = Value(updatedAt);
   static Insertable<Profile> custom({
@@ -802,6 +847,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Expression<String>? restMode,
     Expression<int>? cooldownStretches,
     Expression<String>? barWeightsJson,
+    Expression<String>? muscleFocusJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -822,6 +868,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       if (restMode != null) 'rest_mode': restMode,
       if (cooldownStretches != null) 'cooldown_stretches': cooldownStretches,
       if (barWeightsJson != null) 'bar_weights_json': barWeightsJson,
+      if (muscleFocusJson != null) 'muscle_focus_json': muscleFocusJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -844,6 +891,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Value<String>? restMode,
     Value<int>? cooldownStretches,
     Value<String>? barWeightsJson,
+    Value<String>? muscleFocusJson,
     Value<int>? rowid,
   }) {
     return ProfilesCompanion(
@@ -864,6 +912,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       restMode: restMode ?? this.restMode,
       cooldownStretches: cooldownStretches ?? this.cooldownStretches,
       barWeightsJson: barWeightsJson ?? this.barWeightsJson,
+      muscleFocusJson: muscleFocusJson ?? this.muscleFocusJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -922,6 +971,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     if (barWeightsJson.present) {
       map['bar_weights_json'] = Variable<String>(barWeightsJson.value);
     }
+    if (muscleFocusJson.present) {
+      map['muscle_focus_json'] = Variable<String>(muscleFocusJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -948,6 +1000,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
           ..write('restMode: $restMode, ')
           ..write('cooldownStretches: $cooldownStretches, ')
           ..write('barWeightsJson: $barWeightsJson, ')
+          ..write('muscleFocusJson: $muscleFocusJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5993,6 +6046,7 @@ typedef $$ProfilesTableCreateCompanionBuilder =
       Value<String> restMode,
       Value<int> cooldownStretches,
       Value<String> barWeightsJson,
+      Value<String> muscleFocusJson,
       Value<int> rowid,
     });
 typedef $$ProfilesTableUpdateCompanionBuilder =
@@ -6014,6 +6068,7 @@ typedef $$ProfilesTableUpdateCompanionBuilder =
       Value<String> restMode,
       Value<int> cooldownStretches,
       Value<String> barWeightsJson,
+      Value<String> muscleFocusJson,
       Value<int> rowid,
     });
 
@@ -6108,6 +6163,11 @@ class $$ProfilesTableFilterComposer
 
   ColumnFilters<String> get barWeightsJson => $composableBuilder(
     column: $table.barWeightsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get muscleFocusJson => $composableBuilder(
+    column: $table.muscleFocusJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6205,6 +6265,11 @@ class $$ProfilesTableOrderingComposer
     column: $table.barWeightsJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get muscleFocusJson => $composableBuilder(
+    column: $table.muscleFocusJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProfilesTableAnnotationComposer
@@ -6278,6 +6343,11 @@ class $$ProfilesTableAnnotationComposer
     column: $table.barWeightsJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get muscleFocusJson => $composableBuilder(
+    column: $table.muscleFocusJson,
+    builder: (column) => column,
+  );
 }
 
 class $$ProfilesTableTableManager
@@ -6325,6 +6395,7 @@ class $$ProfilesTableTableManager
                 Value<String> restMode = const Value.absent(),
                 Value<int> cooldownStretches = const Value.absent(),
                 Value<String> barWeightsJson = const Value.absent(),
+                Value<String> muscleFocusJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProfilesCompanion(
                 updatedAt: updatedAt,
@@ -6344,6 +6415,7 @@ class $$ProfilesTableTableManager
                 restMode: restMode,
                 cooldownStretches: cooldownStretches,
                 barWeightsJson: barWeightsJson,
+                muscleFocusJson: muscleFocusJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6365,6 +6437,7 @@ class $$ProfilesTableTableManager
                 Value<String> restMode = const Value.absent(),
                 Value<int> cooldownStretches = const Value.absent(),
                 Value<String> barWeightsJson = const Value.absent(),
+                Value<String> muscleFocusJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProfilesCompanion.insert(
                 updatedAt: updatedAt,
@@ -6384,6 +6457,7 @@ class $$ProfilesTableTableManager
                 restMode: restMode,
                 cooldownStretches: cooldownStretches,
                 barWeightsJson: barWeightsJson,
+                muscleFocusJson: muscleFocusJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

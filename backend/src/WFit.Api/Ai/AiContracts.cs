@@ -95,7 +95,12 @@ public sealed record AdjustFeedback(
 
 public sealed record AdjustedPlanDto(string Title, string CoachNote, int EstimatedMinutes, IReadOnlyList<WorkoutBlockDto> Blocks, PlanMeta Meta);
 
-public sealed record AdjustResponse(string Reply, IReadOnlyList<AdjustFeedback> Feedback, AdjustedPlanDto? Plan, AiUsageDto Usage);
+/// <summary>A muscle-focus change the coach proposes; the app applies it only after the athlete accepts.</summary>
+public sealed record FocusChangeDto(string Muscle, string Level, bool Light, string Reason);
+
+public sealed record AdjustResponse(
+    string Reply, IReadOnlyList<AdjustFeedback> Feedback, AdjustedPlanDto? Plan, AiUsageDto Usage,
+    IReadOnlyList<FocusChangeDto>? FocusChanges = null);
 
 // ---------------- POST /ai/swap ----------------
 
@@ -161,6 +166,15 @@ public sealed record AiAdjustOutput
     public string? Reply { get; init; }
     public List<AiFeedbackOutput>? Feedback { get; init; }
     public AiWorkoutOutput? Plan { get; init; }
+    public List<AiFocusChangeOutput?>? FocusChanges { get; init; }
+}
+
+public sealed record AiFocusChangeOutput
+{
+    public string? Muscle { get; init; }
+    public string? Level { get; init; }
+    public bool? Light { get; init; }
+    public string? Reason { get; init; }
 }
 
 public sealed record AiSwapOutput

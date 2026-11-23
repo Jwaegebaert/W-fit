@@ -123,6 +123,7 @@ SimResult runSimulation(
   int? skipBicepsWeek,
   int? neckPainWeek,
   int neckPainWeeks = 2,
+  int sessionMinutes = 60,
 }) {
   final start = DateTime(2026, 1, 5); // Monday
   final athlete = Athlete(catalog);
@@ -170,7 +171,7 @@ SimResult runSimulation(
         trends: trends,
         history: groupHistory(sets),
       );
-      final workout = RuleEngine(ctx).generate(day: day, date: date);
+      final workout = RuleEngine(ctx).generate(day: day, date: date, sessionMinutes: sessionMinutes);
       plans.add(SimPlan(index, date, day, workout, program));
 
       final sessionId = 's$index';

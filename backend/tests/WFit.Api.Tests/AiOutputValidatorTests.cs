@@ -60,9 +60,9 @@ public class AiOutputValidatorTests
         Assert.Equal(180, row.RestSeconds);
 
         var bench = all["dumbbell-bench-press"];
-        Assert.Equal(5, bench.Sets);
+        Assert.Equal(AiOutputValidator.MaxSetsCompound, bench.Sets); // no padding beyond the compound cap
         Assert.Equal(3, bench.RepMin);
-        Assert.Equal(20, bench.RepMax);
+        Assert.Equal(12 + AiOutputValidator.RepCeilingAboveCatalog, bench.RepMax); // catalog 8-12
         Assert.True(bench.RepMin <= bench.RepMax);
         Assert.Equal(30, bench.RestSeconds);
         Assert.Equal(300, bench.TargetWeightKg);
@@ -157,6 +157,42 @@ public class AiOutputValidatorTests
     }
 
     [Fact]
+    public void Focus_changes_keep_tracked_muscles_once_with_a_valid_level()
+    {
+        var result = AiOutputValidator.ValidateFocusChanges(
+        [
+            new AiFocusChangeOutput { Muscle = "side_delts", Level = "less", Light = true, Reason = "Shoulder niggles" },
+            new AiFocusChangeOutput { Muscle = "side_delts", Level = "more" },
+            new AiFocusChangeOutput { Muscle = "neck", Level = "less" },
+            new AiFocusChangeOutput { Muscle = "glutes", Level = "lots" },
+            null,
+        ]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(new FocusChangeDto("side_delts", "less", true, "Shoulder niggles"), result[0]);
+        Assert.Equal("normal", result[1].Level); // unknown level falls back to normal
+    }
+
+    [Fact]
+    public void Spare_time_is_not_filled_by_inflating_reps_holds_or_sets()
+    {
+        var draft = AiOutputValidator.ItemsById([Block("main", Item("dumbbell-bench-press", sets: 3, repMin: 8, repMax: 12))]);
+        var output = Output(
+            Block("main",
+                Item("dumbbell-bench-press", sets: 5, repMin: 15, repMax: 20),
+                Item("machine-shoulder-press", sets: 5)),
+            Block("cooldown", Item("chest-doorway-stretch", sets: 1, repMin: null, repMax: null, duration: 300, rest: 0)));
+
+        var result = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 90, draftItems: draft);
+        var all = result.Blocks.SelectMany(b => b.Items).ToDictionary(i => i.ExerciseId);
+
+        Assert.Equal(AiOutputValidator.MaxSetsCompound, all["dumbbell-bench-press"].Sets);
+        Assert.Equal(15, all["dumbbell-bench-press"].RepMax);
+        Assert.Equal(AiOutputValidator.MaxSetsCompound, all["machine-shoulder-press"].Sets);
+        Assert.True(all["chest-doorway-stretch"].DurationSeconds <= 60, "hold time at most twice the catalog time");
+    }
+
+    [Fact]
     public void Deload_caps_every_item_at_three_sets()
     {
         var output = Output(
@@ -164,7 +200,10 @@ public class AiOutputValidatorTests
             Block("main", Item("dumbbell-bench-press", sets: 5), Item("machine-shoulder-press", sets: 2)));
 
         var normal = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 60);
-        Assert.Equal(5, normal.Blocks.Single(b => b.Section == "main").Items[0].Sets);
+        Assert.Equal(AiOutputValidator.MaxSetsCompound, normal.Blocks.Single(b => b.Section == "main").Items[0].Sets);
+        var drafted = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 60,
+            draftItems: AiOutputValidator.ItemsById([Block("main", Item("dumbbell-bench-press", sets: 5))]));
+        Assert.Equal(5, drafted.Blocks.Single(b => b.Section == "main").Items[0].Sets); // the draft already had 5
 
         var deload = AiOutputValidator.ValidateWorkout(output, PushCandidates, includeCore: true, "push", 60, deload: true);
         Assert.All(deload.Blocks.SelectMany(b => b.Items), i => Assert.InRange(i.Sets, 1, AiOutputValidator.MaxDeloadSets));

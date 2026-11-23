@@ -32,6 +32,7 @@ class TrainingContext {
     this.experience = 'beginner',
     this.restScale = 1.0,
     this.cooldownStretches = RuleEngine.cooldownSize,
+    this.focus = MuscleFocus.none,
     this.recentExerciseIds = const {},
     this.limitations = const LimitationPolicy.empty(),
     this.feedback = const {},
@@ -58,6 +59,12 @@ class TrainingContext {
 
   /// Stretches in the cool-down (0 = no cool-down block), capped at [RuleEngine.cooldownSize].
   final int cooldownStretches;
+
+  /// The athlete's muscle focus (less / more / light per muscle).
+  final MuscleFocus focus;
+
+  /// [e] trains a muscle marked "light" as a primary mover.
+  bool trainsLight(Exercise e) => e.primary.any(focus.isLight);
 
   /// [seconds] of rest scaled by [restScale], rounded to 5 s. Zero stays zero.
   int scaleRest(int seconds) => seconds <= 0 || restScale == 1.0 ? seconds : math.max(5, (seconds * restScale / 5).round() * 5);
@@ -111,6 +118,7 @@ class TrainingContext {
         experience: experience,
         restScale: restScale,
         cooldownStretches: cooldownStretches,
+        focus: focus,
         recentExerciseIds: recentExerciseIds ?? this.recentExerciseIds,
         limitations: limitations ?? this.limitations,
         feedback: feedback ?? this.feedback,
@@ -210,6 +218,17 @@ class RuleEngine {
 
   /// Plans may exceed the requested session length by at most this much (estimate).
   static const int timeToleranceSeconds = 180;
+
+  /// Time left under the session length from which the plan is filled (extra exercise first, then sets).
+  static const int fillThresholdSeconds = 8 * 60;
+
+  /// At most this many exercises / extra sets are added to fill time.
+  static const int maxFillExercises = 3;
+  static const int maxFillSets = 4;
+
+  /// Set caps when filling time (balance and template sets may already sit higher; those are left alone).
+  static const int maxSetsCompound = 4;
+  static const int maxSetsIsolation = 3;
 
   /// Novelty penalties (block-to-block variation without randomness).
   static const double accessoryRepeatPenalty = 5;
@@ -592,6 +611,22 @@ class _PlanBuilder {
         if (bal.isHigh(m)) s -= 0.5;
       }
     }
+    // Muscle focus: "more" muscles are preferred, "less" ones avoided where the slot allows; "light" muscles avoid
+    // barbell lifts and favour machines / cables.
+    for (final m in e.primary) {
+      switch (ctx.focus.levelOf(m)) {
+        case FocusLevel.more:
+          s += 1;
+        case FocusLevel.less:
+          s -= 1.5;
+        case FocusLevel.normal:
+          break;
+      }
+    }
+    if (ctx.trainsLight(e)) {
+      if (e.bar != null) s -= 3;
+      if (engine.isMachine(e)) s += 1;
+    }
     if (legacy && ctx.recentExerciseIds.contains(e.id)) s += RuleEngine.recentBonus;
     return s;
   }
@@ -697,11 +732,14 @@ class _PlanBuilder {
       p.duration = e.durationSeconds;
     } else {
       final (lo, hi) = scheme.repsFor(e);
-      p.repMin = lo;
-      p.repMax = hi;
+      // "Light" muscles: no heavy sets – at least 10 reps, up to 15.
+      final light = ctx.trainsLight(e) && lo < 10;
+      p.repMin = light ? 10 : lo;
+      p.repMax = light ? math.max(hi, 15) : hi;
     }
     p.rest = ctx.scaleRest(scheme.restFor(e));
     p.notes = switch (p.role) {
+      SlotRole.anchor when ctx.trainsLight(e) => 'Anchor · go-light setting: higher reps, no grinding',
       SlotRole.anchor => deload ? 'Anchor · deload: lighter, crisp reps' : 'Anchor · progress this lift all block',
       SlotRole.flex => 'Extra ${prettyMuscle(p.flexMuscle ?? '').toLowerCase()} work',
       SlotRole.power => 'Explosive, full rest – stop before speed drops',
@@ -796,7 +834,7 @@ class _PlanBuilder {
       if (tracked.isEmpty || !tracked.every(bal.isHigh) || tracked.any(priority.contains)) continue;
       p.extra = -1;
       final m = tracked.first;
-      _otherLines.add('${prettyMuscle(m)} ${_volumeText(m)} (max ${_fmt(trackedMuscles[m]!.target.max)}) → '
+      _otherLines.add('${prettyMuscle(m)} ${_volumeText(m)} (max ${_fmt(ctx.focus.targetFor(m).max)}) → '
           '−1 set on ${p.exercise.name}');
     }
   }
@@ -808,7 +846,7 @@ class _PlanBuilder {
     final last = st.lastActiveWeek;
     if (last == null) return '${_fmt(st.thisWeek)}/$min sets';
     if (last < st.targetMin) return '${_fmt(last)}/$min sets last week';
-    final goal = trackedMuscles[muscle]?.target.goal;
+    final goal = trackedMuscles.containsKey(muscle) ? ctx.focus.targetFor(muscle).goal : null;
     return goal != null && last < goal
         ? '${_fmt(last)} sets last week (goal ${_fmt(goal)})'
         : '${_fmt(last)} sets last week';
@@ -1007,11 +1045,106 @@ class _PlanBuilder {
     var s = double.infinity;
     for (final m in p.exercise.primary) {
       final st = bal.status(m);
-      final goal = trackedMuscles[m]?.target.goal;
+      final goal = trackedMuscles.containsKey(m) ? ctx.focus.targetFor(m).goal : null;
       if (st == null || goal == null || goal <= 0) continue;
       s = math.min(s, (st.lastActiveWeek ?? st.recentAvg) / goal);
     }
     return s.isFinite ? s : 1;
+  }
+
+  // ------------------------------------------------------------------ spare time
+  /// Effective sets planned today for [muscle] (primary 1, secondary ½).
+  double _plannedSets(String muscle) => picks.fold(
+      0.0,
+      (s, p) =>
+          s +
+          (p.exercise.primary.contains(muscle)
+              ? p.totalSets
+              : p.exercise.secondary.contains(muscle)
+                  ? secondarySetWeight * p.totalSets
+                  : 0));
+
+  /// How far [muscle] is from the middle of its weekly band (0 = there, 1 = nothing done). Spare time aims at the
+  /// band's middle – more than the planning goal, still well under the maximum. With balance data the last training
+  /// week plus today's plan counts; without it, today's plan (the muscle's home day comes once a week).
+  double _deficit(String muscle) {
+    final mid = trackedMuscles.containsKey(muscle) ? ctx.focus.targetFor(muscle).mid : 0.0;
+    if (mid <= 0) return 0;
+    final st = balance?.status(muscle);
+    final planned = _plannedSets(muscle);
+    final done = st == null ? planned : math.max(st.lastActiveWeek ?? st.recentAvg, planned);
+    return math.max(0, 1 - done / mid);
+  }
+
+  /// Muscles of today's split worth extra work, most under-trained first; never muscles already above their band.
+  /// (No 48 h check: these are today's own target muscles, which the template trains today anyway.)
+  List<String> _fillMuscles() {
+    final group = switch (day) { DayType.push => MuscleGroup.push, DayType.pull => MuscleGroup.pull, DayType.legs => MuscleGroup.legs };
+    final out = <(String, double)>[];
+    for (final m in trackedMuscleInfo.where((m) => m.group == group)) {
+      if ((balance?.isHigh(m.id) ?? false) || ctx.focus.levelOf(m.id) == FocusLevel.less) continue;
+      final more = ctx.focus.levelOf(m.id) == FocusLevel.more ? 1.0 : 0.0; // "more" muscles go first while they are under
+      out.add((m.id, _deficit(m.id) + more + 2 * (balance?.priority(m.id)?.score ?? 0)));
+    }
+    out.sort((a, b) => b.$2.compareTo(a.$2));
+    return [for (final (m, score) in out) if (score > 0) m];
+  }
+
+  /// Uses time left under the session length: first up to [RuleEngine.maxFillExercises] extra accessories for the
+  /// least-trained muscles of the day, then +1 set on a few exercises (within [RuleEngine.maxSetsCompound] /
+  /// [RuleEngine.maxSetsIsolation]). Rep ranges never grow to fill time. Not in deload weeks.
+  void _fillSpareTime(int Function() total) {
+    if (deload) return;
+    final target = sessionMinutes * 60;
+    final limit = target + RuleEngine.timeToleranceSeconds;
+    final added = <String>[];
+    const slot = SlotSpec(SlotRole.accessory, [], 'Extra time');
+    for (final m in _fillMuscles()) {
+      if (added.length >= RuleEngine.maxFillExercises || target - total() < RuleEngine.fillThresholdSeconds) break;
+      final e = _best(
+        catalog.exercises.where((e) => _usable(e) && e.category == 'strength' && e.fitsDay(day) && e.primary.contains(m)),
+        (e) =>
+            _slotScore(e, slot) +
+            (e.compound ? 0 : 2) +
+            (e.primary.first == m ? 1 : 0) +
+            (ctx.history.containsKey(e.id) ? 0.5 : 0),
+      );
+      if (e == null) continue;
+      final pick = _Pick(slot, e);
+      _prescribe(pick);
+      pick.notes = 'Extra time · ${prettyMuscle(m).toLowerCase()}';
+      _assignWeight(pick);
+      if (total() + pick.toItem().estimateSeconds() > limit) continue;
+      used.add(e.id);
+      picks.add(pick);
+      added.add(e.name);
+      if (!focus.contains(m)) focus.add(m);
+    }
+
+    // Then a set here and there, only where a primary muscle still needs volume: neediest first, accessories before
+    // compounds; never past the caps.
+    double need(_Pick p) => p.exercise.primary.where(trackedMuscles.containsKey).map(_deficit).fold(0.0, math.max);
+    final plusOne = <String>[];
+    final candidates = picks.where((p) => p.role != SlotRole.power && need(p) > 0).toList()
+      ..sort((a, b) {
+        final c = need(b).compareTo(need(a));
+        return c != 0 ? c : (a.exercise.compound ? 1 : 0).compareTo(b.exercise.compound ? 1 : 0);
+      });
+    for (final p in candidates) {
+      if (plusOne.length >= RuleEngine.maxFillSets || target - total() < RuleEngine.fillThresholdSeconds ~/ 2) break;
+      final cap = p.exercise.compound ? RuleEngine.maxSetsCompound : RuleEngine.maxSetsIsolation;
+      final perSet = p.toItem().estimateSeconds() ~/ math.max(1, p.totalSets);
+      if (p.totalSets >= cap || total() + perSet > limit) continue;
+      p.sets++;
+      plusOne.add(p.exercise.name);
+    }
+    final what = [if (added.isNotEmpty) 'added ${added.join(', ')}', if (plusOne.isNotEmpty) '+1 set on ${plusOne.join(', ')}'];
+    if (what.isNotEmpty) _otherLines.add('Extra time ($sessionMinutes min): ${what.join('; ')}');
+    final left = ((target - total()) / 60).round();
+    if (left >= RuleEngine.fillThresholdSeconds ~/ 60) {
+      _otherLines.add('About $left min to spare: today\'s muscles are already at their weekly target, so more sets would '
+          'mostly add fatigue. Finish early or add mobility work.');
+    }
   }
 
   /// Catalog prescription for warm-up / core / cool-down items, with the athlete's rest preference applied.
@@ -1109,6 +1242,7 @@ class _PlanBuilder {
         dropped.add(p.exercise.name);
       }
     }
+    _fillSpareTime(total);
     if (spareDrill != null && total() + spareDrill.estimateSeconds() <= budget) warmup.add(spareDrill);
     if (dropped.isNotEmpty) _otherLines.add('Time budget ($sessionMinutes min): skipped ${dropped.join(', ')}');
     for (final p in picks.where((p) => p.role == SlotRole.power)) {

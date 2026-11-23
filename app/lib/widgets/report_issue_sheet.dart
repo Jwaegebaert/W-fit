@@ -72,6 +72,8 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
   bool _busy = false;
   IssueOutcome? _outcome;
   String? _reply;
+  List<FocusChange> _suggestions = const [];
+  final _decided = <String, bool>{}; // muscle → accepted?
 
   @override
   void initState() {
@@ -111,8 +113,18 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
       _outcome = outcome;
       _busy = false;
     });
-    final reply = await outcome.coachReply;
-    if (mounted && reply != null) setState(() => _reply = reply);
+    final review = await outcome.coachReply;
+    if (mounted && review != null) {
+      setState(() {
+        _reply = review.reply;
+        _suggestions = review.focusChanges;
+      });
+    }
+  }
+
+  Future<void> _decide(FocusChange c, bool accept) async {
+    setState(() => _decided[c.muscle] = accept);
+    if (accept) await ref.read(coachServiceProvider).acceptFocusChange(c);
   }
 
   @override
@@ -156,6 +168,7 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
               ]),
             ),
           ),
+        for (final c in _suggestions) _FocusSuggestion(change: c, decided: _decided[c.muscle], onDecide: (a) => _decide(c, a)),
         const SizedBox(height: Gap.lg),
         FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
       ]);
@@ -284,6 +297,58 @@ class ChangeLine extends ConsumerWidget {
           ])),
         ),
       ]),
+    );
+  }
+}
+
+/// A muscle-focus change proposed by the coach; nothing is saved until the athlete accepts it.
+class _FocusSuggestion extends StatelessWidget {
+  const _FocusSuggestion({required this.change, required this.decided, required this.onDecide});
+
+  final FocusChange change;
+
+  /// null = not decided yet, true = accepted, false = dismissed.
+  final bool? decided;
+  final ValueChanged<bool> onDecide;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final s = t.colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(top: Gap.sm),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.tune_rounded, size: 20, color: s.primary),
+            const SizedBox(width: Gap.sm),
+            Expanded(child: Text('Muscle focus: ${change.label}', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
+          ]),
+          if (change.reason.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 6),
+              child: Text(change.reason, style: t.textTheme.bodySmall?.copyWith(color: s.onSurfaceVariant)),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: switch (decided) {
+              true => Padding(
+                  padding: const EdgeInsets.all(Gap.sm),
+                  child: Text('Saved to your settings', style: t.textTheme.labelLarge?.copyWith(color: s.primary)),
+                ),
+              false => Padding(
+                  padding: const EdgeInsets.all(Gap.sm),
+                  child: Text('Dismissed', style: t.textTheme.labelLarge?.copyWith(color: s.onSurfaceVariant)),
+                ),
+              null => Wrap(spacing: Gap.xs, children: [
+                  TextButton(onPressed: () => onDecide(false), child: const Text('Dismiss')),
+                  FilledButton.tonal(onPressed: () => onDecide(true), child: const Text('Save to settings')),
+                ]),
+            },
+          ),
+        ]),
+      ),
     );
   }
 }

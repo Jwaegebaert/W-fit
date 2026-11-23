@@ -61,7 +61,7 @@ class BalanceScreen extends ConsumerWidget {
             SectionTitle('This week', trailing: Text('sets · target', style: Theme.of(context).textTheme.bodySmall)),
             _WeekCard(balance: b),
             const SectionTitle('8-week balance'),
-            _Heatmap(weeks: snap.weeks),
+            _Heatmap(weeks: snap.weeks, focus: MuscleFocus.decode(snap.profile.muscleFocusJson)),
             const SectionTitle('Distribution'),
             _DistributionCard(balance: b),
             const SectionTitle('Recently trained'),
@@ -206,7 +206,10 @@ class _VolumeBar extends StatelessWidget {
 }
 
 class _Heatmap extends StatelessWidget {
-  const _Heatmap({required this.weeks});
+  const _Heatmap({required this.weeks, this.focus = MuscleFocus.none});
+
+  /// The athlete's muscle focus: cells are coloured against the adjusted band.
+  final MuscleFocus focus;
 
   final List<MuscleWeek> weeks;
 
@@ -239,7 +242,7 @@ class _Heatmap extends StatelessWidget {
                     height: 14,
                     margin: const EdgeInsets.all(1.5),
                     decoration: BoxDecoration(
-                        color: bandColor(w.of(info.id), info.target, s), borderRadius: BorderRadius.circular(3)),
+                        color: bandColor(w.of(info.id), focus.targetFor(info.id), s), borderRadius: BorderRadius.circular(3)),
                   ),
                 ),
             ]),
@@ -378,7 +381,7 @@ class BalanceSummaryCard extends ConsumerWidget {
                     height: 10,
                     margin: const EdgeInsets.symmetric(horizontal: 1),
                     decoration: BoxDecoration(
-                        color: bandColor(m.thisWeek, m.info.target, s), borderRadius: BorderRadius.circular(2)),
+                        color: bandColor(m.thisWeek, MuscleTarget(m.targetMin, m.targetMax), s), borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
             ]),

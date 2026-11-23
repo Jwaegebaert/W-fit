@@ -34,12 +34,22 @@ public sealed record BriefProfile
 
     /// <summary>Cool-down stretches wanted, 0-3 (0 = no cool-down block).</summary>
     public double? CooldownStretches { get; init; }
+
+    /// <summary>Muscles the athlete wants trained less / more, or without heavy loading ("light").</summary>
+    public BriefMuscleFocus? MuscleFocus { get; init; }
     public List<double>? TrainingDays { get; init; }
     public double? Age { get; init; }
     public double? HeightCm { get; init; }
     public double? BodyweightKg { get; init; }
     public string? Injuries { get; init; }
     public string? Notes { get; init; }
+}
+
+public sealed record BriefMuscleFocus
+{
+    public List<string?>? Less { get; init; }
+    public List<string?>? More { get; init; }
+    public List<string?>? Light { get; init; }
 }
 
 public sealed record BriefEquipment
@@ -194,6 +204,9 @@ public static class CoachBriefRules
                     Experience = Short(p.Experience, 16),
                     RestMode = p.RestMode is "short" or "long" ? p.RestMode : "normal",
                     CooldownStretches = p.CooldownStretches is { } c ? Math.Clamp(Math.Round(c), 0, 3) : null,
+                    MuscleFocus = p.MuscleFocus is { } f
+                        ? new BriefMuscleFocus { Less = Muscles(f.Less), More = Muscles(f.More), Light = Muscles(f.Light) }
+                        : null,
                     Goals = Short(p.Goals, MaxNote),
                     TrainingDays = p.TrainingDays?.Take(7).ToList(),
                     Injuries = Short(p.Injuries, 1000),
@@ -335,6 +348,9 @@ public static class CoachBriefRules
         var trimmed = value.Trim();
         return trimmed.Length <= max ? trimmed : trimmed[..max];
     }
+
+    private static List<string?>? Muscles(List<string?>? ids) =>
+        ids?.OfType<string>().Where(Anatomy.TrackedMuscleIds.Contains).Distinct(StringComparer.Ordinal).Select(i => (string?)i).ToList();
 
     private static List<string?>? Ids(List<string?>? ids, int max = MaxIdList) =>
         ids?.OfType<string>().Select(i => i.Trim()).Where(i => i.Length is > 0 and <= 64).Distinct(StringComparer.Ordinal).Take(max)

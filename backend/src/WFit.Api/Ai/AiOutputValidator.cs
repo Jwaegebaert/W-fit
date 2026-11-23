@@ -19,6 +19,13 @@ public static class AiOutputValidator
     public const int MaxFloorItemsPerBlock = 1;
     public const int MaxNoteLength = 300;
     public const int MaxSets = 5;
+
+    /// <summary>Set caps for items the rule-engine draft did not already prescribe higher (no padding to fill time).</summary>
+    public const int MaxSetsCompound = 4;
+    public const int MaxSetsIsolation = 3;
+
+    /// <summary>Reps may exceed the catalog range by at most this much (same nudge as the app's role schemes).</summary>
+    public const int RepCeilingAboveCatalog = 3;
     public const int MaxDeloadSets = 3;
     public const int MaxFlexItems = 1;
     public const int MaxFocus = 4;
@@ -46,7 +53,8 @@ public static class AiOutputValidator
         string dayType,
         int sessionMinutes,
         bool deload = false,
-        IReadOnlySet<string>? flexIds = null)
+        IReadOnlySet<string>? flexIds = null,
+        IReadOnlyDictionary<string, WorkoutItemDto>? draftItems = null)
     {
         var used = new HashSet<string>(StringComparer.Ordinal);
         var itemsBySection = SectionOrder.ToDictionary(s => s, _ => new List<WorkoutItemDto>());
@@ -82,7 +90,7 @@ public static class AiOutputValidator
 
                 used.Add(id);
                 if (exercise.IsFloor) floorBySection[section]++;
-                target.Add(ClampItem(item, exercise, section, deload));
+                target.Add(ClampItem(item, exercise, section, deload, draftItems?.GetValueOrDefault(id)));
             }
         }
 
@@ -107,13 +115,41 @@ public static class AiOutputValidator
             blocks);
     }
 
-    public static WorkoutItemDto ClampItem(WorkoutItemDto item, CatalogExerciseItem exercise, WorkoutSection section, bool deload = false)
+    /// <summary>Items of a draft / current plan by exercise id (first occurrence), used as the clamp baseline.</summary>
+    public static IReadOnlyDictionary<string, WorkoutItemDto> ItemsById(IEnumerable<WorkoutBlockDto?>? blocks)
+    {
+        var result = new Dictionary<string, WorkoutItemDto>(StringComparer.Ordinal);
+        foreach (var item in (blocks ?? []).OfType<WorkoutBlockDto>().SelectMany(b => b.Items ?? []))
+        {
+            if (item?.ExerciseId is { } id) result.TryAdd(id, item);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Clamps one item. Spare time must not be filled by inflating work: reps stay within the catalog range +
+    /// <see cref="RepCeilingAboveCatalog"/>, holds within twice the catalog time, and sets within the compound / isolation
+    /// cap unless the <paramref name="draft"/> item already had more.
+    /// </summary>
+    public static WorkoutItemDto ClampItem(
+        WorkoutItemDto item, CatalogExerciseItem exercise, WorkoutSection section, bool deload = false, WorkoutItemDto? draft = null)
     {
         var (repMin, repMax, duration) = Prescription(exercise, item.RepMin, item.RepMax, item.DurationSeconds);
+        if (repMax is { } hi && exercise.RepMax is { } catalogMax)
+        {
+            var ceiling = Math.Max(catalogMax + RepCeilingAboveCatalog, draft?.RepMax ?? 0);
+            repMax = Math.Min(hi, ceiling);
+            repMin = Math.Min(repMin ?? repMax.Value, repMax.Value);
+        }
+        if (duration is { } sec && exercise.DurationSeconds is { } catalogSec)
+            duration = Math.Min(sec, Math.Max(catalogSec * 2, draft?.DurationSeconds ?? 0));
+        var setCap = section == WorkoutSection.Main
+            ? Math.Max(exercise.Compound ? MaxSetsCompound : MaxSetsIsolation, draft?.Sets ?? 0)
+            : MaxSets;
         return new WorkoutItemDto
         {
             ExerciseId = exercise.Id,
-            Sets = Math.Clamp(item.Sets, 1, deload ? MaxDeloadSets : MaxSets),
+            Sets = Math.Clamp(item.Sets, 1, Math.Min(deload ? MaxDeloadSets : MaxSets, setCap)),
             RepMin = repMin,
             RepMax = repMax,
             DurationSeconds = duration,
@@ -179,6 +215,24 @@ public static class AiOutputValidator
     /// Pain / discomfort need a region or an exercise; exercise feedback (too_easy, too_hard, like, dislike) needs an exercise;
     /// unavailable needs an exercise or equipment.
     /// </summary>
+    public static readonly string[] FocusLevels = ["less", "normal", "more"];
+    public const int MaxFocusChanges = 4;
+
+    /// <summary>Focus changes on tracked muscles only, one per muscle, at most <see cref="MaxFocusChanges"/>.</summary>
+    public static IReadOnlyList<FocusChangeDto> ValidateFocusChanges(IEnumerable<AiFocusChangeOutput?>? changes)
+    {
+        var result = new List<FocusChangeDto>();
+        foreach (var c in changes ?? [])
+        {
+            if (result.Count >= MaxFocusChanges) break;
+            if (c?.Muscle is not { } muscle || !Anatomy.TrackedMuscleIds.Contains(muscle)) continue;
+            if (result.Any(r => r.Muscle == muscle)) continue;
+            var level = FocusLevels.Contains(c.Level) ? c.Level! : "normal";
+            result.Add(new FocusChangeDto(muscle, level, c.Light == true, SyncMapper.Trunc(c.Reason?.Trim() ?? "", 200)));
+        }
+        return result;
+    }
+
     public static IReadOnlyList<AdjustFeedback> ValidateFeedback(IEnumerable<AiFeedbackOutput?>? feedback, CatalogService catalog)
     {
         var result = new List<AdjustFeedback>();

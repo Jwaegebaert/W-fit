@@ -259,6 +259,7 @@ BalanceReport analyzeBalance(
   Catalog catalog, {
   DateTime? now,
   Iterable<DateTime> deloadWeeks = const [],
+  MuscleFocus focus = MuscleFocus.none,
 }) {
   final today = dateOnly(now ?? DateTime.now());
   final currentStart = startOfWeek(today);
@@ -306,8 +307,10 @@ BalanceReport analyzeBalance(
   final notes = <String>[];
   for (final info in trackedMuscleInfo) {
     final m = info.id;
-    final min = info.target.min;
-    final max = info.target.max;
+    // The athlete's muscle focus scales the band (less / more), so status and priorities follow it.
+    final target = focus.targetFor(m);
+    final min = target.min;
+    final max = target.max;
     final thisWeek = current?.of(m) ?? 0;
     final lastWeek = lastWeekObj?.of(m) ?? 0;
     final recent = active.take(3).map((w) => w.of(m)).toList();
@@ -348,7 +351,7 @@ BalanceReport analyzeBalance(
     ));
 
     // ---- priority ----
-    final goal = info.target.goal;
+    final goal = target.goal;
     double deficit(double v) => ((min - v) / min).clamp(0.0, 1.0);
     final lastDef = lastActive == null ? 0.0 : deficit(lastActive);
     final goalDef = lastActive == null || lastActive >= goal ? 0.0 : ((goal - lastActive) / goal).clamp(0.0, 1.0);

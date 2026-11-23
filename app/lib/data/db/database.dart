@@ -32,6 +32,9 @@ class Profiles extends Table with SyncColumns {
   /// Empty-bar weights set by the user as JSON ({"smith_machine": 15}); added in schema v3.
   TextColumn get barWeightsJson => text().withDefault(const Constant('{}'))();
 
+  /// Muscle focus as JSON ({"less":[...],"more":[...],"light":[...]}, see `MuscleFocus`); added in schema v4.
+  TextColumn get muscleFocusJson => text().withDefault(const Constant('{}'))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -177,9 +180,9 @@ class AppDatabase extends _$AppDatabase {
   static QueryExecutor _open() => driftDatabase(name: 'wfit');
 
   /// v1: initial schema. v2: `feedback_entries` table and `planned_workouts.meta_json`.
-  /// v3: profile `rest_mode`, `cooldown_stretches` and `bar_weights_json`.
+  /// v3: profile `rest_mode`, `cooldown_stretches` and `bar_weights_json`. v4: profile `muscle_focus_json`.
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   static final _feedbackStatusIndex = Index('idx_feedback_status',
       'CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback_entries (status, deleted)');
@@ -204,6 +207,7 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(profiles, profiles.cooldownStretches);
             await m.addColumn(profiles, profiles.barWeightsJson);
           }
+          if (from < 4) await m.addColumn(profiles, profiles.muscleFocusJson);
         },
       );
 

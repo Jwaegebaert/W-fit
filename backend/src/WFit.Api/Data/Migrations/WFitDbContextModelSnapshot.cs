@@ -440,6 +440,13 @@ namespace WFit.Api.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<string>("MuscleFocusJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasDefaultValue("{}");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

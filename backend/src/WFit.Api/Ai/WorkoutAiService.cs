@@ -129,7 +129,8 @@ public sealed class WorkoutAiService(CatalogService catalog, AiGateway ai, TimeP
             AiSchemas.Workout(candidates.Ids), AiEffort.Low);
         var output = await ai.CompleteJsonAsync<AiWorkoutOutput>(prompt, ct);
 
-        var validated = AiOutputValidator.ValidateWorkout(output, candidates.ByCategory, includeCore, dayType, sessionMinutes, deload, candidates.FlexIds);
+        var validated = AiOutputValidator.ValidateWorkout(output, candidates.ByCategory, includeCore, dayType, sessionMinutes, deload, candidates.FlexIds,
+            AiOutputValidator.ItemsById(request.Draft?.Blocks));
         var meta = AiOutputValidator.ValidateMeta(
             output.Focus, output.Rationale, output.Changes, validated.ExerciseIds, catalog,
             request.Draft?.Meta?.Program ?? brief.ProgramLabel(dayType),

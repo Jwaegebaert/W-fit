@@ -76,7 +76,8 @@ public sealed class AdjustAiService(CatalogService catalog, AiGateway ai, TimePr
         if (plan is not null && dayType is not null)
             adjusted = AdjustPlan(plan, dayType, output.Plan, feedback, brief, today, includeCore, sessionMinutes, deload);
 
-        return new AdjustResponse(reply, feedback, adjusted, await ai.GetUsageAsync(ct));
+        var focusChanges = AiOutputValidator.ValidateFocusChanges(output.FocusChanges);
+        return new AdjustResponse(reply, feedback, adjusted, await ai.GetUsageAsync(ct), focusChanges);
     }
 
     /// <summary>
@@ -119,7 +120,8 @@ public sealed class AdjustAiService(CatalogService catalog, AiGateway ai, TimePr
         {
             try
             {
-                var validated = AiOutputValidator.ValidateWorkout(proposed, candidates.ByCategory, includeCore, dayType, sessionMinutes, deload);
+                var validated = AiOutputValidator.ValidateWorkout(proposed, candidates.ByCategory, includeCore, dayType, sessionMinutes, deload,
+                    draftItems: AiOutputValidator.ItemsById(plan.Blocks));
                 var meta = AiOutputValidator.ValidateMeta(proposed.Focus, proposed.Rationale, proposed.Changes, validated.ExerciseIds,
                     catalog, programLabel, variant, deload, ctx.Limitations);
                 return new AdjustedPlanDto(validated.Title, validated.CoachNote, validated.EstimatedMinutes, validated.Blocks, meta);
@@ -144,7 +146,8 @@ public sealed class AdjustAiService(CatalogService catalog, AiGateway ai, TimePr
                 EstimatedMinutes = (int)Math.Round(plan.EstimatedMinutes ?? 0),
                 Blocks = current,
             };
-            var validated = AiOutputValidator.ValidateWorkout(kept, candidates.ByCategory, includeCore, dayType, sessionMinutes, deload);
+            var validated = AiOutputValidator.ValidateWorkout(kept, candidates.ByCategory, includeCore, dayType, sessionMinutes, deload,
+                draftItems: AiOutputValidator.ItemsById(plan.Blocks));
             var rationale = removed.Select(id => $"Removed {id}: {AiPrompts.BlockedReason(catalog.FindExercise(id), ctx)}.");
             var meta = AiOutputValidator.ValidateMeta(plan.Meta?.Focus, rationale, null, validated.ExerciseIds,
                 catalog, programLabel, variant, deload, ctx.Limitations);

@@ -34,6 +34,7 @@ Every synced record has `updatedAt` (client clock, last-write-wins) and `deleted
   "restMode": "normal",          // short (x0.7) | normal | long (x1.3) rest between sets
   "cooldownStretches": 3,         // 0-3; 0 = no cool-down block
   "barWeights": { "smith_machine": 15 },  // user-set empty-bar kg (max 10, 0-60 kg); bar exercises log plates only
+  "muscleFocus": { "less": ["side_delts"], "more": ["glutes"], "light": ["lower_back"] },  // tracked muscles; more wins over less
   "heightCm": 180, "birthYear": 1995, "injuries": "", "notes": "",
   "updatedAt": "...", "deleted": false }
 
@@ -205,7 +206,8 @@ Response `200`
     { "kind": "discomfort", "region": "knee", "severity": 1, "exerciseId": null, "equipmentId": null,
       "note": "Left knee a bit sore.", "reviewInDays": 14 } ],
   "plan": { "title": "…", "coachNote": "…", "estimatedMinutes": 55, "blocks": [ /* WorkoutBlock[] */ ], "meta": { /* PlanMeta */ } } | null,
-  "usage": AiUsage }
+  "usage": AiUsage,
+  "focusChanges": [ { "muscle": "side_delts", "level": "less", "light": true, "reason": "…" } ] }  // proposals only; the app saves them when the athlete accepts
 ```
 Feedback validation (≤ 5 entries): `kind` / `region` per the §4.3 vocabularies; `pain` / `discomfort` need a region or
 an exercise and get severity 1–3 (default pain 2, discomfort 1); other kinds have `severity: null`; `too_easy`,

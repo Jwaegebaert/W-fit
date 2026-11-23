@@ -22,8 +22,16 @@ public sealed record ProfileDto : ISyncDto
     public string RestMode { get; init; } = "normal";
     public int CooldownStretches { get; init; } = 3;
     public Dictionary<string, double>? BarWeights { get; init; }
+    public MuscleFocusDto? MuscleFocus { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
     public bool Deleted { get; init; }
+}
+
+public sealed record MuscleFocusDto
+{
+    public List<string> Less { get; init; } = [];
+    public List<string> More { get; init; } = [];
+    public List<string> Light { get; init; } = [];
 }
 
 public sealed record EquipmentStatusDto : ISyncDto
