@@ -164,22 +164,8 @@ extension StatusColors on ColorScheme {
   Color get gold => tertiary;
 }
 
-extension SectionStyle on Section {
-  /// Brightness-aware accents harmonised with the brand palette (≥3:1 on surfaces).
-  Color color(ColorScheme s) => switch (this) {
-        Section.warmup => _tone(s, const Color(0xFFC4660F), const Color(0xFFF5A65B)),
-        Section.main => s.primary,
-        Section.core => _tone(s, const Color(0xFF7559D9), const Color(0xFFB3A1F7)),
-        Section.cooldown => _tone(s, const Color(0xFF2F7FD0), const Color(0xFF7DB6F2)),
-      };
-
-  IconData get icon => switch (this) {
-        Section.warmup => Icons.local_fire_department_rounded,
-        Section.main => Icons.fitness_center_rounded,
-        Section.core => Icons.adjust_rounded,
-        Section.cooldown => Icons.self_improvement_rounded,
-      };
-}
+/// Core in the push / pull / legs / core chart.
+Color coreColor(ColorScheme s) => _tone(s, const Color(0xFF7559D9), const Color(0xFFB3A1F7));
 
 extension DayStyle on DayType {
   IconData get icon => switch (this) {

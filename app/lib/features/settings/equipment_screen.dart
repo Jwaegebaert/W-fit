@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme.dart';
+import '../../domain/catalog.dart';
 import '../../domain/equipment_presets.dart';
 import '../../domain/progression.dart' show formatKg;
 import '../../providers.dart';
+import '../../widgets/common.dart';
+import '../../widgets/equipment_sheet.dart';
 
 /// Lets the user set the empty-bar weight of [equipmentId] (e.g. their gym's Smith machine).
 Future<void> showBarWeightDialog(BuildContext context, WidgetRef ref, String equipmentId) async {
@@ -74,148 +78,103 @@ class _BarWeightDialogState extends State<_BarWeightDialog> {
       );
 }
 
+/// What the gym has: groups with a count, a switch per piece; tapping a piece shows it (with its bar weight).
 class EquipmentScreen extends ConsumerWidget {
   const EquipmentScreen({super.key});
-
-  static const _groups = {
-    'free': 'Free weights',
-    'benches': 'Benches',
-    'racks': 'Racks',
-    'machines': 'Machines',
-    'bodyweight': 'Bodyweight stations',
-    'functional': 'Functional',
-    'cardio': 'Cardio',
-  };
 
   Future<void> _applyPreset(BuildContext context, WidgetRef ref, EquipmentPreset preset) async {
     final catalog = ref.read(catalogProvider);
     final off = catalog.equipment.where((e) => preset.unavailable.contains(e.id)).map((e) => e.name).toList();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Apply "${preset.label}"?'),
-        content: Text(off.isEmpty
-            ? 'All equipment will be switched on.'
-            : 'Switches off: ${off.join(', ')}.\n\nEverything else will be switched on.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Apply')),
-        ],
-      ),
+    final ok = await confirmDestructive(
+      context,
+      title: 'Apply "${preset.label}"?',
+      message: off.isEmpty
+          ? 'All equipment will be switched on.'
+          : 'Switches off: ${off.join(', ')}.\n\nEverything else will be switched on.',
+      action: 'Apply',
     );
-    if (ok != true) return;
+    if (!ok) return;
     final repo = ref.read(repositoryProvider);
     for (final entry in preset.availability(catalog).entries) {
       await repo.setEquipment(entry.key, entry.value);
     }
     ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${preset.label} applied')));
-    }
+    if (context.mounted) showSnack(context, '${preset.label} applied');
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(catalogProvider);
     final status = ref.watch(equipmentProvider).value ?? const {};
-    final repo = ref.read(repositoryProvider);
     final loads = ref.watch(loadModelProvider);
     final t = Theme.of(context);
+    final s = t.colorScheme;
+    bool has(Equipment e) => status[e.id] ?? true;
+    final unset = catalog.equipment.where((e) => e.hasBar && has(e) && loads.barWeight(e.id) <= 0).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Gym equipment')),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 32 + MediaQuery.paddingOf(context).bottom),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Quick setup', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text('Start from a preset, then fine-tune the switches below.', style: t.textTheme.bodySmall),
-                const SizedBox(height: 12),
-                for (final preset in EquipmentPreset.all)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      ),
-                      onPressed: () => _applyPreset(context, ref, preset),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(preset.label),
-                        Text(
-                          preset.description,
-                          style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
-                        ),
-                      ]),
-                    ),
-                  ),
-              ]),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            color: t.colorScheme.secondaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Text(
-                'Switch off anything your gym does not have. Workouts and AI suggestions will never use it. '
-                'Equipment that is just busy can be skipped during a workout with "Swap → Occupied".',
-                style: TextStyle(color: t.colorScheme.onSecondaryContainer),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-            child: Text('Bar weights', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          ),
-          Card(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                child: Text(
-                  'For bar exercises you log only the plates. Statistics add the empty bar shown here.',
-                  style: t.textTheme.bodySmall,
-                ),
-              ),
-              for (final e in catalog.equipment.where((e) => e.hasBar))
-                ListTile(
-                  title: Text(e.name),
-                  trailing: Text(
-                    loads.barWeight(e.id) > 0 ? '${formatKg(loads.barWeight(e.id))} kg' : 'Not set',
-                    style: t.textTheme.titleSmall,
-                  ),
-                  onTap: () => showBarWeightDialog(context, ref, e.id),
-                ),
-            ]),
-          ),
-          for (final g in _groups.entries) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-              child: Text(g.value, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-            ),
-            Card(
-              child: Column(children: [
-                for (final e in catalog.equipment.where((e) => e.group == g.key && !e.alwaysAvailable))
-                  SwitchListTile(
-                    title: Text(e.name),
-                    subtitle: e.description == null
-                        ? null
-                        : Text(e.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    value: status[e.id] ?? true,
-                    onChanged: (v) {
-                      repo.setEquipment(e.id, v);
-                      ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
-                    },
-                  ),
-              ]),
-            ),
+      appBar: AppBar(title: const Text('Equipment'), actions: [
+        PopupMenuButton<EquipmentPreset>(
+          tooltip: 'Presets',
+          icon: const Icon(Icons.checklist_rounded),
+          onSelected: (p) => _applyPreset(context, ref, p),
+          itemBuilder: (_) => [
+            for (final p in EquipmentPreset.all) PopupMenuItem(value: p, child: Text(p.label)),
           ],
-        ],
-      ),
+        ),
+        const HelpButton(
+          title: 'Equipment',
+          text: 'Switch off what your gym does not have; workouts and your coach then never use it. For something that is '
+              'just busy, use Swap during the workout.\n\n'
+              'For bar exercises you log only the plates. Your records and stats add the empty bar; tap a bar to set its '
+              'weight.',
+        ),
+      ]),
+      body: ListView(padding: pagePadding(context), children: [
+        for (final e in unset)
+          Card(
+            margin: const EdgeInsets.only(bottom: Gap.item),
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              leading: Icon(Icons.error_outline_rounded, color: s.attention),
+              title: Text('Set the bar weight of your ${e.name.toLowerCase()}'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showBarWeightDialog(context, ref, e.id),
+            ),
+          ),
+        for (final g in equipmentGroupLabels.entries)
+          if (catalog.equipment.where((e) => e.group == g.key && !e.alwaysAvailable).toList() case final group
+              when group.isNotEmpty)
+            Card(
+              margin: const EdgeInsets.only(bottom: Gap.item),
+              clipBehavior: Clip.antiAlias,
+              child: ExpansionTile(
+                shape: const Border(),
+                title: Text(g.value, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text('${group.where(has).length} of ${group.length} available'),
+                children: [
+                  for (final e in group)
+                    ListTile(
+                      title: Text(e.name),
+                      subtitle: e.hasBar
+                          ? Text(loads.barWeight(e.id) > 0 ? 'Bar ${formatKg(loads.barWeight(e.id))} kg' : 'Bar weight not set')
+                          : null,
+                      onTap: () => showEquipmentSheet(context, e.id),
+                      trailing: Semantics(
+                        label: '${e.name} available',
+                        child: Switch(
+                          value: has(e),
+                          onChanged: (v) {
+                            ref.read(repositoryProvider).setEquipment(e.id, v);
+                            ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+      ]),
     );
   }
 }

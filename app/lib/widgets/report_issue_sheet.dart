@@ -12,11 +12,10 @@ import 'common.dart';
 enum _Kind {
   pain('pain', 'Pain', Icons.healing_outlined),
   discomfort('discomfort', 'Discomfort', Icons.sentiment_dissatisfied_outlined),
-  unavailable('unavailable', 'Equipment unavailable', Icons.build_circle_outlined),
-  dislike('dislike', "Doesn't feel right", Icons.thumb_down_alt_outlined),
   tooEasy('too_easy', 'Too easy', Icons.trending_up),
   tooHard('too_hard', 'Too hard', Icons.trending_down),
-  note('note', 'Other note', Icons.edit_note);
+  dislike('dislike', "Doesn't feel right", Icons.thumb_down_alt_outlined),
+  note('note', 'Note', Icons.edit_note);
 
   const _Kind(this.id, this.label, this.icon);
   final String id;
@@ -24,7 +23,6 @@ enum _Kind {
   final IconData icon;
 
   bool get painLike => this == pain || this == discomfort;
-  bool get needsExercise => this == dislike || this == tooEasy || this == tooHard;
 }
 
 const _severityHints = {
@@ -33,10 +31,17 @@ const _severityHints = {
   3: 'Severe: also no direct work for the muscles around the area.',
 };
 
-/// "Report an issue": pain, discomfort, equipment or exercise feedback. Applies the change to upcoming plans at
-/// once and shows the coach's reply when the AI is connected. [exerciseId] gives exercise context (preselects the
-/// region from its stress tags), [plannedId] the plan to refine, [sessionId] a workout in progress.
-Future<void> showReportIssueSheet(BuildContext context, {String? exerciseId, String? plannedId, String? sessionId}) =>
+/// "Report pain": pain or discomfort. Applies the change to upcoming plans at once and shows the coach's reply when the
+/// AI is connected. [exerciseId] gives exercise context (preselects the region from its stress tags), [plannedId] the
+/// plan to refine, [sessionId] a workout in progress.
+Future<void> showReportPain(BuildContext context, {String? exerciseId, String? plannedId, String? sessionId}) =>
+    _show(context, pain: true, exerciseId: exerciseId, plannedId: plannedId, sessionId: sessionId);
+
+/// "Tell your coach": a wish or a note in the athlete's own words, with quick answers about [exerciseId].
+Future<void> showTellCoach(BuildContext context, {String? exerciseId, String? plannedId, String? sessionId}) =>
+    _show(context, pain: false, exerciseId: exerciseId, plannedId: plannedId, sessionId: sessionId);
+
+Future<void> _show(BuildContext context, {required bool pain, String? exerciseId, String? plannedId, String? sessionId}) =>
     showAppSheet<void>(
       context,
       builder: (_) => DraggableScrollableSheet(
@@ -45,6 +50,7 @@ Future<void> showReportIssueSheet(BuildContext context, {String? exerciseId, Str
         maxChildSize: 0.95,
         builder: (context, controller) => ReportIssueSheet(
           controller: controller,
+          pain: pain,
           exerciseId: exerciseId,
           plannedId: plannedId,
           sessionId: sessionId,
@@ -53,9 +59,13 @@ Future<void> showReportIssueSheet(BuildContext context, {String? exerciseId, Str
     );
 
 class ReportIssueSheet extends ConsumerStatefulWidget {
-  const ReportIssueSheet({super.key, this.controller, this.exerciseId, this.plannedId, this.sessionId});
+  const ReportIssueSheet(
+      {super.key, this.controller, required this.pain, this.exerciseId, this.plannedId, this.sessionId});
 
   final ScrollController? controller;
+
+  /// Report pain, or a message to the coach.
+  final bool pain;
   final String? exerciseId;
   final String? plannedId;
   final String? sessionId;
@@ -66,10 +76,9 @@ class ReportIssueSheet extends ConsumerStatefulWidget {
 
 class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
   final _note = TextEditingController();
-  _Kind _kind = _Kind.pain;
+  late _Kind _kind = widget.pain ? _Kind.pain : _Kind.note;
   BodyRegion? _region;
   int _severity = 2;
-  String? _equipment;
   bool _busy = false;
   IssueOutcome? _outcome;
   String? _reply;
@@ -81,7 +90,6 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
     super.initState();
     final e = widget.exerciseId == null ? null : ref.read(catalogProvider).exercise(widget.exerciseId!);
     _region = e == null || e.stress.isEmpty ? null : BodyRegion.parse(e.stress.first);
-    _equipment = e?.equipment.where((id) => id != 'bodyweight').firstOrNull;
   }
 
   @override
@@ -92,7 +100,6 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
 
   bool get _valid => switch (_kind) {
         _Kind.pain || _Kind.discomfort => _region != null || widget.exerciseId != null,
-        _Kind.unavailable => _equipment != null || widget.exerciseId != null,
         _Kind.note => _note.text.trim().isNotEmpty,
         _ => widget.exerciseId != null,
       };
@@ -104,7 +111,6 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
           region: _kind.painLike ? _region?.id : null,
           severity: _kind.painLike ? _severity : null,
           exerciseId: widget.exerciseId,
-          equipmentId: _kind == _Kind.unavailable ? _equipment : null,
           note: _note.text,
           plannedId: widget.plannedId,
           sessionId: widget.sessionId,
@@ -177,13 +183,11 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
       ]);
     }
 
-    final equipment = [
-      ...?exercise?.equipment.where((id) => id != 'bodyweight'),
-      for (final e in catalog.equipment)
-        if (!e.alwaysAvailable && e.id != 'bodyweight' && !(exercise?.equipment.contains(e.id) ?? false)) e.id,
-    ];
+    final kinds = widget.pain
+        ? const [_Kind.pain, _Kind.discomfort]
+        : [if (exercise != null) ...const [_Kind.tooEasy, _Kind.tooHard, _Kind.dislike]];
     return ListView(controller: widget.controller, padding: sheetPadding(context), children: [
-      Text('Report an issue', style: title),
+      Text(widget.pain ? 'Report pain' : 'Tell your coach', style: title),
       if (exercise != null) ...[
         const SizedBox(height: Gap.sm),
         Row(children: [
@@ -192,21 +196,22 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
           Expanded(child: Text(exercise.name, style: const TextStyle(fontWeight: FontWeight.w600))),
         ]),
       ],
-      label('What happened?'),
-      Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
-        for (final k in _Kind.values)
-          if (!k.needsExercise || exercise != null)
+      if (kinds.isNotEmpty) ...[
+        const SizedBox(height: Gap.md),
+        Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
+          for (final k in kinds)
             ChoiceChip(
               avatar: Icon(k.icon, size: 18),
               showCheckmark: false,
               label: Text(k.label),
               selected: _kind == k,
-              onSelected: (_) => setState(() {
-                _kind = k;
+              onSelected: (on) => setState(() {
+                _kind = on || widget.pain ? k : _Kind.note;
                 _severity = k == _Kind.pain ? 2 : 1;
               }),
             ),
-      ]),
+        ]),
+      ],
       if (_kind.painLike) ...[
         label(exercise == null ? 'Where?' : 'Where? (optional)'),
         Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
@@ -244,19 +249,7 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
             ),
           ),
       ],
-      if (_kind == _Kind.unavailable && equipment.isNotEmpty) ...[
-        label('Which equipment?'),
-        DropdownButtonFormField<String>(
-          initialValue: _equipment,
-          isExpanded: true,
-          items: [
-            for (final id in equipment)
-              DropdownMenuItem(value: id, child: Text(catalog.equipmentById(id)?.name ?? id, overflow: TextOverflow.ellipsis)),
-          ],
-          onChanged: (v) => setState(() => _equipment = v),
-        ),
-      ],
-      label('Note'),
+      const SizedBox(height: Gap.md),
       TextField(
         controller: _note,
         minLines: 1,
@@ -264,7 +257,9 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
         maxLength: 500,
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
-            hintText: _kind == _Kind.note ? 'What should the coach know?' : 'Anything the coach should know (optional)'),
+            hintText: _kind == _Kind.note
+                ? 'For example "go easy on my shoulders" or "more badminton work"'
+                : 'Note (optional)'),
       ),
       const SizedBox(height: Gap.sm),
       FilledButton.icon(
@@ -272,7 +267,7 @@ class _ReportIssueSheetState extends ConsumerState<ReportIssueSheet> {
         icon: _busy
             ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.send),
-        label: const Text('Save report'),
+        label: Text(widget.pain ? 'Save report' : 'Send'),
       ),
     ]);
   }
@@ -328,7 +323,7 @@ class _FocusSuggestion extends StatelessWidget {
           Row(children: [
             Icon(Icons.tune_rounded, size: 20, color: s.primary),
             const SizedBox(width: Gap.sm),
-            Expanded(child: Text('Muscle focus: ${change.label}', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
+            Expanded(child: Text(change.label, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
           ]),
           if (change.reason.isNotEmpty)
             Padding(

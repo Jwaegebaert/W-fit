@@ -8,13 +8,11 @@ import '../../data/db/database.dart';
 import '../../data/repositories/repository.dart';
 import '../../domain/catalog.dart';
 import '../../domain/muscles.dart';
-import '../../domain/progression.dart';
 import '../../domain/stats.dart';
 import '../../providers.dart';
 import '../../widgets/brand.dart';
 import '../../widgets/common.dart';
 import '../../widgets/sync_indicator.dart';
-import '../balance/balance_screen.dart';
 import '../workout/workout_actions.dart';
 
 /// The next planned workout (generated with the rule engine when missing).
@@ -31,6 +29,7 @@ final plannedStreamProvider = StreamProvider.family<PlannedWorkout?, String>(
   (ref, id) => ref.watch(repositoryProvider).watchPlanned(id),
 );
 
+/// Today: the workout to start or resume, due check-ins and this week's days.
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -38,7 +37,6 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider).value;
     final active = ref.watch(activeSessionProvider).value;
-    final greeting = _greeting();
     final name = (profile?.name.isNotEmpty ?? false) ? ', ${profile!.name}' : '';
 
     return Scaffold(
@@ -47,7 +45,7 @@ class DashboardScreen extends ConsumerWidget {
         leading: const Padding(padding: EdgeInsets.only(left: Gap.md), child: Center(child: BrandMark(size: 30))),
         leadingWidth: 56,
         titleSpacing: Gap.sm,
-        title: AppBarTitle('$greeting$name', subtitle: Text(DateFormat('EEEE d MMMM').format(DateTime.now()))),
+        title: AppBarTitle('${_greeting()}$name', subtitle: Text(DateFormat('EEEE d MMMM').format(DateTime.now()))),
         actions: [
           const SyncIndicator(),
           IconButton(
@@ -65,17 +63,10 @@ class DashboardScreen extends ConsumerWidget {
         child: ListView(
           padding: pagePadding(context),
           children: [
-            if (active != null) ...[_ResumeCard(session: active), const SizedBox(height: Gap.md)],
-            const _NextWorkoutCard(),
+            active != null ? _ResumeHero(session: active) : const _NextWorkoutCard(),
             const _CheckInCards(),
             const SectionTitle('This week'),
             const _WeekCard(),
-            const SizedBox(height: Gap.item),
-            const BalanceSummaryCard(),
-            const SectionTitle('Coming up'),
-            const _UpcomingList(),
-            const SectionTitle('Quick actions'),
-            const _QuickActions(),
           ],
         ),
       ),
@@ -90,29 +81,6 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _ResumeCard extends StatelessWidget {
-  const _ResumeCard({required this.session});
-
-  final WorkoutSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
-    return Card(
-      color: s.tertiaryContainer,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Icon(Icons.play_circle_fill_rounded, color: s.onTertiaryContainer, size: 36),
-        title: Text('Workout in progress', style: TextStyle(color: s.onTertiaryContainer, fontWeight: FontWeight.w700)),
-        subtitle: Text('${session.title} · started ${DateFormat.Hm().format(session.startedAt.toLocal())}',
-            style: TextStyle(color: s.onTertiaryContainer)),
-        trailing: Icon(Icons.chevron_right, color: s.onTertiaryContainer),
-        onTap: () => context.push('/session/${session.id}'),
-      ),
-    );
-  }
-}
-
 class _NextWorkoutCard extends ConsumerWidget {
   const _NextWorkoutCard();
 
@@ -120,145 +88,145 @@ class _NextWorkoutCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final next = ref.watch(nextPlanProvider);
     return next.when(
-      loading: () => const Card(child: SizedBox(height: 220, child: Center(child: CircularProgressIndicator()))),
-      error: (e, _) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Could not plan workout: $e'))),
+      loading: () => const Card(child: SizedBox(height: 180, child: Center(child: CircularProgressIndicator()))),
+      error: (e, _) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.error_outline),
+          title: const Text('Could not plan your next workout'),
+          trailing: TextButton(onPressed: () => ref.invalidate(nextPlanProvider), child: const Text('Try again')),
+        ),
+      ),
       data: (initial) {
         final plan = ref.watch(plannedStreamProvider(initial.id)).value ?? initial;
         if (plan.deleted || plan.status != 'planned') {
           Future.microtask(() => ref.invalidate(nextPlanProvider));
         }
-        return _HeroCard(plan: plan);
+        return _PlanHero(plan: plan);
       },
     );
   }
 }
 
-class _CheckInCards extends ConsumerWidget {
-  const _CheckInCards();
+/// The workout that is running: one tap back into it.
+class _ResumeHero extends StatelessWidget {
+  const _ResumeHero({required this.session});
+
+  final WorkoutSession session;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final due = ref.watch(dueCheckInsProvider).value ?? const <FeedbackEntry>[];
-    if (due.isEmpty) return const SizedBox.shrink();
-    final t = Theme.of(context);
-    final catalog = ref.watch(catalogProvider);
-    final coach = ref.read(coachServiceProvider);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      for (final f in due.take(2))
-        Card(
-          margin: const EdgeInsets.only(top: Gap.md),
-          color: t.colorScheme.tertiaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(Gap.md),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                f.region != null
-                    ? 'Is your ${prettyRegion(f.region!).toLowerCase()} still bothering you?'
-                    : 'Is ${catalog.exerciseName(f.exerciseId ?? '')} still uncomfortable?',
-                style: t.textTheme.titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700, color: t.colorScheme.onTertiaryContainer),
-              ),
-              const SizedBox(height: Gap.xs),
-              Text(
-                'Reported ${DateFormat('d MMM').format(f.createdAt.toLocal())}${f.note.isEmpty ? '' : ' · ${f.note}'}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onTertiaryContainer),
-              ),
-              const SizedBox(height: Gap.sm),
-              Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
-                FilledButton(onPressed: () => coach.resolveIssue(f.id), child: const Text('Resolved')),
-                OutlinedButton(onPressed: () => coach.keepIssue(f.id), child: const Text('Still hurts')),
-              ]),
-            ]),
-          ),
-        ),
-    ]);
+  Widget build(BuildContext context) {
+    void resume() => context.push('/session/${session.id}');
+    return _Hero(
+      label: 'Workout in progress',
+      title: session.title,
+      detail: 'Started ${DateFormat.Hm().format(session.startedAt.toLocal())}',
+      onTap: resume,
+      actions: [_HeroStart(label: 'Resume', onPressed: resume)],
+    );
   }
 }
 
-class _HeroCard extends ConsumerWidget {
-  const _HeroCard({required this.plan});
+class _PlanHero extends ConsumerWidget {
+  const _PlanHero({required this.plan});
 
   final PlannedWorkout plan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = Theme.of(context);
-    final day = DayType.parse(plan.dayType);
-    const color = BrandColors.hero;
-    final date = parseDateKey(plan.date);
-    final isToday = dateKey(date) == dateKey(DateTime.now());
-    final blocks = Repository.decodeBlocks(plan.blocksJson);
-    final main = blocks.where((b) => b.section == Section.main).expand((b) => b.items).toList();
-    final catalog = ref.watch(catalogProvider);
-    final active = ref.watch(activeSessionProvider).value;
+    final today = dateKey(DateTime.now());
+    final isToday = plan.date == today;
+    final trainedToday =
+        (ref.watch(completedSessionsProvider).value ?? const []).any((s) => dateKey(s.startedAt.toLocal()) == today);
+    final when = DateFormat('EEE d MMM').format(parseDateKey(plan.date));
+    final exercises = Repository.decodeBlocks(plan.blocksJson)
+        .where((b) => b.section == Section.main)
+        .fold<int>(0, (n, b) => n + b.items.length);
+    void open() => context.push('/plan/${plan.id}');
+    return _Hero(
+      label: isToday
+          ? 'Today'
+          : trainedToday
+              ? 'Done for today · next $when'
+              : 'Rest day · next $when',
+      coach: plan.source == 'ai',
+      title: plan.title,
+      detail: '~${plan.estimatedMinutes} min · $exercises exercises',
+      onTap: open,
+      actions: [
+        _HeroStart(label: isToday ? 'Start workout' : 'Start early', onPressed: () => startWorkout(context, ref, plan)),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54), minimumSize: const Size(48, 52)),
+          onPressed: open,
+          child: const Text('View plan', maxLines: 1),
+        ),
+      ],
+    );
+  }
+}
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(Gap.radius + 4),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color, Color.lerp(color, Colors.black, 0.3)!],
+class _Hero extends StatelessWidget {
+  const _Hero({
+    required this.label,
+    required this.title,
+    required this.detail,
+    required this.onTap,
+    required this.actions,
+    this.coach = false,
+  });
+
+  final String label;
+  final String title;
+  final String detail;
+
+  /// Written or refined by the AI coach.
+  final bool coach;
+  final VoidCallback onTap;
+
+  /// The main button first; the optional second one gets its natural width next to it.
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Material(
+      borderRadius: BorderRadius.circular(Gap.radius + 4),
+      clipBehavior: Clip.antiAlias,
+      color: BrandColors.hero,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Text(label,
+                    style: t.textTheme.labelLarge?.copyWith(color: Colors.white70, fontWeight: FontWeight.w600)),
+              ),
+              if (coach) const Icon(Icons.auto_awesome, size: 20, color: Colors.white70, semanticLabel: 'From your coach'),
+            ]),
+            const SizedBox(height: Gap.sm),
+            // Capped so Start stays above the fold on small phones; the plan shows the full title.
+            Text(title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: t.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+            const SizedBox(height: Gap.xs),
+            Text(detail, style: t.textTheme.bodyMedium?.copyWith(color: Colors.white70)),
+            const SizedBox(height: Gap.md + 2),
+            LayoutBuilder(builder: (context, c) {
+              if (actions.length == 1) return SizedBox(width: double.infinity, child: actions.single);
+              // Side by side when both labels fit on one line, otherwise stacked (narrow phones, large text).
+              if (_labelWidth(context, 'Start workout') + _labelWidth(context, 'View plan') + 130 <= c.maxWidth) {
+                return Row(children: [Expanded(child: actions.first), const SizedBox(width: Gap.item), actions.last]);
+              }
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [actions.first, const SizedBox(height: Gap.sm), actions.last]);
+            }),
+          ]),
         ),
       ),
-      padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Wrap(spacing: 8, runSpacing: 6, children: [
-              Pill(isToday ? 'TODAY' : DateFormat('EEE d MMM').format(date).toUpperCase(),
-                  color: Colors.white, icon: Icons.event),
-              Pill(plan.source == 'ai' ? 'AI coach' : 'Smart plan',
-                  color: Colors.white, icon: plan.source == 'ai' ? Icons.auto_awesome : Icons.rule),
-            ]),
-          ),
-          Icon(day.icon, color: Colors.white70, size: 28),
-        ]),
-        const SizedBox(height: 16),
-        Text(plan.title,
-            style: t.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        Text(day.focus, style: t.textTheme.bodyMedium?.copyWith(color: Colors.white70)),
-        const SizedBox(height: 12),
-        Row(children: [
-          const Icon(Icons.timer_outlined, color: Colors.white70, size: 18),
-          const SizedBox(width: 4),
-          Text('~${plan.estimatedMinutes} min', style: const TextStyle(color: Colors.white)),
-          const SizedBox(width: 16),
-          const Icon(Icons.fitness_center, color: Colors.white70, size: 18),
-          const SizedBox(width: 4),
-          Text('${main.length} exercises', style: const TextStyle(color: Colors.white)),
-        ]),
-        const SizedBox(height: 12),
-        Wrap(spacing: 6, runSpacing: 6, children: [
-          // Capped so Start stays above the fold on small phones.
-          for (final i in main.take(3)) _HeroChip(catalog.exerciseName(i.exerciseId)),
-          if (main.length > 3) _HeroChip('+${main.length - 3} more'),
-        ]),
-        const SizedBox(height: 18),
-        LayoutBuilder(builder: (context, c) {
-          final start = FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: color),
-            onPressed: active != null
-                ? () => context.push('/session/${active.id}')
-                : () => startWorkout(context, ref, plan),
-            icon: Icon(active != null ? Icons.play_arrow : Icons.play_arrow_rounded),
-            label: Text(active != null ? 'Resume' : 'Start workout', maxLines: 1),
-          );
-          final view = OutlinedButton(
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
-            onPressed: () => context.push('/plan/${plan.id}'),
-            child: const Text('View plan', maxLines: 1),
-          );
-          // Side by side when both labels fit on one line, otherwise stacked (narrow phones, large text).
-          if (_labelWidth(context, 'Start workout') + _labelWidth(context, 'View plan') + 130 <= c.maxWidth) {
-            return Row(children: [Expanded(child: start), const SizedBox(width: Gap.item), view]);
-          }
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [start, const SizedBox(height: Gap.sm), view]);
-        }),
-      ]),
     );
   }
 
@@ -277,17 +245,67 @@ class _HeroCard extends ConsumerWidget {
   }
 }
 
-class _HeroChip extends StatelessWidget {
-  const _HeroChip(this.text);
+class _HeroStart extends StatelessWidget {
+  const _HeroStart({required this.label, required this.onPressed});
 
-  final String text;
+  final String label;
+  final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(Gap.sm)),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12)),
+  Widget build(BuildContext context) => FilledButton.icon(
+        key: const ValueKey('start-workout'),
+        style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: BrandColors.hero),
+        onPressed: onPressed,
+        icon: const Icon(Icons.play_arrow_rounded),
+        label: Text(label, maxLines: 1),
       );
+}
+
+/// "Shoulder: still bothering you?" for pain and discomfort whose check-in date has come.
+class _CheckInCards extends ConsumerWidget {
+  const _CheckInCards();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final due = ref.watch(dueCheckInsProvider).value ?? const <FeedbackEntry>[];
+    if (due.isEmpty) return const SizedBox.shrink();
+    final t = Theme.of(context);
+    final s = t.colorScheme;
+    final catalog = ref.watch(catalogProvider);
+    final coach = ref.read(coachServiceProvider);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final f in due.take(2))
+        Card(
+          margin: const EdgeInsets.only(top: Gap.item),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.md, 12, Gap.sm, Gap.xs),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(Icons.healing_outlined, size: 20, color: s.attention),
+                const SizedBox(width: Gap.sm),
+                Expanded(
+                  child: Text.rich(TextSpan(children: [
+                    TextSpan(
+                      text: f.region != null ? prettyRegion(f.region!) : catalog.exerciseName(f.exerciseId ?? ''),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    TextSpan(
+                        text: ': still bothering you? (since ${DateFormat('d MMM').format(f.createdAt.toLocal())})'),
+                  ])),
+                ),
+              ]),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(children: [
+                  TextButton(onPressed: () => coach.keepIssue(f.id), child: const Text('Still hurts')),
+                  TextButton(onPressed: () => coach.resolveIssue(f.id), child: const Text('Resolved')),
+                ]),
+              ),
+            ]),
+          ),
+        ),
+    ]);
+  }
 }
 
 class _WeekCard extends ConsumerWidget {
@@ -302,14 +320,11 @@ class _WeekCard extends ConsumerWidget {
     final monday = startOfWeek(DateTime.now());
     final trainedDates = sessions.map((s) => dateKey(s.startedAt.toLocal())).toSet();
     final thisWeek = sessions.where((s) => !s.startedAt.toLocal().isBefore(monday)).length;
-    final sets = ref.watch(allLoggedSetsProvider).value ?? const [];
-    final weeks = weeklyStats(sessions.map((s) => s.startedAt.toLocal()), sets, weeks: 12);
-    final streak = weekStreak(weeks, days.length);
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: [
+        padding: const EdgeInsets.all(Gap.md),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             for (var i = 0; i < 7; i++)
               _DayDot(
@@ -318,31 +333,9 @@ class _WeekCard extends ConsumerWidget {
                 done: trainedDates.contains(dateKey(addDays(monday, i))),
               ),
           ]),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('$thisWeek / ${days.length} sessions',
-                    style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: days.isEmpty ? 0 : (thisWeek / days.length).clamp(0, 1).toDouble(),
-                    minHeight: 8,
-                  ),
-                ),
-              ]),
-            ),
-            const SizedBox(width: 16),
-            Column(children: [
-              Row(children: [
-                Icon(Icons.local_fire_department, color: t.colorScheme.gold),
-                Text('$streak', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-              ]),
-              Text('week streak', style: t.textTheme.bodySmall),
-            ]),
-          ]),
+          const SizedBox(height: 12),
+          Text('$thisWeek of ${days.length} workouts done',
+              style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
         ]),
       ),
     );
@@ -362,137 +355,29 @@ class _DayDot extends StatelessWidget {
     final isToday = dateKey(date) == dateKey(DateTime.now());
     final bg = done ? s.primary : (planned ? s.primaryContainer : s.surfaceContainerHighest);
     final fg = done ? s.onPrimary : (planned ? s.onPrimaryContainer : s.onSurfaceVariant);
-    return Column(children: [
-      Text(DateFormat.E().format(date).substring(0, 2),
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              fontWeight: isToday ? FontWeight.w800 : FontWeight.w500, color: isToday ? s.primary : null)),
-      const SizedBox(height: 6),
-      Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: bg,
-          shape: BoxShape.circle,
-          border: isToday ? Border.all(color: s.primary, width: 2) : null,
-        ),
-        child: Center(
-          child: done
-              ? Icon(Icons.check, size: 18, color: fg)
-              : Text('${date.day}', style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
-        ),
-      ),
-    ]);
-  }
-}
-
-class _UpcomingList extends ConsumerWidget {
-  const _UpcomingList();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final next = ref.watch(nextPlanProvider).value;
-    final profile = ref.watch(profileProvider).value;
-    if (next == null || profile == null) return const SizedBox.shrink();
-    final start = addDays(parseDateKey(next.date), 1);
-    final dates = upcomingTrainingDates(parseDays(profile.trainingDays), count: 3, from: start);
-    final s = Theme.of(context).colorScheme;
-    var day = DayType.parse(next.dayType);
-    final entries = <(DateTime, DayType)>[];
-    for (final d in dates) {
-      day = day.next;
-      entries.add((d, day));
-    }
-    return Card(
+    return Semantics(
+      label: '${DateFormat('EEEE d').format(date)}${done ? ', trained' : planned ? ', planned' : ''}',
+      excludeSemantics: true,
       child: Column(children: [
-        for (final (d, dt) in entries)
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: dt.color(s).withValues(alpha: 0.15),
-              child: Icon(dt.icon, color: dt.color(s)),
-            ),
-            // Date sits in the title row so the focus line can use the full width.
-            title: Row(children: [
-              Expanded(child: Text('${dt.label} day', style: const TextStyle(fontWeight: FontWeight.w600))),
-              const SizedBox(width: Gap.sm),
-              Text(DateFormat('EEE d MMM').format(d),
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(color: s.onSurfaceVariant)),
-            ]),
-            subtitle: Text(dt.focus),
+        Text(DateFormat.E().format(date).substring(0, 2),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontWeight: isToday ? FontWeight.w800 : FontWeight.w500, color: isToday ? s.primary : null)),
+        const SizedBox(height: 6),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: bg,
+            shape: BoxShape.circle,
+            border: isToday ? Border.all(color: s.primary, width: 2) : null,
           ),
+          child: Center(
+            child: done
+                ? Icon(Icons.check, size: 18, color: fg)
+                : Text('${date.day}', style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
+          ),
+        ),
       ]),
-    );
-  }
-}
-
-class _QuickActions extends ConsumerWidget {
-  const _QuickActions();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final body = ref.watch(bodyMetricsProvider).value ?? const [];
-    final latest = body.where((b) => b.weightKg != null).firstOrNull;
-    final sessions = ref.watch(completedSessionsProvider).value ?? const [];
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 0.95,
-      children: [
-        _ActionTile(
-          icon: Icons.monitor_weight_outlined,
-          label: 'Body',
-          value: latest == null ? 'Log weight' : '${formatKg(latest.weightKg)} kg',
-          onTap: () => context.push('/body'),
-        ),
-        _ActionTile(
-          icon: Icons.menu_book_outlined,
-          label: 'Exercises',
-          value: '${ref.watch(catalogProvider).exercises.length} moves',
-          onTap: () => context.push('/library'),
-        ),
-        _ActionTile(
-          icon: Icons.emoji_events_outlined,
-          label: 'Workouts',
-          value: '${sessions.length} done',
-          onTap: () => StatefulNavigationShell.maybeOf(context)?.goBranch(1),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({required this.icon, required this.label, required this.value, required this.onTap});
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Icon(icon, color: t.colorScheme.primary),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(value, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700), maxLines: 1),
-              ),
-              Text(label, style: t.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-            ]),
-          ]),
-        ),
-      ),
     );
   }
 }

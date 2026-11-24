@@ -81,7 +81,7 @@ void main() {
       await shot('05-plan');
       await shotEnd('06-plan-end');
 
-      await tester.tap(find.text('Start workout'));
+      await tester.tap(find.byKey(const ValueKey('start-workout')).hitTestable());
       await settle(tester);
       await shot('07-session');
       // Open the first main exercise (after the warm-up block) to see the set-logging rows.
@@ -114,9 +114,7 @@ void main() {
       await shot('12-finish-sheet');
       await tester.tap(find.text('Save workout'));
       await settle(tester, frames: 30);
-      await shot('13-summary');
-      await tester.tap(find.text('Done'));
-      await settle(tester);
+      await shot('13-saved');
 
       await seedHistory(tester, container);
           await pumpUntil(tester, () => container.read(healthSyncProvider).setEnabled(true));
@@ -136,13 +134,15 @@ void main() {
         ('/exercise/$weightedId', '28-exercise-detail'),
         ('/settings', '29-settings'),
         ('/settings/profile', '30-profile'),
+        ('/settings/schedule', '30b-schedule'),
+        ('/settings/injuries', '30c-injuries'),
         ('/settings/equipment', '31-equipment'),
         ('/settings/connection', '32-connection'),
         ('/settings/focus', '32b-focus'),
         ('/settings/health', '32c-health'),
         ('/settings/health/send', '32d-health-send'),
       ];
-      for (final (route, name) in dark ? routes.take(4) : routes) {
+      for (final (route, name) in routes) {
         await go(tester, route);
         await shot(name);
         await shotEnd('$name-end');
@@ -157,9 +157,9 @@ void main() {
         await settle(tester, frames: 10);
 
         await go(tester, '/coach');
-        await tester.ensureVisible(find.text('Report pain / tell your coach'));
+        await tester.scrollUntilVisible(find.text('Report pain'), 150, scrollable: find.byType(Scrollable).hitTestable().first);
         await tester.pump();
-        await tester.tap(find.text('Report pain / tell your coach'));
+        await tester.tap(find.text('Report pain'));
         await settle(tester);
         await tester.ensureVisible(find.text('Neck'));
         await tester.pump();

@@ -498,10 +498,18 @@ result and records on top, effort **unset** until touched, optional note, one Sa
 
 ## 5. Prioritised list
 
-**Status, 23 November 2026:** phase 1 is built in the main checkout, uncommitted and not installed on the phone. Not in
-it: P1.6 and "timer side first" from P1.8, because the watch session rewrote exactly that code in its branch. Also done
-along the way: numbers typed but not ticked no longer disappear when a card scrolls off screen, and a set added by hand
-counts before the next card opens. The sections above describe the app before phase 1.
+**Status, 24 November 2026:** phase 1 is committed (e26a47d). Phases 2 to 5 are built in the main checkout, uncommitted
+and not installed on the phone. The sections above describe the app before phase 1. Not done, or done differently:
+
+- P4.5 (Samsung Health screens): the other session's health changes are still uncommitted, so those files were left alone.
+- P1.6 and the slimmer timer bar of P2.4: the watch branch rewrote that code; decide there.
+- P2.1: the next card opens by itself after the last set (built in phase 1) instead of a "Next" button in the bottom bar;
+  − and + are below the fields of the set to do now, because they do not fit next to them on a small phone.
+- P2.3: warm-up and cool-down lines log all sets of the exercise with the planned reps or time and no longer count in
+  "x / y sets".
+- P2.5: records are shown before saving; warm-up and cool-down sets never count as records.
+- P5.1b: volume is gone from every screen; the coach brief sent to the AI still has it.
+- P5.5: warm-up, core and cool-down lost their colours; push, pull and legs keep theirs on small icons and one chart.
 
 Impact on training: H/M/L. Effort: XS under an hour of work, S, M, L. Tokens are a rough estimate of everything one Claude
 session processes (reading, edits, tests, screenshots), ±50 %. Items in one phase share reading, so a phase costs less

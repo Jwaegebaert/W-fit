@@ -39,25 +39,20 @@ class BodyScreen extends ConsumerWidget {
           final weights = list.where((b) => b.weightKg != null).toList().reversed.toList();
           final waist = list.where((b) => b.waistCm != null).toList().reversed.toList();
           final latest = weights.isEmpty ? null : weights.last;
-          final first = weights.isEmpty ? null : weights.first;
           return ListView(padding: pagePadding(context, Gap.page.copyWith(bottom: Gap.fabClearance)), children: [
-            StatRow(children: [
-              StatTile(
-                label: 'current weight',
-                value: latest == null ? '–' : '${formatKg(latest.weightKg)} kg',
-                icon: Icons.monitor_weight_outlined,
+            if (latest != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                  Text('${formatKg(latest.weightKg)} kg', style: t.textTheme.headlineSmall),
+                  const SizedBox(width: Gap.sm),
+                  if (_change(weights) case final change?)
+                    Flexible(
+                      child: Text(change, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+                    ),
+                ]),
               ),
-              StatTile(
-                label: 'change',
-                value: latest == null || first == null
-                    ? '–'
-                    : '${(latest.weightKg! - first.weightKg!) >= 0 ? '+' : ''}${(latest.weightKg! - first.weightKg!).toStringAsFixed(1)} kg',
-                icon: Icons.trending_flat,
-              ),
-              StatTile(label: 'entries', value: '${list.length}', icon: Icons.list_alt),
-            ]),
             if (weights.length >= 2) ...[
-              const SectionTitle('Weight'),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
@@ -78,7 +73,6 @@ class BodyScreen extends ConsumerWidget {
                     values: waist.map((b) => b.waistCm!).toList(),
                     labels: waist.map((b) => DateFormat('d/M').format(parseDateKey(b.date))).toList(),
                     unit: ' cm',
-                    color: t.colorScheme.tertiary,
                   ),
                 ),
               ),
@@ -100,6 +94,15 @@ class BodyScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// "−0.7 kg in 4 weeks", against the oldest entry of the last four weeks.
+  static String? _change(List<BodyMetric> weights) {
+    final since = dateKey(DateTime.now().subtract(const Duration(days: 28)));
+    final recent = weights.where((b) => b.date.compareTo(since) >= 0).toList();
+    if (recent.length < 2) return null;
+    final d = recent.last.weightKg! - recent.first.weightKg!;
+    return '${d < 0 ? '−' : '+'}${d.abs().toStringAsFixed(1)} kg in 4 weeks';
   }
 
   static String _summary(BodyMetric b) {

@@ -986,8 +986,7 @@ class CoachService {
     final priorities = (await snapshot()).balance.priorities;
 
     return Insights(
-      summary: '${sessions.length} workouts logged.'
-          '${weeks.last.volume > 0 ? ' This week: ${weeks.last.volume.toStringAsFixed(0)} kg total volume.' : ''}',
+      summary: '${sessions.length} workouts logged.',
       highlights: highlights,
       recommendations: recs,
       nextFocus: avgWeekly < target ? 'Hit $target sessions this week.' : 'Progressive overload on your main lifts.',

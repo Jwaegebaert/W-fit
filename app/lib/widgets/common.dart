@@ -126,7 +126,7 @@ class AsyncView<T> extends StatelessWidget {
       );
 }
 
-/// Rounded square with the equipment-kind icon (dumbbell, machine, cable…) tinted by the exercise's section colour.
+/// Rounded square with the equipment-kind icon (dumbbell, machine, cable…).
 class ExerciseAvatar extends ConsumerWidget {
   const ExerciseAvatar({super.key, required this.exercise, this.size = 44});
 
@@ -137,13 +137,7 @@ class ExerciseAvatar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s = Theme.of(context).colorScheme;
     final e = exercise;
-    final section = switch (e?.category) {
-      'warmup' => Section.warmup,
-      'core' => Section.core,
-      'cooldown' => Section.cooldown,
-      _ => Section.main,
-    };
-    final color = section.color(s);
+    final color = s.primary;
     final kind = e == null ? null : ExerciseKind.of(e, ref.watch(catalogProvider));
     return Semantics(
       label: kind?.label,
@@ -158,6 +152,73 @@ class ExerciseAvatar extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// One choice out of a few, as a full-width segmented button. Labels that do not fit shrink together, never one alone.
+class OptionBar<T> extends StatelessWidget {
+  const OptionBar({super.key, required this.options, required this.selected, required this.onSelected});
+
+  final Map<T, String> options;
+  final T selected;
+  final ValueChanged<T> onSelected;
+
+  static const _fontSize = 14.0;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, c) {
+        final style = Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: _fontSize, fontWeight: FontWeight.w600);
+        var widest = 0.0;
+        for (final label in options.values) {
+          final painter = TextPainter(
+            text: TextSpan(text: label, style: style),
+            textScaler: MediaQuery.textScalerOf(context),
+            textDirection: Directionality.of(context),
+          )..layout();
+          if (painter.width > widest) widest = painter.width;
+          painter.dispose();
+        }
+        // Segment padding (12 each side) and border.
+        final room = c.maxWidth / options.length - 26;
+        final size = widest <= room ? _fontSize : _fontSize * room / widest;
+        return SegmentedButton<T>(
+          expandedInsets: EdgeInsets.zero,
+          segments: [
+            for (final MapEntry(key: value, value: label) in options.entries)
+              ButtonSegment(
+                value: value,
+                label: Text(label, maxLines: 1, softWrap: false, style: TextStyle(fontSize: size)),
+              ),
+          ],
+          selected: {selected},
+          showSelectedIcon: false,
+          onSelectionChanged: (s) => onSelected(s.first),
+        );
+      });
+}
+
+/// App-bar question mark that opens an explanation, instead of a text block on the page.
+class HelpButton extends StatelessWidget {
+  const HelpButton({super.key, required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'How it works',
+        icon: const Icon(Icons.help_outline_rounded),
+        onPressed: () => showAppSheet<void>(
+          context,
+          builder: (context) => SingleChildScrollView(
+            padding: sheetPadding(context),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: Gap.sm),
+              Text(text, style: Theme.of(context).textTheme.bodyLarge),
+            ]),
+          ),
+        ),
+      );
 }
 
 class Pill extends StatelessWidget {

@@ -101,7 +101,7 @@ az functionapp config appsettings set -g <resource-group> -n <function-app> --se
 
 `AI_MONTHLY_TOKEN_LIMIT`, `AI_MAX_OUTPUT_TOKENS`, `AZURE_OPENAI_DEPLOYMENT` and `AZURE_OPENAI_FALLBACK_DEPLOYMENT` work
 the same way (defaults are listed in [backend/README.md](backend/README.md)). The app shows current usage under
-**Settings > Backend connection** and on the **Coach** tab.
+**Settings > Cloud & coach**.
 
 To switch models, change the model parameters in `infra/main.bicep` and the deployment app settings, then run the live
 evaluation described in [backend/README.md](backend/README.md).
@@ -114,8 +114,8 @@ flutter build apk --release --dart-define=WFIT_API_URL=https://<function-app>.az
 # The APK ends up in build/app/outputs/flutter-apk/app-release.apk (copy it to the phone, or: adb install -r <apk>)
 ```
 
-Open **Settings > Backend connection**, paste your API key (the URL is already filled in thanks to the dart-define)
-and tap **Save & connect**. Without a connection the app simply runs offline.
+Open **Settings > Cloud & coach**, paste your API key (the URL is already filled in thanks to the dart-define)
+and tap **Connect**. Without a connection the app simply runs offline.
 
 The release build is signed with the Flutter debug key, which is fine for sideloading a personal app. If you want your
 own upload key, follow the [Flutter Android signing guide](https://docs.flutter.dev/deployment/android#sign-the-app).

@@ -13,8 +13,10 @@ import 'features/settings/connection_screen.dart';
 import 'features/settings/equipment_screen.dart';
 import 'features/settings/health_screen.dart';
 import 'features/settings/health_send_screen.dart';
+import 'features/settings/injuries_screen.dart';
 import 'features/settings/muscle_focus_screen.dart';
 import 'features/settings/profile_screen.dart';
+import 'features/settings/schedule_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/stats/exercise_progress_screen.dart';
 import 'features/stats/stats_screen.dart';
@@ -31,7 +33,6 @@ final router = GoRouter(
       builder: (context, state, shell) => _Shell(shell: shell),
       branches: [
         StatefulShellBranch(routes: [GoRoute(path: '/', builder: (_, _) => const DashboardScreen())]),
-        StatefulShellBranch(routes: [GoRoute(path: '/history', builder: (_, _) => const HistoryScreen())]),
         StatefulShellBranch(routes: [GoRoute(path: '/stats', builder: (_, _) => const StatsScreen())]),
         StatefulShellBranch(routes: [GoRoute(path: '/coach', builder: (_, _) => const CoachScreen())]),
       ],
@@ -46,6 +47,7 @@ final router = GoRouter(
       parentNavigatorKey: _rootKey,
       builder: (_, s) => SessionScreen(sessionId: s.pathParameters['id']!),
     ),
+    GoRoute(path: '/history', parentNavigatorKey: _rootKey, builder: (_, _) => const HistoryScreen()),
     GoRoute(
       path: '/history/:id',
       parentNavigatorKey: _rootKey,
@@ -66,6 +68,8 @@ final router = GoRouter(
     GoRoute(path: '/balance', parentNavigatorKey: _rootKey, builder: (_, _) => const BalanceScreen()),
     GoRoute(path: '/settings', parentNavigatorKey: _rootKey, builder: (_, _) => const SettingsScreen()),
     GoRoute(path: '/settings/profile', parentNavigatorKey: _rootKey, builder: (_, _) => const ProfileScreen()),
+    GoRoute(path: '/settings/schedule', parentNavigatorKey: _rootKey, builder: (_, _) => const ScheduleScreen()),
+    GoRoute(path: '/settings/injuries', parentNavigatorKey: _rootKey, builder: (_, _) => const InjuriesScreen()),
     GoRoute(path: '/settings/equipment', parentNavigatorKey: _rootKey, builder: (_, _) => const EquipmentScreen()),
     GoRoute(path: '/settings/focus', parentNavigatorKey: _rootKey, builder: (_, _) => const MuscleFocusScreen()),
     GoRoute(path: '/settings/health', parentNavigatorKey: _rootKey, builder: (_, _) => const HealthScreen()),
@@ -89,8 +93,6 @@ class _Shell extends StatelessWidget {
           onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
           destinations: const [
             NavigationDestination(icon: Icon(Icons.today_outlined), selectedIcon: Icon(Icons.today), label: 'Today'),
-            NavigationDestination(
-                icon: Icon(Icons.history_outlined), selectedIcon: Icon(Icons.history), label: 'History'),
             NavigationDestination(
                 icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Progress'),
             NavigationDestination(

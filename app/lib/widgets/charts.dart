@@ -111,12 +111,16 @@ class TrendLineChart extends StatelessWidget {
 
 /// Weekly bar chart with an optional target line.
 class WeeklyBarChart extends StatelessWidget {
-  const WeeklyBarChart({super.key, required this.values, required this.labels, this.target, this.height = 160});
+  const WeeklyBarChart(
+      {super.key, required this.values, required this.labels, this.target, this.height = 160, this.lastIsRunning = false});
 
   final List<double> values;
   final List<String> labels;
   final double? target;
   final double height;
+
+  /// The last bar is a week that is not over: drawn as an outline.
+  final bool lastIsRunning;
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +136,7 @@ class WeeklyBarChart extends StatelessWidget {
           extraLinesData: target == null
               ? null
               : ExtraLinesData(horizontalLines: [
-                  HorizontalLine(y: target!, color: t.colorScheme.tertiary, strokeWidth: 1.5, dashArray: [6, 4]),
+                  HorizontalLine(y: target!, color: t.colorScheme.outline, strokeWidth: 1.5, dashArray: [6, 4]),
                 ]),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(),
@@ -171,7 +175,14 @@ class WeeklyBarChart extends StatelessWidget {
                   toY: values[i],
                   width: 14,
                   borderRadius: BorderRadius.circular(6),
-                  color: target != null && values[i] >= target! ? t.colorScheme.primary : t.colorScheme.primary.withValues(alpha: 0.45),
+                  color: lastIsRunning && i == values.length - 1
+                      ? t.colorScheme.primary.withValues(alpha: 0.12)
+                      : target != null && values[i] >= target!
+                          ? t.colorScheme.primary
+                          : t.colorScheme.primary.withValues(alpha: 0.45),
+                  borderSide: lastIsRunning && i == values.length - 1 && values[i] > 0
+                      ? BorderSide(color: t.colorScheme.primary, width: 1.5)
+                      : BorderSide.none,
                 ),
               ]),
           ],

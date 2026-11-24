@@ -180,10 +180,7 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
       padding: sheetPadding(context),
       children: [
         Text('Swap ${original.name}', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        Text('Targets ${original.primary.map(prettyMuscle).join(', ').toLowerCase()}',
-            style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         LayoutBuilder(builder: (context, c) {
           // Icons only when each segment has room, so labels never break mid-word on narrow phones / large text.
           final roomy = c.maxWidth / SwapReason.values.length >= MediaQuery.textScalerOf(context).scale(105);
@@ -208,10 +205,11 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
           );
         }),
         const SizedBox(height: 12),
-        if (_reason != SwapReason.preference && original.equipment.isNotEmpty) ...[
+        // One busy machine needs no question; what to leave out of future plans always does.
+        if (_reason == SwapReason.unavailable || (_reason == SwapReason.occupied && original.equipment.length > 1)) ...[
           Text(
             _reason == SwapReason.occupied
-                ? 'Which equipment is busy? It will be avoided for the rest of this workout.'
+                ? 'What is busy? It is avoided for the rest of this workout.'
                 : 'Select what your gym does not have. It is left out of all future plans (undo in Settings).',
             style: t.textTheme.bodySmall,
           ),
@@ -236,35 +234,12 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
             title: const Text("Don't suggest this exercise again"),
             subtitle: const Text('Otherwise the swap is for this workout only.'),
           ),
-        const SizedBox(height: 8),
-        if (aiConfigured) ...[
-          TextField(
-            controller: _note,
-            decoration: const InputDecoration(
-              hintText: 'Optional note for the coach (e.g. "shoulder feels tight")',
-              prefixIcon: Icon(Icons.edit_note),
-            ),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _aiLoading ? null : _askAi,
-            icon: _aiLoading
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.auto_awesome),
-            label: Text(_aiLoading ? 'Asking the AI coach…' : 'Ask the AI coach'),
-          ),
-          if (_aiError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text('$_aiError Showing smart suggestions instead.',
-                  style: TextStyle(color: t.colorScheme.error)),
-            ),
-        ],
         if (_ai != null && _ai!.isNotEmpty) ...[
-          const SectionTitle('AI coach suggestions'),
+          const SectionTitle('From your coach'),
           for (final s in _ai!) _SuggestionTile(suggestion: s, onTap: () => _apply(s)),
-        ],
-        const SectionTitle('Equivalent exercises'),
+          const SectionTitle('Similar exercises'),
+        ] else
+          const SizedBox(height: Gap.sm),
         if (_rules.isEmpty)
           const Padding(
             padding: EdgeInsets.all(16),
@@ -272,6 +247,26 @@ class _SwapSheetState extends ConsumerState<_SwapSheet> {
                 'left out.'),
           ),
         for (final s in _rules) _SuggestionTile(suggestion: s, onTap: () => _apply(s)),
+        if (aiConfigured) ...[
+          const SectionTitle('Something else?'),
+          TextField(
+            controller: _note,
+            decoration: const InputDecoration(hintText: 'Wish for your coach (optional)'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _aiLoading ? null : _askAi,
+            icon: _aiLoading
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.auto_awesome),
+            label: Text(_aiLoading ? 'Asking your coach…' : 'Ask your coach'),
+          ),
+          if (_aiError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_aiError!, style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+            ),
+        ],
       ],
     );
   }
@@ -295,10 +290,9 @@ class _SuggestionTile extends StatelessWidget {
           leading: ExerciseAvatar(exercise: suggestion.exercise),
           title: Row(children: [
             Expanded(child: Text(suggestion.exercise.name, style: const TextStyle(fontWeight: FontWeight.w600))),
-            if (suggestion.fromAi) Icon(Icons.auto_awesome, size: 16, color: t.colorScheme.tertiary),
+            if (suggestion.fromAi) Icon(Icons.auto_awesome, size: 16, color: t.colorScheme.gold),
           ]),
           subtitle: Text(suggestion.why),
-          trailing: const Icon(Icons.swap_horiz),
         ),
       ),
     );

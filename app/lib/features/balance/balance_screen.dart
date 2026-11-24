@@ -29,7 +29,7 @@ Color _groupColor(MuscleGroup g, ColorScheme s) => switch (g) {
       MuscleGroup.push => DayType.push.color(s),
       MuscleGroup.pull => DayType.pull.color(s),
       MuscleGroup.legs => DayType.legs.color(s),
-      MuscleGroup.core => Section.core.color(s),
+      MuscleGroup.core => coreColor(s),
     };
 
 String _n(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
@@ -56,21 +56,41 @@ class BalanceScreen extends ConsumerWidget {
           }
           final b = snap.balance;
           return ListView(padding: pagePadding(context), children: [
-            const SectionTitle('Next focus', padding: EdgeInsets.fromLTRB(4, 8, 4, 8)),
+            const SectionTitle('Behind', padding: SectionTitle.first),
             _FocusCard(balance: b, coachFocus: coachFocus),
             SectionTitle('This week', trailing: Text('sets · target', style: Theme.of(context).textTheme.bodySmall)),
             _WeekCard(balance: b),
-            const SectionTitle('8-week balance'),
-            _Heatmap(weeks: snap.weeks, focus: MuscleFocus.decode(snap.profile.muscleFocusJson)),
-            const SectionTitle('Distribution'),
-            _DistributionCard(balance: b),
-            const SectionTitle('Recently trained'),
-            _RecentCard(balance: b),
+            const SizedBox(height: Gap.item),
+            _Fold(
+              title: 'Last 8 weeks',
+              child: _Heatmap(weeks: snap.weeks, focus: MuscleFocus.decode(snap.profile.muscleFocusJson)),
+            ),
+            _Fold(title: 'Push, pull, legs', child: _DistributionCard(balance: b)),
+            _Fold(title: 'Days since trained', child: _RecentCard(balance: b)),
           ]);
         },
       ),
     );
   }
+}
+
+/// A folded section.
+class _Fold extends StatelessWidget {
+  const _Fold({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(top: Gap.item),
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          shape: const Border(),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+          children: [child],
+        ),
+      );
 }
 
 class _FocusCard extends StatelessWidget {
@@ -104,7 +124,7 @@ class _FocusCard extends StatelessWidget {
             ),
           if (coachFocus.isNotEmpty)
             Wrap(spacing: 6, runSpacing: 6, children: [
-              Pill('Coach', icon: Icons.auto_awesome, color: t.colorScheme.tertiary),
+              Pill('Coach says', icon: Icons.auto_awesome, color: t.colorScheme.gold),
               for (final m in coachFocus) Pill(trackedMuscles[m]?.label ?? prettyMuscle(m)),
             ]),
         ]),

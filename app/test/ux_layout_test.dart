@@ -30,7 +30,7 @@ void main() {
 
           await check('dashboard');
           // The primary action must be visible without scrolling, above the tab bar.
-          expect(tester.getRect(find.text('Start workout')).bottom, lessThanOrEqualTo(contentLimit(tester)),
+          expect(tester.getRect(find.byKey(const ValueKey('start-workout'))).bottom, lessThanOrEqualTo(contentLimit(tester)),
               reason: 'dashboard Start workout below the fold');
           expectFullyVisible(tester, find.text('Coach'), reason: 'navigation bar label');
           for (final route in ['/history', '/stats', '/coach']) {
@@ -46,9 +46,9 @@ void main() {
           await tester.tap(find.text('View plan'));
           await settle(tester);
           await check('plan');
-          expectFullyVisible(tester, find.text('Start workout'), reason: 'plan Start workout');
+          expectFullyVisible(tester, find.byKey(const ValueKey('start-workout')).hitTestable(), reason: 'plan Start workout');
 
-          await tester.tap(find.text('Start workout'));
+          await tester.tap(find.byKey(const ValueKey('start-workout')).hitTestable());
           await settle(tester);
           expectFullyVisible(tester, find.text('Finish'), reason: 'session Finish');
           await check('session');
@@ -102,10 +102,8 @@ void main() {
           await settle(tester, frames: 5);
           await tester.tap(find.text('Save workout'));
           await settle(tester, frames: 30);
-          expect(tester.takeException(), isNull, reason: 'summary dialog');
-          expectFullyVisible(tester, find.text('Done'), reason: 'summary Done');
-          await tester.tap(find.text('Done'));
-          await settle(tester);
+          expect(tester.takeException(), isNull, reason: 'saved');
+          expect(find.text('Workout saved'), findsOneWidget);
 
           await unpumpWFit(tester);
         });
@@ -132,6 +130,8 @@ void main() {
             '/exercise/$weightedId',
             '/settings',
             '/settings/profile',
+            '/settings/schedule',
+            '/settings/injuries',
             '/settings/equipment',
             '/settings/connection',
             '/settings/focus',
@@ -159,9 +159,9 @@ void main() {
 
           // Report an issue: severe pain shows the safety note; saving shows the instant plan changes.
           await go(tester, '/coach');
-          await tester.ensureVisible(find.text('Report pain / tell your coach'));
+          await tester.scrollUntilVisible(find.text('Report pain'), 150, scrollable: find.byType(Scrollable).hitTestable().first);
           await tester.pump();
-          await tester.tap(find.text('Report pain / tell your coach'));
+          await tester.tap(find.text('Report pain'));
           await settle(tester);
           expect(tester.takeException(), isNull, reason: 'report sheet');
           await tester.ensureVisible(find.text('Neck'));
@@ -183,7 +183,7 @@ void main() {
           await expectScrollEndClear(tester, scrollable: reportScroll, reason: 'report result', overSheet: true);
           await tester.tap(find.text('Done'));
           await settle(tester, frames: 10);
-          expect(find.text('Active limitations'), findsOneWidget);
+          expect(find.text('Active injuries'), findsOneWidget);
 
           await unpumpWFit(tester);
         });

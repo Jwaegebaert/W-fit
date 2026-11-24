@@ -29,6 +29,7 @@ class PlanScreen extends ConsumerStatefulWidget {
 class _PlanScreenState extends ConsumerState<PlanScreen> {
   late String _id = widget.plannedId;
   bool _busy = false;
+  bool _askingCoach = false;
 
   Future<void> _regenerate({required bool ai, DayType? day}) async {
     final plan = await ref.read(repositoryProvider).plannedById(_id);
@@ -47,7 +48,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (input == null) return;
       note = input;
     }
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _askingCoach = ai;
+    });
     final coach = ref.read(coachServiceProvider);
     final date = parseDateKey(plan.date);
     final dayType = day ?? DayType.parse(plan.dayType);
@@ -58,7 +62,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       if (!mounted) return;
       setState(() => _id = id);
       ref.invalidate(nextPlanProvider);
-      showSnack(context, ai ? 'Your AI coach built a new workout.' : 'Workout rebuilt.');
+      showSnack(context, ai ? 'Your coach built a new workout.' : 'Workout rebuilt.');
     } on ApiException catch (e) {
       if (mounted) showSnack(context, '${e.message} Your current plan is unchanged.');
     } finally {
@@ -72,12 +76,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.auto_awesome),
-        title: const Text('Ask the AI coach'),
+        title: const Text('New plan from your coach'),
         content: TextField(
           controller: c,
           maxLines: 3,
           decoration: const InputDecoration(
-            hintText: 'Anything to consider today? e.g. "short on time", "knee feels sore", "more badminton work"',
+            hintText: 'Wishes for today (optional), like "short on time"',
           ),
         ),
         actions: [
@@ -98,7 +102,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     final day = DayType.parse(plan.dayType);
     final blocks = Repository.decodeBlocks(plan.blocksJson);
     final usedIds = blocks.expand((b) => b.items).map((i) => i.exerciseId).toSet();
-    final t = Theme.of(context);
+    final active = ref.watch(activeSessionProvider).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -110,16 +114,18 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             onSelected: (v) => switch (v) {
               'ai' => _regenerate(ai: true),
               'rules' => _regenerate(ai: false),
-              'report' => showReportIssueSheet(context, plannedId: plan.id),
+              'pain' => showReportPain(context, plannedId: plan.id),
+              'tell' => showTellCoach(context, plannedId: plan.id),
               final d => _regenerate(ai: false, day: DayType.parse(d)),
             },
             itemBuilder: (_) => [
               if (aiConfigured)
-                const PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('Ask AI coach'))),
+                const PopupMenuItem(value: 'ai', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('New plan from your coach'))),
               const PopupMenuItem(value: 'rules', child: ListTile(leading: Icon(Icons.refresh), title: Text('Rebuild plan'))),
               const PopupMenuItem(
-                  value: 'report',
-                  child: ListTile(leading: Icon(Icons.report_problem_outlined), title: Text('Report an issue'))),
+                  value: 'pain', child: ListTile(leading: Icon(Icons.healing_outlined), title: Text('Report pain'))),
+              const PopupMenuItem(
+                  value: 'tell', child: ListTile(leading: Icon(Icons.edit_note), title: Text('Tell your coach'))),
               const PopupMenuDivider(),
               for (final d in DayType.values.where((d) => d != day))
                 PopupMenuItem(value: d.name, child: ListTile(leading: Icon(d.icon), title: Text('Switch to ${d.label} day'))),
@@ -131,49 +137,12 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         ListView(
           padding: Gap.page,
           children: [
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              Pill(DateFormat('EEEE d MMM').format(parseDateKey(plan.date)), icon: Icons.event),
-              Pill('~${plan.estimatedMinutes} min', icon: Icons.timer_outlined),
-              Pill(plan.source == 'ai' ? 'AI coach' : 'Smart plan',
-                  icon: plan.source == 'ai' ? Icons.auto_awesome : Icons.rule, color: t.colorScheme.tertiary),
-            ]),
-            if (plan.coachNote.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Card(
-                color: t.colorScheme.secondaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Icon(Icons.tips_and_updates_outlined, color: t.colorScheme.onSecondaryContainer),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(plan.coachNote, style: TextStyle(color: t.colorScheme.onSecondaryContainer))),
-                  ]),
-                ),
-              ),
-            ],
-            if (ref.watch(coachPreparingProvider) == plan.date)
-              Padding(
-                padding: const EdgeInsets.only(top: Gap.item),
-                child: Row(children: [
-                  const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                  const SizedBox(width: Gap.sm),
-                  Expanded(child: Text('Coach is preparing a refined plan…', style: t.textTheme.bodySmall)),
-                ]),
-              ),
-            _WhyCard(meta: PlanMeta.decode(plan.metaJson)),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => showReportIssueSheet(context, plannedId: plan.id),
-                icon: const Icon(Icons.report_problem_outlined),
-                label: const Text('Report an issue'),
-              ),
-            ),
+            _PlanHeader(plan: plan, preparing: ref.watch(coachPreparingProvider) == plan.date),
             for (var b = 0; b < blocks.length; b++) ...[
               SectionTitle(
                 blocks[b].section.label,
                 trailing: Text('${(blocks[b].items.fold<int>(0, (s, i) => s + i.estimateSeconds()) / 60).round()} min',
-                    style: t.textTheme.bodySmall),
+                    style: Theme.of(context).textTheme.bodySmall),
               ),
               Card(
                 child: Column(children: [
@@ -195,7 +164,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
                           ? () => _remove(plan, blocks, b, i)
                           : null,
                       onReport: () =>
-                          showReportIssueSheet(context, exerciseId: blocks[b].items[i].exerciseId, plannedId: plan.id),
+                          showReportPain(context, exerciseId: blocks[b].items[i].exerciseId, plannedId: plan.id),
                     ),
                 ]),
               ),
@@ -205,14 +174,31 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         if (_busy)
           Container(
             color: Colors.black26,
-            child: const Center(child: Card(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))),
+            child: Center(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(Gap.lg),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: Gap.md),
+                    Text(_askingCoach ? 'Your coach is building the workout.\nThis can take a minute or two.' : 'Rebuilding…',
+                        textAlign: TextAlign.center),
+                  ]),
+                ),
+              ),
+            ),
           ),
       ]),
       bottomNavigationBar: BottomActionBar(
         child: FilledButton.icon(
+          key: const ValueKey('start-workout'),
           onPressed: _busy ? null : () => _start(plan),
           icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Start workout'),
+          label: Text(active != null
+              ? 'Resume workout'
+              : plan.date == dateKey(DateTime.now())
+                  ? 'Start workout'
+                  : 'Start early'),
         ),
       ),
     );
@@ -247,87 +233,133 @@ class _PlanItemTile extends ConsumerWidget {
     final weight =
         item.targetWeightKg != null ? ' · ${ref.watch(loadModelProvider).weightLabel(e, item.targetWeightKg!)}' : '';
     final target = item.copyWith(perSide: item.perSide || (e?.unilateral ?? false)).targetLabel;
-    final rest = item.restSeconds > 0 && section != Section.cooldown ? ' · rest ${formatSeconds(item.restSeconds)}' : '';
     return ListTile(
       onTap: () => context.push('/exercise/${item.exerciseId}'),
-      // Trailing icon buttons bring their own padding; keep the title as wide as possible.
+      // The trailing menu brings its own padding; keep the title as wide as possible.
       contentPadding: const EdgeInsetsDirectional.only(start: Gap.md - 4, end: Gap.xs),
       horizontalTitleGap: Gap.md - 4,
       leading: ExerciseAvatar(exercise: e),
       title: Text(e?.name ?? item.exerciseId, style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text('$target$weight$rest${item.notes.isNotEmpty ? '\n${item.notes}' : ''}'),
-      isThreeLine: item.notes.isNotEmpty,
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton(tooltip: 'Swap', icon: const Icon(Icons.swap_horiz), onPressed: onSwap),
-        PopupMenuButton<String>(
-          onSelected: (v) => v == 'remove' ? onRemove!() : onReport(),
-          itemBuilder: (_) => [
-            const PopupMenuItem(value: 'report', child: Text('Report an issue')),
-            if (onRemove != null) const PopupMenuItem(value: 'remove', child: Text('Remove from today')),
-          ],
-        ),
+      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('$target$weight'),
+        if (item.notes.isNotEmpty) Text(item.notes, maxLines: 2, overflow: TextOverflow.ellipsis),
       ]),
-    );
-  }
-}
-
-/// "Why this plan": program position, deload, focus muscles, rationale and changes from the plan meta.
-class _WhyCard extends ConsumerWidget {
-  const _WhyCard({required this.meta});
-
-  final PlanMeta meta;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (meta.isEmpty) return const SizedBox.shrink();
-    final t = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(top: Gap.item),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Why this plan', style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: Gap.sm),
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            if (meta.program.isNotEmpty) Pill(meta.program, icon: Icons.timeline),
-            if (meta.deload) Pill('Deload week', icon: Icons.battery_charging_full, color: t.colorScheme.tertiary),
-            for (final m in meta.focus)
-              Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), icon: Icons.center_focus_strong, color: t.colorScheme.primary),
-          ]),
-          for (final r in meta.rationale)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('•  '),
-                Expanded(child: Text(r, style: t.textTheme.bodyMedium)),
-              ]),
-            ),
-          for (final c in meta.changes) ChangeLine(change: c),
-        ]),
+      trailing: PopupMenuButton<String>(
+        onSelected: (v) => switch (v) {
+          'swap' => onSwap(),
+          'remove' => onRemove!(),
+          _ => onReport(),
+        },
+        itemBuilder: (_) => [
+          const PopupMenuItem(value: 'swap', child: Text('Swap')),
+          const PopupMenuItem(value: 'report', child: Text('Report pain')),
+          if (onRemove != null) const PopupMenuItem(value: 'remove', child: Text('Remove from today')),
+        ],
       ),
     );
   }
 }
 
-/// Compact list of a workout's sections for read-only display.
-class PlanSummary extends StatelessWidget {
-  const PlanSummary({super.key, required this.blocks, required this.catalog});
+/// Date and length on one line, then one line from the coach (or "Why this plan") that opens the reasons and changes.
+class _PlanHeader extends StatefulWidget {
+  const _PlanHeader({required this.plan, required this.preparing});
 
-  final List<PlanBlock> blocks;
-  final Catalog catalog;
+  final PlannedWorkout plan;
+
+  /// The coach is refining this plan in the background.
+  final bool preparing;
+
+  @override
+  State<_PlanHeader> createState() => _PlanHeaderState();
+}
+
+class _PlanHeaderState extends State<_PlanHeader> {
+  bool _open = false;
 
   @override
   Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
+    final t = Theme.of(context);
+    final s = t.colorScheme;
+    final plan = widget.plan;
+    final meta = PlanMeta.decode(plan.metaJson);
+    final fromCoach = plan.source == 'ai';
+    // The rules engine writes the same sentence every time; only its deload note says something new.
+    final note = fromCoach || meta.deload ? plan.coachNote.trim() : '';
+    // The program position is in the line above already.
+    final reasons = [
+      for (final r in meta.rationale) meta.program.isNotEmpty && r.startsWith('${meta.program}: ') ? r.substring(meta.program.length + 2) : r,
+    ];
+    final changes = [for (final c in meta.changes) if (c.from != c.to) c];
+    final hasMore = reasons.isNotEmpty || changes.isNotEmpty || meta.focus.isNotEmpty;
+
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      for (final b in blocks)
+      Text(
+        [
+          DateFormat('EEE d MMM').format(parseDateKey(plan.date)),
+          '~${plan.estimatedMinutes} min',
+          if (meta.program.isNotEmpty) meta.program,
+          if (meta.deload) 'deload week',
+        ].join(' · '),
+        style: t.textTheme.bodyMedium?.copyWith(color: s.onSurfaceVariant),
+      ),
+      if (widget.preparing)
         Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(b.section.icon, size: 16, color: b.section.color(s)),
-            const SizedBox(width: 6),
-            Expanded(child: Text(b.items.map((i) => catalog.exerciseName(i.exerciseId)).join(' · '))),
+          padding: const EdgeInsets.only(top: Gap.sm),
+          child: Row(children: [
+            const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: Gap.sm),
+            Expanded(child: Text('Coach is preparing a refined plan…', style: t.textTheme.bodySmall)),
           ]),
+        ),
+      if (note.isNotEmpty || hasMore)
+        Card(
+          margin: const EdgeInsets.only(top: Gap.item),
+          color: fromCoach ? s.secondaryContainer : null,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, Gap.sm, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (fromCoach) ...[
+                    Icon(Icons.auto_awesome, size: 20, color: s.gold),
+                    const SizedBox(width: Gap.sm),
+                  ],
+                  Expanded(
+                    child: Text(
+                      note.isEmpty ? 'Why this plan' : note,
+                      maxLines: _open ? null : 2,
+                      overflow: _open ? null : TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (changes.isNotEmpty && !_open) ...[
+                    const SizedBox(width: Gap.sm),
+                    Text('${changes.length} changed', style: t.textTheme.labelMedium),
+                  ],
+                  Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                ]),
+                if (_open) ...[
+                  if (meta.focus.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: Gap.sm),
+                      child: Wrap(spacing: 6, runSpacing: 6, children: [
+                        for (final m in meta.focus) Pill('Extra ${(trackedMuscles[m]?.label ?? prettyMuscle(m)).toLowerCase()}', color: s.primary),
+                      ]),
+                    ),
+                  for (final r in reasons)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('•  '),
+                        Expanded(child: Text(r, style: t.textTheme.bodyMedium)),
+                      ]),
+                    ),
+                  for (final c in changes) ChangeLine(change: c),
+                ],
+              ]),
+            ),
+          ),
         ),
     ]);
   }

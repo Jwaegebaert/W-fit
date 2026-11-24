@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme.dart';
+import '../domain/progression.dart' show formatKg;
+import '../features/settings/equipment_screen.dart' show showBarWeightDialog;
 import '../providers.dart';
 import 'common.dart';
 import 'exercise_visuals.dart';
@@ -70,6 +72,23 @@ class EquipmentSheet extends ConsumerWidget {
             ),
           ),
         ]),
+        if (eq?.hasBar ?? false)
+          Card(
+            margin: const EdgeInsets.only(top: Gap.sm),
+            color: s.surfaceContainerHigh,
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              title: const Text('Empty bar'),
+              subtitle: const Text('You log only the plates; stats add the bar'),
+              trailing: Text(
+                ref.watch(loadModelProvider).barWeight(equipmentId) > 0
+                    ? '${formatKg(ref.watch(loadModelProvider).barWeight(equipmentId))} kg'
+                    : 'Not set',
+                style: t.textTheme.titleSmall,
+              ),
+              onTap: () => showBarWeightDialog(context, ref, equipmentId),
+            ),
+          ),
         const SizedBox(height: Gap.sm),
         if (eq?.alwaysAvailable ?? false)
           const ListTile(

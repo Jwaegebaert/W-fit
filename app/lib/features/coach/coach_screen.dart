@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
@@ -9,41 +8,11 @@ import '../../domain/catalog.dart';
 import '../../domain/muscles.dart';
 import '../../providers.dart';
 import '../../services/coach_service.dart';
+import '../../widgets/active_injuries.dart';
 import '../../widgets/common.dart';
 import '../../widgets/report_issue_sheet.dart';
 
-/// Active pain / discomfort entries with a Resolve action.
-class _Limitations extends ConsumerWidget {
-  const _Limitations();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final entries = (ref.watch(activeFeedbackProvider).value ?? const [])
-        .where((f) => f.kind == 'pain' || f.kind == 'discomfort')
-        .toList();
-    if (entries.isEmpty) return const SizedBox.shrink();
-    final catalog = ref.watch(catalogProvider);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SectionTitle('Active limitations'),
-      Card(
-        child: Column(children: [
-          for (final f in entries)
-            ListTile(
-              leading: const Icon(Icons.healing_outlined),
-              title: Text(f.region != null ? prettyRegion(f.region!) : catalog.exerciseName(f.exerciseId ?? '')),
-              subtitle: Text('${switch (f.severity) { 1 => 'Mild', 3 => 'Severe', _ => 'Moderate' }} ${f.kind} · '
-                  'since ${DateFormat('d MMM').format(f.createdAt.toLocal())}'),
-              trailing: TextButton(
-                onPressed: () => ref.read(coachServiceProvider).resolveIssue(f.id),
-                child: const Text('Resolve'),
-              ),
-            ),
-        ]),
-      ),
-    ]);
-  }
-}
-
+/// What to do next, two ways to talk to the coach, active injuries; the longer review is folded.
 class CoachScreen extends ConsumerStatefulWidget {
   const CoachScreen({super.key});
 
@@ -55,7 +24,9 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
   Insights? _insights;
   String? _notice;
   bool _loading = false;
-  Map<String, dynamic>? _usage;
+
+  // Both buttons fit next to each other on a normal phone.
+  static final _compact = FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: Gap.sm));
 
   @override
   void initState() {
@@ -63,7 +34,7 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
     _load();
   }
 
-  Future<void> _load({bool force = false, bool ai = true}) async {
+  Future<void> _load({bool force = false}) async {
     setState(() {
       _loading = true;
       _notice = null;
@@ -71,18 +42,16 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
     final coach = ref.read(coachServiceProvider);
     final configured = (await ref.read(apiConfigProvider.future)).isConfigured;
     Insights result;
-    if (ai && configured) {
+    if (configured) {
       try {
         result = await coach.aiInsights(force: force);
         if (mounted) ref.invalidate(cachedInsightsProvider);
       } on ApiException catch (e) {
         result = await coach.localInsights();
-        _notice = '${e.message} Showing on-device insights.';
+        _notice = '${e.message} Showing advice from this phone.';
       }
-      _usage = await coach.aiUsage();
     } else {
       result = await coach.localInsights();
-      if (!configured) _notice = 'Connect your backend in Settings to unlock AI coaching.';
     }
     if (!mounted) return;
     setState(() {
@@ -94,122 +63,117 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final s = t.colorScheme;
     final i = _insights;
+    final injuries = (ref.watch(activeFeedbackProvider).value ?? const []).any(isInjury);
     return Scaffold(
-      appBar: AppBar(title: const Text('Coach'), actions: [
-        IconButton(
-          tooltip: 'Refresh insights',
-          onPressed: _loading ? null : () => _load(force: true),
-          icon: const Icon(Icons.refresh),
-        ),
-      ]),
+      appBar: AppBar(
+        title: const Text('Coach'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh advice',
+            onPressed: _loading ? null : () => _load(force: true),
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+        bottom: _loading && i != null
+            ? const PreferredSize(preferredSize: Size.fromHeight(2), child: LinearProgressIndicator(minHeight: 2))
+            : null,
+      ),
       body: RefreshIndicator(
         onRefresh: () => _load(),
         child: ListView(padding: pagePadding(context), children: [
-          Card(
-            child: ListTile(
-              leading: Icon(Icons.auto_awesome, color: t.colorScheme.gold),
-              title: const Text('Your training coach', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(i == null
-                  ? 'Analysing your training…'
-                  : i.source == 'ai'
-                      ? 'AI insights${i.generatedAt != null ? ' · ${DateFormat('d MMM HH:mm').format(i.generatedAt!.toLocal())}' : ''}'
-                      : 'On-device insights'),
+          const SectionTitle('Do next', padding: SectionTitle.first),
+          if (i == null)
+            const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator()))
+          else
+            Card(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (i.nextFocus.isNotEmpty)
+                  ListTile(
+                    leading: Icon(Icons.flag_rounded, color: i.source == 'ai' ? s.gold : s.primary),
+                    title: Text(i.nextFocus, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: i.focusMuscles.isEmpty
+                        ? null
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Wrap(spacing: 6, runSpacing: 6, children: [
+                              for (final m in i.focusMuscles)
+                                Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), color: s.primary),
+                            ]),
+                          ),
+                  ),
+                for (final r in i.recommendations)
+                  ListTile(leading: Icon(Icons.arrow_right_rounded, color: s.onSurfaceVariant), title: Text(r)),
+              ]),
             ),
-          ),
           if (_notice != null)
             Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(_notice!, style: TextStyle(color: t.colorScheme.onSurfaceVariant)),
+              padding: const EdgeInsets.only(top: Gap.sm),
+              child: Text(_notice!, style: t.textTheme.bodySmall?.copyWith(color: s.onSurfaceVariant)),
             ),
-          const SizedBox(height: Gap.item),
-          FilledButton.tonalIcon(
-            onPressed: () => showReportIssueSheet(context),
-            icon: const Icon(Icons.report_problem_outlined),
-            label: const Text('Report pain / tell your coach'),
-          ),
-          const _Limitations(),
-          if (_loading && i == null)
-            const Padding(padding: EdgeInsets.all(48), child: Center(child: CircularProgressIndicator())),
-          if (_loading && i != null) const LinearProgressIndicator(),
-          if (i != null) ...[
-            const SectionTitle('Summary'),
-            Card(child: Padding(padding: const EdgeInsets.all(16), child: Text(i.summary, style: t.textTheme.bodyLarge))),
-            if (i.highlights.isNotEmpty) ...[
-              const SectionTitle('Highlights'),
-              Card(
-                child: Column(children: [
-                  for (final h in i.highlights)
-                    ListTile(leading: Icon(Icons.trending_up, color: t.colorScheme.primary), title: Text(h)),
-                ]),
-              ),
-            ],
-            if (i.recommendations.isNotEmpty) ...[
-              const SectionTitle('Recommendations'),
-              Card(
-                child: Column(children: [
-                  for (final r in i.recommendations)
-                    ListTile(leading: Icon(Icons.lightbulb_outline, color: t.colorScheme.gold), title: Text(r)),
-                ]),
-              ),
-            ],
-            if (i.nextFocus.isNotEmpty) ...[
-              const SectionTitle('Next focus'),
-              Card(
-                color: t.colorScheme.primaryContainer,
-                child: ListTile(
-                  leading: Icon(Icons.flag_rounded, color: t.colorScheme.onPrimaryContainer),
-                  title: Text(i.nextFocus,
-                      style: TextStyle(color: t.colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600)),
-                  subtitle: i.focusMuscles.isEmpty
-                      ? null
-                      : Padding(
-                          padding: const EdgeInsets.only(top: Gap.sm),
-                          child: Wrap(spacing: 6, runSpacing: 6, children: [
-                            for (final m in i.focusMuscles)
-                              Pill(trackedMuscles[m]?.label ?? prettyMuscle(m), color: t.colorScheme.onPrimaryContainer),
-                          ]),
-                        ),
-                ),
-              ),
-            ],
+          const SizedBox(height: Gap.md),
+          _Actions(children: [
+            FilledButton.tonalIcon(
+              style: _compact,
+              onPressed: () => showReportPain(context),
+              icon: const Icon(Icons.healing_outlined),
+              label: const Text('Report pain', maxLines: 1),
+            ),
+            FilledButton.tonalIcon(
+              style: _compact,
+              onPressed: () => showTellCoach(context),
+              icon: const Icon(Icons.edit_note),
+              label: const Text('Tell your coach', maxLines: 1),
+            ),
+          ]),
+          if (injuries) ...[
+            const SectionTitle('Active injuries'),
+            const ActiveInjuries(),
           ],
-          const SectionTitle('Coach tools'),
-          Card(
-            child: Column(children: [
-              ListTile(
-                leading: const Icon(Icons.event_note),
-                title: const Text('Plan / regenerate next workout'),
-                subtitle: const Text('Open your next workout and use the menu to ask the AI coach'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => StatefulNavigationShell.maybeOf(context)?.goBranch(0),
+          if (i != null && (i.summary.isNotEmpty || i.highlights.isNotEmpty)) ...[
+            const SizedBox(height: Gap.md),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: ExpansionTile(
+                shape: const Border(),
+                title: const Text('Review', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(i.source == 'ai'
+                    ? 'From your coach${i.generatedAt == null ? '' : ', ${DateFormat('d MMM HH:mm').format(i.generatedAt!.toLocal())}'}'
+                    : 'From this phone'),
+                expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                childrenPadding: const EdgeInsets.fromLTRB(Gap.md, 0, Gap.md, Gap.md),
+                children: [
+                  Text(i.summary),
+                  for (final h in i.highlights)
+                    Padding(
+                      padding: const EdgeInsets.only(top: Gap.sm),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Icon(Icons.trending_up, size: 20, color: s.primary),
+                        const SizedBox(width: Gap.sm),
+                        Expanded(child: Text(h)),
+                      ]),
+                    ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.fitness_center),
-                title: const Text('Equipment in my gym'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/equipment'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.thumbs_up_down_outlined),
-                title: const Text('Exercise preferences'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/library'),
-              ),
-            ]),
-          ),
-          if (_usage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              'AI usage: ${_usage!['callsToday']}/${_usage!['dailyCallLimit']} calls today · '
-              '${((_usage!['tokensThisMonth'] as num) / 1000).toStringAsFixed(0)}k of '
-              '${((_usage!['monthlyTokenLimit'] as num) / 1000).toStringAsFixed(0)}k tokens this month',
-              style: t.textTheme.bodySmall,
-              textAlign: TextAlign.center,
             ),
           ],
         ]),
       ),
     );
   }
+}
+
+/// Two buttons side by side when they fit, otherwise stacked.
+class _Actions extends StatelessWidget {
+  const _Actions({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, c) => c.maxWidth / MediaQuery.textScalerOf(context).scale(1) >= 345
+            ? Row(spacing: Gap.item, children: [for (final w in children) Expanded(child: w)])
+            : Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: Gap.sm, children: children),
+      );
 }

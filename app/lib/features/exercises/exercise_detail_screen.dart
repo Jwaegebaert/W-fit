@@ -10,6 +10,7 @@ import '../../providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/equipment_sheet.dart';
 import '../../widgets/exercise_visuals.dart';
+import '../../widgets/preference_sheet.dart';
 import '../settings/equipment_screen.dart' show showBarWeightDialog;
 
 class ExerciseDetailScreen extends ConsumerWidget {
@@ -24,8 +25,8 @@ class ExerciseDetailScreen extends ConsumerWidget {
       final name = ref.read(catalogProvider).equipmentById(e.bar!)?.name ?? 'Bar';
       String fmt(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
       return bar > 0
-          ? ('Bar: ${fmt(bar)} kg', 'Log only the plates (both sides together). Your stats add the ${fmt(bar)} kg bar. Tap to change.')
-          : ('Bar weight not set', '$name bars differ per gym. Tap to set it; log only the plates.');
+          ? ('Bar: ${fmt(bar)} kg', 'Log only the plates, both sides together.')
+          : ('Bar weight not set', '$name bars differ per gym. Tap to set yours.');
     }
     return switch (e.load) {
       LoadType.assist => ('Assisted machine', 'Log the assistance. More kg makes it easier, so you progress by lowering it.'),
@@ -46,29 +47,56 @@ class ExerciseDetailScreen extends ConsumerWidget {
     final kind = ExerciseKind.of(e, catalog);
     final gear = e.equipment.where((id) => !(catalog.equipmentById(id)?.alwaysAvailable ?? false)).toList();
 
+    final preference = ref.watch(preferencesProvider).value?[e.id] ?? 'neutral';
+    // During a workout the plan's own sets and reps count, not the catalog's.
+    final training = ref.watch(activeSessionProvider).value != null;
+
     return Scaffold(
-      appBar: AppBar(title: Text(_categoryLabel(e.category))),
+      appBar: AppBar(
+        title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            tooltip: 'Like or exclude',
+            icon: Icon(
+              preferenceChoices[preference]?.$3 ?? Icons.thumbs_up_down_outlined,
+              color: preference == 'neutral' ? null : s.primary,
+            ),
+            onPressed: () => showPreferenceSheet(context, e),
+          ),
+        ],
+      ),
       body: ListView(padding: pagePadding(context), children: [
         ExerciseDemo(exercise: e),
-        const SizedBox(height: Gap.md),
-        Text(e.name, style: t.textTheme.headlineSmall),
         const SizedBox(height: Gap.sm),
+        // Only a long name that the app bar cuts off is repeated in full.
+        if (e.name.length > 22) ...[
+          Text(e.name, style: t.textTheme.titleLarge),
+          const SizedBox(height: Gap.sm),
+        ],
         Wrap(spacing: Gap.sm, runSpacing: Gap.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
           _KindLabel(kind),
-          if (e.unilateral) Pill('Each side', color: s.tertiary, icon: Icons.swap_horiz_rounded),
+          if (e.unilateral) Pill('Each side', color: s.secondary, icon: Icons.swap_horiz_rounded),
+          TextButton.icon(
+            onPressed: () => launchUrl(
+              Uri.https('www.youtube.com', '/results', {'search_query': '${e.name} exercise proper form'}),
+              mode: LaunchMode.externalApplication,
+            ),
+            icon: const Icon(Icons.play_circle_outline),
+            label: const Text('Watch a demo'),
+          ),
         ]),
-        const SizedBox(height: Gap.md),
-        _FactsStrip(exercise: e),
+        if (!training) ...[
+          const SizedBox(height: Gap.sm),
+          _FactsStrip(exercise: e),
+        ],
         if (_loadNote(e, ref) case final note?) ...[
           const SizedBox(height: Gap.sm),
           Card(
-            color: s.secondaryContainer,
             child: ListTile(
-              leading: Icon(e.bar != null ? Icons.horizontal_rule_rounded : Icons.info_outline,
-                  color: s.onSecondaryContainer),
-              title: Text(note.$1, style: TextStyle(color: s.onSecondaryContainer, fontWeight: FontWeight.w700)),
-              subtitle: Text(note.$2, style: TextStyle(color: s.onSecondaryContainer)),
-              trailing: e.bar != null ? Icon(Icons.edit_outlined, color: s.onSecondaryContainer) : null,
+              leading: Icon(e.bar != null ? Icons.horizontal_rule_rounded : Icons.info_outline),
+              title: Text(note.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(note.$2),
+              trailing: e.bar != null ? const Icon(Icons.edit_outlined) : null,
               onTap: e.bar != null ? () => showBarWeightDialog(context, ref, e.bar!) : null,
             ),
           ),
@@ -90,36 +118,17 @@ class ExerciseDetailScreen extends ConsumerWidget {
           const SizedBox(height: Gap.md),
           _BadmintonCard(e.badminton!),
         ],
-        const SizedBox(height: Gap.lg),
-        OutlinedButton.icon(
-          onPressed: () => launchUrl(
-            Uri.https('www.youtube.com', '/results', {'search_query': '${e.name} exercise proper form'}),
-            mode: LaunchMode.externalApplication,
-          ),
-          icon: const Icon(Icons.play_circle_outline),
-          label: const Text('Watch a demo'),
-        ),
         if (e.category == 'strength' || e.category == 'power') ...[
-          const SizedBox(height: Gap.sm),
+          const SizedBox(height: Gap.lg),
           FilledButton.tonalIcon(
             onPressed: () => context.push('/progress/${e.id}'),
             icon: const Icon(Icons.show_chart),
             label: const Text('See my progress'),
           ),
         ],
-        _PreferencePicker(exerciseId: e.id),
       ]),
     );
   }
-
-  static String _categoryLabel(String c) => switch (c) {
-        'warmup' => 'Warm-up',
-        'strength' => 'Strength',
-        'power' => 'Power',
-        'core' => 'Core',
-        'cooldown' => 'Mobility',
-        _ => c,
-      };
 }
 
 class _KindLabel extends StatelessWidget {
@@ -358,9 +367,8 @@ class _BadmintonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
-    final fg = t.colorScheme.onTertiaryContainer;
+    final fg = t.colorScheme.onSurface;
     return Card(
-      color: t.colorScheme.tertiaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -378,45 +386,5 @@ class _BadmintonCard extends StatelessWidget {
         ]),
       ),
     );
-  }
-}
-
-class _PreferencePicker extends ConsumerWidget {
-  const _PreferencePicker({required this.exerciseId});
-
-  final String exerciseId;
-
-  static const _hints = {
-    'liked': 'Liked: picked more often',
-    'neutral': 'Neutral: normal rotation',
-    'disliked': 'Disliked: picked less often',
-    'banned': 'Never: left out of your plans',
-  };
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pref = ref.watch(preferencesProvider).value?[exerciseId] ?? 'neutral';
-    final t = Theme.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const SectionTitle('Your preference'),
-      SegmentedButton<String>(
-        expandedInsets: EdgeInsets.zero,
-        segments: const [
-          ButtonSegment(value: 'liked', icon: Icon(Icons.thumb_up_outlined), tooltip: 'Like'),
-          ButtonSegment(value: 'neutral', icon: Icon(Icons.thumbs_up_down_outlined), tooltip: 'Neutral'),
-          ButtonSegment(value: 'disliked', icon: Icon(Icons.thumb_down_outlined), tooltip: 'Dislike'),
-          ButtonSegment(value: 'banned', icon: Icon(Icons.block), tooltip: 'Never'),
-        ],
-        selected: {pref},
-        showSelectedIcon: false,
-        onSelectionChanged: (s) => ref.read(repositoryProvider).setPreference(exerciseId, s.first),
-      ),
-      const SizedBox(height: Gap.sm),
-      Text(
-        _hints[pref] ?? '',
-        textAlign: TextAlign.center,
-        style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
-      ),
-    ]);
   }
 }

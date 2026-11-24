@@ -7,6 +7,7 @@ import 'package:wfit/data/repositories/repository.dart';
 import 'package:wfit/domain/catalog.dart';
 import 'package:wfit/domain/plan.dart';
 import 'package:wfit/domain/progression.dart';
+import 'package:wfit/features/workout/section_checklist.dart';
 import 'package:wfit/features/workout/session_screen.dart';
 import 'package:wfit/providers.dart';
 import 'package:wfit/router.dart';
@@ -37,8 +38,10 @@ void main() {
     await settle(tester, frames: 14);
   }
 
-  Future<void> openCard(WidgetTester tester, String id) =>
-      tap(tester, find.descendant(of: card(id), matching: find.byType(InkWell)).first);
+  Future<void> openCard(WidgetTester tester, String id) async {
+    if (open(tester) == id) return;
+    await tap(tester, find.descendant(of: card(id), matching: find.byType(InkWell)).first);
+  }
 
   /// Starts a workout with a warm-up, three lifts and returns its id.
   Future<(ProviderContainer, Repository, String)> start(WidgetTester tester) async {
@@ -89,7 +92,7 @@ void main() {
     await unpumpWFit(tester);
   });
 
-  testWidgets('a weighted set is not logged without weight; bodyweight and warm-up sets are', (tester) async {
+  testWidgets('a weighted set is not logged without weight; bodyweight sets are', (tester) async {
     final (_, repo, session) = await start(tester);
     await openCard(tester, press);
     await tap(tester, tick(press, 1));
@@ -105,14 +108,10 @@ void main() {
     await openCard(tester, dip);
     await tap(tester, tick(dip, 1));
     expect((await logged(tester, repo, session, dip)).single.weightKg, isNull);
-
-    await openCard(tester, warmup);
-    await tap(tester, tick(warmup, 1));
-    expect(await logged(tester, repo, session, warmup), hasLength(1));
     await unpumpWFit(tester);
   });
 
-  testWidgets('the reps field and the Aim chip show what a tick logs', (tester) async {
+  testWidgets('the reps field and the aim show what a tick logs', (tester) async {
     final (_, repo, session) = await start(tester);
     await openCard(tester, press);
     final hint = tester.widget<TextField>(fields(press).at(1)).decoration!.hintText!;
@@ -125,24 +124,23 @@ void main() {
 
   testWidgets('after a card opened by hand is done, the next unfinished one opens and scrolls into view', (tester) async {
     await start(tester);
-    expect(open(tester), warmup);
-    await openCard(tester, press);
-    await tester.enterText(fields(press).at(0), '40');
+    expect(open(tester), press, reason: 'warm-up is a list, not a card');
+    await openCard(tester, bench);
+    await tester.enterText(fields(bench).at(0), '40');
     for (var n = 1; n <= 3; n++) {
-      expect(open(tester), press);
-      await tap(tester, tick(press, n));
+      expect(open(tester), bench);
+      await tap(tester, tick(bench, n));
     }
-    expect(open(tester), bench, reason: 'not back to the skipped warm-up');
-    final rect = tester.getRect(card(bench));
-    expect(rect.top, greaterThanOrEqualTo(statusBarHeight));
+    expect(open(tester), dip, reason: 'the next one below, not the skipped first');
+    final rect = tester.getRect(card(dip));
+    expect(rect.top, greaterThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom - 0.5));
     expect(rect.bottom, lessThanOrEqualTo(contentLimit(tester)));
 
     // The last exercise in the list is followed by what was skipped.
-    await openCard(tester, dip);
     for (var n = 1; n <= 3; n++) {
       await tap(tester, tick(dip, n));
     }
-    expect(open(tester), warmup);
+    expect(open(tester), press);
     await unpumpWFit(tester);
   });
 
@@ -154,7 +152,7 @@ void main() {
       expect(open(tester), dip);
       await tap(tester, tick(dip, n));
     }
-    expect(open(tester), warmup);
+    expect(open(tester), press);
     await unpumpWFit(tester);
   });
 
@@ -192,11 +190,10 @@ void main() {
     Navigator.of(tester.element(find.byType(BottomSheet))).pop();
     await settle(tester, frames: 10);
 
-    await openCard(tester, warmup); // closes the card that was open
-    await openCard(tester, warmup);
-    await tap(tester, tick(warmup, 1));
+    await openCard(tester, dip);
+    await tap(tester, tick(dip, 1));
     await tap(tester, find.text('Finish'));
-    expect(find.text('9 of 10 sets are not ticked.'), findsOneWidget);
+    expect(find.text('8 of 9 sets are not ticked.'), findsOneWidget, reason: 'the warm-up does not count');
     await tap(tester, find.text('Save workout'));
     await settle(tester, frames: 20);
     final saved = (await pumpUntil(tester, () => repo.sessionById(session)))!;
@@ -218,6 +215,7 @@ void main() {
   testWidgets('swap: nothing lasting happens unless it is chosen', (tester) async {
     final (_, repo, _) = await start(tester);
     bool selected(String label) => tester.widget<FilterChip>(find.widgetWithText(FilterChip, label)).selected;
+    await openCard(tester, bench);
     await tap(tester, find.descendant(of: card(bench), matching: find.byTooltip('Swap exercise')));
     expect((selected('Barbell & plates'), selected('Flat bench')), (true, true));
     await tap(tester, find.text('Not in my gym'));
@@ -229,6 +227,61 @@ void main() {
     expect(await pumpUntil(tester, () => repo.getPreferences()), isEmpty);
     expect((await pumpUntil(tester, () => repo.getEquipment())).values.where((v) => !v), isEmpty);
     expect(card(bench), findsNothing);
+    await unpumpWFit(tester);
+  });
+
+  testWidgets('warm-up lines are ticked off one by one or all at once', (tester) async {
+    final (_, repo, session) = await start(tester);
+    final list = find.byType(SectionChecklist);
+    final name = catalog.exercise(warmup)!.name;
+    await tap(tester, find.descendant(of: list, matching: find.byTooltip('Done: $name')));
+    final sets = await logged(tester, repo, session, warmup);
+    expect(sets, hasLength(catalog.exercise(warmup)!.sets));
+    expect(sets.first.durationSeconds, catalog.exercise(warmup)!.durationSeconds);
+    expect(open(tester), press, reason: 'the open card stays');
+
+    await tap(tester, find.descendant(of: list, matching: find.byTooltip('Undo $name')));
+    expect(await logged(tester, repo, session, warmup), isEmpty);
+    await tap(tester, find.text('All done'));
+    expect(await logged(tester, repo, session, warmup), hasLength(sets.length));
+    expect(find.text('All done'), findsNothing);
+    await unpumpWFit(tester);
+  });
+
+  testWidgets('− and + change the set to do now in the steps of the exercise', (tester) async {
+    final (_, repo, session) = await start(tester);
+    await openCard(tester, press);
+    final step = catalog.exercise(press)!.incrementKg;
+    await tap(tester, find.descendant(of: card(press), matching: find.byTooltip('More weight')));
+    await tap(tester, find.descendant(of: card(press), matching: find.byTooltip('More weight')));
+    final target = int.parse(tester.widget<TextField>(fields(press).at(1)).decoration!.hintText!);
+    await tap(tester, find.descendant(of: card(press), matching: find.byTooltip('Less reps')));
+    expect(text(tester, fields(press).at(2)), formatKg(step * 2), reason: 'the later sets follow');
+    await tap(tester, tick(press, 1));
+    final set = (await logged(tester, repo, session, press)).single;
+    expect((set.weightKg, set.reps), (step * 2, target - 1));
+    await unpumpWFit(tester);
+  });
+
+  testWidgets('a logged set can be corrected later', (tester) async {
+    final (_, repo, session) = await start(tester);
+    await openCard(tester, dip);
+    await tap(tester, tick(dip, 1));
+    await pumpUntil(tester, () async {
+      await repo.finishSession(session);
+      return 1;
+    });
+    router.go('/');
+    router.push('/history/$session');
+    await settle(tester, frames: 25);
+    await tap(tester, find.text(catalog.exerciseName(dip)));
+    await tester.enterText(find.descendant(of: find.byType(BottomSheet), matching: find.byType(TextField)).last, '4');
+    await tap(tester, find.text('Save'));
+    expect((await logged(tester, repo, session, dip)).single.reps, 4);
+    await tap(tester, find.text(catalog.exerciseName(dip)));
+    await tap(tester, find.byTooltip('Remove set 1'));
+    await tap(tester, find.text('Save and remove 1'));
+    expect(await logged(tester, repo, session, dip), isEmpty);
     await unpumpWFit(tester);
   });
 

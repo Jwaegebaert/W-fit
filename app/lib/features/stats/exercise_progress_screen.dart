@@ -45,7 +45,6 @@ class ExerciseProgressScreen extends ConsumerWidget {
               .map((p) => p.map((s) => estimatedOneRepMax(s.loadKg ?? 0, s.reps ?? 0)).fold<double>(0, math.max))
               .toList();
           final top = points.map((p) => p.map((s) => s.loadKg ?? 0).fold<double>(0, math.max)).toList();
-          final volume = points.map((p) => p.fold<double>(0, (a, s) => a + s.volume)).toList();
           final reps = points.map((p) => p.map((s) => (s.reps ?? 0).toDouble()).fold<double>(0, math.max)).toList();
           final best = computeBests(sets)[exerciseId];
           final first = weighted ? e1rm.first : reps.first;
@@ -56,35 +55,22 @@ class ExerciseProgressScreen extends ConsumerWidget {
           return ListView(padding: pagePadding(context), children: [
             StatRow(children: [
               StatTile(
-                label: weighted ? 'best e1RM' : 'best reps',
+                label: weighted ? 'est. 1-rep max' : 'best reps',
                 value: weighted ? '${formatKg(best?.bestE1rm)} kg' : '${best?.mostReps?.reps ?? 0}',
                 icon: Icons.emoji_events_outlined,
                 color: t.colorScheme.gold,
               ),
-              StatTile(
-                label: 'since first session',
-                value: '${change >= 0 ? '+' : ''}${change.toStringAsFixed(0)}%',
-                icon: change >= 0 ? Icons.trending_up : Icons.trending_down,
-              ),
+              if (points.length > 2)
+                StatTile(
+                  label: 'since first session',
+                  value: '${change >= 0 ? '+' : ''}${change.toStringAsFixed(0)}%',
+                  icon: change >= 0 ? Icons.trending_up : Icons.trending_down,
+                ),
               StatTile(label: 'sessions', value: '${points.length}', icon: Icons.event_repeat),
             ]),
             if (weighted) ...[
-              const SectionTitle('Estimated 1-rep max'),
-              Card(child: Padding(padding: const EdgeInsets.fromLTRB(8, 16, 16, 8), child: TrendLineChart(values: e1rm, labels: labels, unit: ' kg'))),
-              const SectionTitle('Top set weight'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-                  child: TrendLineChart(values: top, labels: labels, unit: ' kg', color: t.colorScheme.tertiary),
-                ),
-              ),
-              const SectionTitle('Volume per session'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
-                  child: TrendLineChart(values: volume, labels: labels, unit: ' kg', color: t.colorScheme.secondary, minYZero: true),
-                ),
-              ),
+              const SizedBox(height: Gap.md),
+              _WeightChart(e1rm: e1rm, top: top, labels: labels),
             ] else ...[
               const SectionTitle('Best set (reps)'),
               Card(child: Padding(padding: const EdgeInsets.fromLTRB(8, 16, 16, 8), child: TrendLineChart(values: reps, labels: labels))),
@@ -107,6 +93,38 @@ class ExerciseProgressScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// One chart, either the estimated one-rep max or the heaviest set.
+class _WeightChart extends StatefulWidget {
+  const _WeightChart({required this.e1rm, required this.top, required this.labels});
+
+  final List<double> e1rm;
+  final List<double> top;
+  final List<String> labels;
+
+  @override
+  State<_WeightChart> createState() => _WeightChartState();
+}
+
+class _WeightChartState extends State<_WeightChart> {
+  bool _topSet = true;
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        OptionBar<bool>(
+          options: const {true: 'Heaviest set', false: 'Est. 1-rep max'},
+          selected: _topSet,
+          onSelected: (v) => setState(() => _topSet = v),
+        ),
+        const SizedBox(height: Gap.sm),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
+            child: TrendLineChart(values: _topSet ? widget.top : widget.e1rm, labels: widget.labels, unit: ' kg'),
+          ),
+        ),
+      ]);
 }
 
 String formatKgOrDash(int? v) => v == null ? '–' : '${v}s';

@@ -35,8 +35,7 @@ void main() {
     await settle(tester);
 
     debugPrint('STEP dashboard');
-    expect(find.text('Start workout'), findsOneWidget);
-    expect(find.text('Smart plan'), findsOneWidget);
+    expect(find.byKey(const ValueKey('start-workout')), findsOneWidget);
 
     debugPrint('STEP plan preview');
     await tester.tap(find.text('View plan'));
@@ -48,7 +47,7 @@ void main() {
     await settle(tester);
 
     debugPrint('STEP start workout');
-    await tester.tap(find.text('Start workout'));
+    await tester.tap(find.byKey(const ValueKey('start-workout')));
     await settle(tester);
     expect(find.text('Finish'), findsOneWidget);
 
@@ -63,32 +62,33 @@ void main() {
     await settle(tester);
     await tester.tap(find.text('Save workout'));
     await settle(tester, frames: 30);
-    expect(find.text('Workout saved!'), findsOneWidget);
-    await tester.tap(find.text('Done'));
-    await settle(tester);
-
-    debugPrint('STEP history');
-    await tester.tap(find.text('History'));
-    await settle(tester);
-    expect(find.textContaining('sets ·'), findsOneWidget);
+    expect(find.text('Workout saved'), findsOneWidget);
 
     debugPrint('STEP progress');
     await tester.tap(find.text('Progress'));
     await settle(tester);
-    expect(find.text('workouts total'), findsOneWidget);
+    expect(find.text('Consistency'), findsOneWidget);
+
+    debugPrint('STEP history');
+    await tester.tap(find.text('All'));
+    await settle(tester);
+    expect(find.text('Workouts'), findsOneWidget);
+    expect(find.textContaining('1 set'), findsOneWidget);
+    await tester.pageBack();
+    await settle(tester);
 
     debugPrint('STEP balance');
     await tester.scrollUntilVisible(find.text('Muscle balance'), 300, scrollable: find.byType(Scrollable).first);
     await tester.tap(find.text('Muscle balance'));
     await settle(tester);
-    expect(find.text('8-week balance'), findsOneWidget);
+    expect(find.text('Last 8 weeks'), findsOneWidget);
     await tester.pageBack();
     await settle(tester);
 
     debugPrint('STEP coach');
     await tester.tap(find.text('Coach'));
     await settle(tester);
-    expect(find.text('Your training coach'), findsOneWidget);
+    expect(find.text('Do next'), findsOneWidget);
 
     debugPrint('STEP done');
     await tester.pumpWidget(const SizedBox());

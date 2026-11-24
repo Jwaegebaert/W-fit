@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/api/api_client.dart';
 import '../../providers.dart';
@@ -29,7 +30,7 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     super.dispose();
   }
 
-  Future<void> _test({bool save = false}) async {
+  Future<void> _connect() async {
     setState(() {
       _testing = true;
       _failed = false;
@@ -40,13 +41,11 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     try {
       await api.health();
       final usage = await api.usage(); // Validates the API key too.
-      if (save) {
-        await ref.read(apiConfigProvider.notifier).save(config);
-        ref.read(syncControllerProvider.notifier).syncNow();
-      }
+      await ref.read(apiConfigProvider.notifier).save(config);
+      ref.read(syncControllerProvider.notifier).syncNow();
       setState(() {
         _usage = usage;
-        _result = save ? 'Connected and saved. Syncing…' : 'Connection OK';
+        _result = 'Connected';
       });
     } on ApiException catch (e) {
       setState(() {
@@ -84,13 +83,16 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
     }
     final t = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Backend connection')),
+      appBar: AppBar(title: const Text('Cloud & coach')),
       body: ListView(padding: pagePadding(context), children: [
-        Text(
-          'W-fit works fully offline. Connect your Azure backend to back up your data and unlock the AI coach.',
-          style: t.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 16),
+        if (config?.isConfigured == true) ...[
+          const _SyncCard(),
+          const SectionTitle('Connection', padding: EdgeInsets.fromLTRB(4, 20, 4, 14)),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text('Optional: backs up your data and adds the coach.', style: t.textTheme.bodyMedium),
+          ),
         TextField(
           controller: _url,
           keyboardType: TextInputType.url,
@@ -110,29 +112,21 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Row(children: [
-          Expanded(
-            child: OutlinedButton(onPressed: _testing ? null : () => _test(), child: const Text('Test')),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FilledButton(
-              onPressed: _testing ? null : () => _test(save: true),
-              child: _testing
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Save & connect'),
-            ),
-          ),
-        ]),
+        FilledButton(
+          onPressed: _testing ? null : _connect,
+          child: _testing
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Connect'),
+        ),
         if (_result != null) ...[
           const SizedBox(height: 12),
           Text(_result!, style: TextStyle(color: _failed ? t.colorScheme.error : t.colorScheme.primary)),
         ],
         if (_usage != null) ...[
-          const SectionTitle('AI usage'),
+          const SectionTitle('Coach usage'),
           StatRow(children: [
             StatTile(
-              label: 'AI calls today',
+              label: 'calls today',
               value: '${_usage!['callsToday'] ?? 0}/${_usage!['dailyCallLimit'] ?? '–'}',
               icon: Icons.auto_awesome,
             ),
@@ -151,6 +145,39 @@ class _ConnectionScreenState extends ConsumerState<ConnectionScreen> {
           TextButton.icon(onPressed: _disconnect, icon: const Icon(Icons.link_off), label: const Text('Disconnect')),
         ],
       ]),
+    );
+  }
+}
+
+/// When the last sync was, what is waiting, and a button to sync now.
+class _SyncCard extends ConsumerWidget {
+  const _SyncCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sync = ref.watch(syncControllerProvider);
+    final s = Theme.of(context).colorScheme;
+    final failed = sync.error != null;
+    return Card(
+      child: ListTile(
+        leading: Icon(failed ? Icons.cloud_off_outlined : Icons.cloud_done_outlined, color: failed ? s.error : s.primary),
+        title: Text(failed
+            ? 'Last sync failed'
+            : sync.lastSync == null
+                ? 'Not synced yet'
+                : 'Synced ${DateFormat('d MMM HH:mm').format(sync.lastSync!)}'),
+        subtitle: Text(failed
+            ? 'Your changes are safe on this phone (${sync.pending} waiting)'
+            : sync.pending == 0
+                ? 'All changes uploaded'
+                : '${sync.pending} changes waiting'),
+        trailing: sync.syncing
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            : TextButton(
+                onPressed: () => ref.read(syncControllerProvider.notifier).syncNow(),
+                child: const Text('Sync now'),
+              ),
+      ),
     );
   }
 }

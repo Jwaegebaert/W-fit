@@ -19,6 +19,8 @@ import '../../widgets/report_issue_sheet.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../settings/equipment_screen.dart' show showBarWeightDialog;
 import 'coach_strip.dart';
+import 'section_checklist.dart';
+import 'set_tick.dart';
 import 'swap_sheet.dart';
 import 'workout_timer.dart';
 
@@ -64,14 +66,14 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     final i = _entries.indexWhere((e) => e.key == _openKey);
     if (i < 0) return;
     if (_entries[i].isDone(before) || !_entries[i].isDone(after)) return;
-    final next = [..._entries.skip(i + 1), ..._entries.take(i)].where((e) => !e.isDone(after)).firstOrNull?.key;
+    final next = [..._entries.skip(i + 1), ..._entries.take(i)].where((e) => e.isCard && !e.isDone(after)).firstOrNull?.key;
     setState(() {
       _expandedKey = next;
       _collapsed.remove(next);
     });
     if (next == null) return;
-    // After the finished card has folded, or the target would move while scrolling to it.
-    Future.delayed(const Duration(milliseconds: 250), () {
+    // After the finished card has folded (200 ms plus the frames around it), or the target would move meanwhile.
+    Future.delayed(const Duration(milliseconds: 400), () {
       final card = mounted ? _cardKeys[next]?.currentContext : null;
       if (card == null || !card.mounted) return;
       Scrollable.ensureVisible(card, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
@@ -98,25 +100,49 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     final day = DayType.parse(session.dayType);
     final usedIds = blocks.expand((b) => b.items).map((i) => i.exerciseId).toSet();
 
-    final totalSets = blocks.expand((b) => b.items).fold<int>(0, (s, i) => s + i.sets);
-    final doneSets = sets.where((s) => s.completed).length;
-
     // Determine which card is open: the user's choice or the one after the last finished, otherwise the first unfinished.
     var order = 0;
     _entries = [
       for (final b in blocks)
         for (final item in b.items)
-          _Entry(order++, item.exerciseId, item.sets + (_extraSets['${order - 1}:${item.exerciseId}'] ?? 0)),
+          _Entry(order++, item.exerciseId, b.section, item.sets + (_extraSets['${order - 1}:${item.exerciseId}'] ?? 0)),
     ];
-    final openKey = _openKey = _expandedKey ?? _entries.where((e) => !e.isDone(sets)).firstOrNull?.key;
+    // Progress counts the work; warm-up and cool-down are ticked off on the side.
+    final cards = _entries.where((e) => e.isCard).toList();
+    final totalSets = cards.fold<int>(0, (n, e) => n + e.sets);
+    final doneSets = cards.fold<int>(0, (n, e) => n + e.doneOf(sets));
+    final openKey = _openKey = _expandedKey ?? cards.where((e) => !e.isDone(sets)).firstOrNull?.key;
     final currentExerciseId = openKey?.substring(openKey.indexOf(':') + 1);
 
     final children = <Widget>[];
     order = 0;
     for (var b = 0; b < blocks.length; b++) {
       final block = blocks[b];
-      children.add(SectionTitle(block.section.label,
-          trailing: Icon(block.section.icon, color: block.section.color(Theme.of(context).colorScheme), size: 20)));
+      Future<void> swap(int i) async {
+        final changed = await showSwapSheet(
+          context,
+          plannedId: plan!.id,
+          blockIndex: b,
+          itemIndex: i,
+          exerciseId: block.items[i].exerciseId,
+          day: day,
+          section: block.section,
+          excludeIds: usedIds,
+        );
+        if (changed && mounted) setState(() => _expandedKey = null);
+      }
+
+      if (_Entry.isChecklist(block.section)) {
+        children.add(SectionChecklist(
+          sessionId: session.id,
+          section: block.section,
+          items: [for (final item in block.items) (order++, item)],
+          logged: sets,
+          onSwap: plan == null ? null : swap,
+        ));
+        continue;
+      }
+      children.add(SectionTitle(block.section.label));
       for (var i = 0; i < block.items.length; i++) {
         final item = block.items[i];
         final itemOrder = order++;
@@ -143,21 +169,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                 _expandedKey = key;
               }
             }),
-            onSwap: plan == null
-                ? null
-                : () async {
-                    final changed = await showSwapSheet(
-                      context,
-                      plannedId: plan.id,
-                      blockIndex: b,
-                      itemIndex: i,
-                      exerciseId: item.exerciseId,
-                      day: day,
-                      section: block.section,
-                      excludeIds: usedIds,
-                    );
-                    if (changed && mounted) setState(() => _expandedKey = null);
-                  },
+            onSwap: plan == null ? null : () => swap(i),
           ),
         ));
       }
@@ -173,15 +185,20 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             PopupMenuButton<String>(
               onSelected: (v) async {
                 if (v == 'discard') await _discard(session);
-                if (v == 'report' && context.mounted) {
-                  await showReportIssueSheet(context,
+                if (v == 'pain' && context.mounted) {
+                  await showReportPain(context,
+                      exerciseId: currentExerciseId, plannedId: plan?.id, sessionId: session.id);
+                }
+                if (v == 'tell' && context.mounted) {
+                  await showTellCoach(context,
                       exerciseId: currentExerciseId, plannedId: plan?.id, sessionId: session.id);
                 }
               },
               itemBuilder: (_) => const [
                 PopupMenuItem(
-                    value: 'report',
-                    child: ListTile(leading: Icon(Icons.report_problem_outlined), title: Text('Report an issue'))),
+                    value: 'pain', child: ListTile(leading: Icon(Icons.healing_outlined), title: Text('Report pain'))),
+                PopupMenuItem(
+                    value: 'tell', child: ListTile(leading: Icon(Icons.edit_note), title: Text('Tell your coach'))),
                 PopupMenuItem(value: 'discard', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Discard workout'))),
               ],
             ),
@@ -224,51 +241,56 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   }
 
   Future<void> _finish(WorkoutSession session, int doneSets, int totalSets) async {
-    final feedback = await showAppSheet<_Feedback>(context,
-        builder: (_) => _FinishSheet(doneSets: doneSets, totalSets: totalSets));
-    if (feedback == null || !mounted) return;
     final repo = ref.read(repositoryProvider);
+    final logged = (await repo.loggedSets())
+        .where((s) => s.section != Section.warmup.name && s.section != Section.cooldown.name);
+    final prs = detectPrs(
+        logged.where((s) => s.sessionId == session.id).toList(), logged.where((s) => s.sessionId != session.id));
+    if (!mounted) return;
+    final feedback = await showAppSheet<_Feedback>(
+      context,
+      builder: (_) => _FinishSheet(
+        minutes: DateTime.now().toUtc().difference(session.startedAt.toUtc()).inMinutes,
+        doneSets: doneSets,
+        totalSets: totalSets,
+        prs: prs,
+      ),
+    );
+    if (feedback == null || !mounted) return;
     ref.read(workoutTimerProvider.notifier).skip();
     await repo.finishSession(session.id, effort: feedback.effort, notes: feedback.notes);
-
-    final mine = await repo.loggedSets();
-    final current = mine.where((s) => s.sessionId == session.id).toList();
-    final previous = mine.where((s) => s.sessionId != session.id);
-    final prs = detectPrs(current, previous);
-    final volume = current.fold<double>(0, (s, x) => s + x.volume);
-    final duration = DateTime.now().toUtc().difference(session.startedAt.toUtc());
 
     ref.read(occupiedEquipmentProvider.notifier).clear();
     unawaited(ref.read(syncControllerProvider.notifier).syncNow());
     unawaited(ref.read(coachServiceProvider).pregenerateNext());
     unawaited(ref.read(healthSyncProvider).catchUp()); // save to Health Connect, read the watch's heart rate
     if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _SummaryDialog(
-        prs: prs,
-        sets: current.length,
-        volume: volume,
-        minutes: duration.inMinutes,
-        catalog: ref.read(catalogProvider),
-      ),
-    );
-    if (mounted) context.go('/');
+    showSnack(context, 'Workout saved');
+    context.go('/');
   }
 }
 
 /// One exercise of the running plan: how many sets it takes and whether they are done.
 class _Entry {
-  const _Entry(this.order, this.exerciseId, this.sets);
+  const _Entry(this.order, this.exerciseId, this.section, this.sets);
 
   final int order;
   final String exerciseId;
+  final Section section;
   final int sets;
 
   String get key => '$order:$exerciseId';
 
-  bool isDone(List<SetLog> logged) =>
-      logged.where((s) => s.exerciseOrder == order && s.exerciseId == exerciseId && s.completed).length >= sets;
+  /// Warm-up and cool-down are a list to tick off, the rest are cards to log sets on.
+  static bool isChecklist(Section s) => s == Section.warmup || s == Section.cooldown;
+  bool get isCard => !isChecklist(section);
+
+  int doneOf(List<SetLog> logged) {
+    final n = logged.where((s) => s.exerciseOrder == order && s.exerciseId == exerciseId && s.completed).length;
+    return n > sets ? sets : n;
+  }
+
+  bool isDone(List<SetLog> logged) => doneOf(logged) >= sets;
 }
 
 class _ElapsedClock extends StatefulWidget {
@@ -471,8 +493,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
       timer.start(name, secs, isWork: true, onDone: log);
       return;
     }
-    timer.start('$name · side 1', secs, isWork: true, onDone: () {
-      if (mounted) timer.start('$name · side 2', secs, isWork: true, onDone: log);
+    timer.start('Side 1 · $name', secs, isWork: true, onDone: () {
+      if (mounted) timer.start('Side 2 · $name', secs, isWork: true, onDone: log);
     });
   }
 
@@ -539,31 +561,37 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
         InkWell(
           onTap: widget.onToggle,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+            padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
             child: Row(children: [
               complete
-                  ? CircleAvatar(radius: 22, backgroundColor: t.colorScheme.primary, child: Icon(Icons.check, color: t.colorScheme.onPrimary))
-                  : ExerciseAvatar(exercise: e),
+                  ? CircleAvatar(radius: 18, backgroundColor: t.colorScheme.primary, child: Icon(Icons.check, size: 20, color: t.colorScheme.onPrimary))
+                  : ExerciseAvatar(exercise: e, size: 36),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(name, style: t.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 2),
                   Text(
-                    '${widget.item.copyWith(perSide: _perSide).targetLabel}'
-                    '${widget.item.targetWeightKg != null ? ' · ${_weightLabel(e, widget.item.targetWeightKg!)}' : ''}'
-                    ' · $done/${widget.item.sets} done',
-                    style: t.textTheme.bodySmall,
+                    [
+                      widget.item.copyWith(perSide: _perSide).targetLabel,
+                      // The open card has the weight in its fields.
+                      if (!widget.expanded && widget.item.targetWeightKg != null) '${formatKg(widget.item.targetWeightKg)} kg',
+                      if (!widget.expanded && done > 0 && !complete) '$done done',
+                    ].join(' · '),
+                    style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
                   ),
                 ]),
               ),
-              IconButton(
-                tooltip: 'How to',
-                icon: const Icon(Icons.info_outline),
-                onPressed: () => context.push('/exercise/${widget.item.exerciseId}'),
-              ),
-              if (widget.onSwap != null)
-                IconButton(tooltip: 'Swap exercise', icon: const Icon(Icons.swap_horiz), onPressed: widget.onSwap),
+              if (widget.expanded) ...[
+                IconButton(
+                  tooltip: 'How to',
+                  icon: const Icon(Icons.info_outline),
+                  onPressed: () => context.push('/exercise/${widget.item.exerciseId}'),
+                ),
+                if (widget.onSwap != null)
+                  IconButton(tooltip: 'Swap exercise', icon: const Icon(Icons.swap_horiz), onPressed: widget.onSwap),
+              ] else
+                const SizedBox(width: Gap.sm, height: Gap.tap),
             ]),
           ),
         ),
@@ -580,27 +608,27 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   Widget _buildBody(BuildContext context, Exercise? e, String name) {
     final t = Theme.of(context);
     final isTimed = widget.item.isTimed;
+    // The set to do now gets the − and + buttons.
+    final active = [for (var n = 1; n <= _rowCount; n++) n].where((n) => !(_loggedFor(n)?.completed ?? false)).firstOrNull;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         CoachStrip(
           item: widget.item,
           exercise: e,
-          loads: ref.watch(loadModelProvider),
           advice: _advice,
-          showProgress: widget.section == Section.main,
           fromCoach: widget.fromCoach,
           change: widget.change,
         ),
-        if (!isTimed && e?.bar != null) _barLine(e!),
+        if (!isTimed && e?.bar != null && ref.watch(loadModelProvider).barWeight(e!.bar!) <= 0) _barMissing(e),
         if (!isTimed)
           Padding(
             padding: const EdgeInsets.only(bottom: Gap.xs),
             child: DefaultTextStyle.merge(
               style: t.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: t.colorScheme.onSurfaceVariant),
               textAlign: TextAlign.center,
-              child: Row(children: [
-                const SizedBox(width: 36, child: Text('Set')),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                const SizedBox(width: _numberWidth),
                 if (_weightColumn(e)) ...[
                   Expanded(child: Text(_weightHeader(e))),
                   const SizedBox(width: Gap.sm),
@@ -610,20 +638,17 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
               ]),
             ),
           ),
-        if (isTimed && _perSide)
-          Padding(
-            padding: const EdgeInsets.only(bottom: Gap.xs),
-            child: Text('Each set: ${formatSeconds(widget.item.durationSeconds ?? 30)} per side, the timer runs both.',
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-          ),
-        for (var n = 1; n <= _rowCount; n++) isTimed ? _timedRow(n, name) : _repsRow(n, showWeight: _weightColumn(e)),
+        for (var n = 1; n <= _rowCount; n++) ...[
+          isTimed ? _timedRow(n, name) : _repsRow(n, showWeight: _weightColumn(e)),
+          if (!isTimed && n == active) _steppers(n, e, showWeight: _weightColumn(e)),
+        ],
         Wrap(spacing: Gap.sm, children: [
           TextButton.icon(
             onPressed: () {
               setState(() => _extraSets++);
               widget.onAddSet?.call();
             },
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, size: 20),
             label: const Text('Add set'),
           ),
           if (!isTimed && e?.load == LoadType.optional && !_weightColumn(e))
@@ -640,54 +665,87 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   String _weightHeader(Exercise? e) => switch (e?.load) {
         LoadType.assist => 'Assist kg',
         LoadType.optional => 'Extra kg',
-        _ => e?.bar != null ? 'Plates kg' : 'kg',
+        _ => e?.bar == null
+            ? 'kg'
+            : switch (ref.watch(loadModelProvider).barWeight(e!.bar!)) {
+                > 0 && final bar => 'Plates kg (+${formatKg(bar)} bar)',
+                _ => 'Plates kg',
+              },
       };
 
-  String _weightLabel(Exercise? e, double kg) => ref.watch(loadModelProvider).weightLabel(e, kg);
-
-  /// Bar exercises: reminds that only plates are logged and shows the bar weight (tap to change it).
-  Widget _barLine(Exercise e) {
+  /// Bar exercises whose bar weight is unknown (Smith machines): stats would be too low.
+  Widget _barMissing(Exercise e) {
     final t = Theme.of(context);
-    final loads = ref.watch(loadModelProvider);
-    final bar = loads.barWeight(e.bar!);
-    final barName = ref.read(catalogProvider).equipmentById(e.bar!)?.name ?? 'Bar';
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => showBarWeightDialog(context, ref, e.bar!),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: Gap.sm),
-        child: Row(children: [
-          Icon(Icons.horizontal_rule_rounded, size: 18, color: t.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              bar > 0
-                  ? 'Log plates only · ${barName.split(' ').first} bar ${formatKg(bar)} kg is added in your stats'
-                  : 'Log plates only · set your ${barName.toLowerCase()} bar weight (tap)',
-              style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
-            ),
-          ),
-          Icon(Icons.edit_outlined, size: 16, color: t.colorScheme.onSurfaceVariant),
-        ]),
-      ),
+    return TextButton.icon(
+      style: TextButton.styleFrom(foregroundColor: t.colorScheme.attention, padding: EdgeInsets.zero),
+      onPressed: () => showBarWeightDialog(context, ref, e.bar!),
+      icon: const Icon(Icons.error_outline_rounded, size: 18),
+      label: const Text('Set the bar weight'),
     );
+  }
+
+  static const _numberWidth = 28.0;
+
+  Widget _number(int n, {required bool done}) {
+    final t = Theme.of(context);
+    return SizedBox(
+      width: _numberWidth,
+      child: Text('$n',
+          style: t.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700, color: done ? t.colorScheme.primary : t.colorScheme.onSurfaceVariant)),
+    );
+  }
+
+  /// A logged set reads as plain text; it can still be corrected in place.
+  InputDecoration _cell(String hint, {required bool done}) => InputDecoration(
+        hintText: hint,
+        isDense: true,
+        fillColor: done ? Colors.transparent : null,
+      );
+
+  static void _selectAll(TextEditingController c) =>
+      c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+
+  void _stepWeight(int n, double by) {
+    final now = double.tryParse(_weight[n - 1].text.replaceAll(',', '.')) ?? 0;
+    final next = now + by;
+    _weight[n - 1].text = formatKg(next < 0 ? 0 : next);
+    _weightTyped(n);
+  }
+
+  void _stepReps(int n, int by) {
+    final next = (int.tryParse(_reps[n - 1].text) ?? _targetReps) + by;
+    setState(() => _reps[n - 1].text = '${next < 0 ? 0 : next}');
+    _updateIfLogged(n);
+  }
+
+  /// − and + under the fields of the set to do now.
+  Widget _steppers(int n, Exercise? e, {required bool showWeight}) {
+    final step = (e?.incrementKg ?? 0) > 0 ? e!.incrementKg : 2.5;
+    Widget pair(String what, VoidCallback less, VoidCallback more) => Expanded(
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+            IconButton(tooltip: 'Less $what', icon: const Icon(Icons.remove_rounded), onPressed: less),
+            IconButton(tooltip: 'More $what', icon: const Icon(Icons.add_rounded), onPressed: more),
+          ]),
+        );
+    return Row(children: [
+      const SizedBox(width: _numberWidth),
+      if (showWeight) ...[
+        pair('weight', () => _stepWeight(n, -step), () => _stepWeight(n, step)),
+        const SizedBox(width: 8),
+      ],
+      pair('reps', () => _stepReps(n, -1), () => _stepReps(n, 1)),
+      const SizedBox(width: 8 + Gap.tap),
+    ]);
   }
 
   Widget _repsRow(int n, {required bool showWeight}) {
     final log = _loggedFor(n);
     final done = log?.completed ?? false;
-    final s = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(children: [
-        SizedBox(
-          width: 36,
-          child: CircleAvatar(
-            radius: 13,
-            backgroundColor: done ? s.primary : s.surfaceContainerHighest,
-            child: Text('$n', style: TextStyle(fontSize: 12, color: done ? s.onPrimary : s.onSurface)),
-          ),
-        ),
+        _number(n, done: done),
         if (showWeight) ...[
           Expanded(
             child: TextField(
@@ -695,7 +753,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
               focusNode: _weightFocus[n - 1],
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
-              decoration: const InputDecoration(hintText: '–', isDense: true),
+              decoration: _cell('–', done: done),
+              onTap: () => _selectAll(_weight[n - 1]),
               onChanged: (_) => _weightTyped(n),
             ),
           ),
@@ -707,12 +766,13 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             // What a tick logs when nothing else is typed.
-            decoration: InputDecoration(hintText: '$_targetReps', isDense: true),
+            decoration: _cell('$_targetReps', done: done),
+            onTap: () => _selectAll(_reps[n - 1]),
             onChanged: (_) => _updateIfLogged(n),
           ),
         ),
         const SizedBox(width: 8),
-        _SetTick(set: n, done: done, onPressed: () => _tickReps(n, done: done)),
+        SetTick(label: done ? 'Undo set $n' : 'Log set $n', done: done, onPressed: () => _tickReps(n, done: done)),
       ]),
     );
   }
@@ -720,54 +780,23 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   Widget _timedRow(int n, String name) {
     final log = _loggedFor(n);
     final done = log?.completed ?? false;
-    final s = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(children: [
-        SizedBox(
-          width: 36,
-          child: CircleAvatar(
-            radius: 13,
-            backgroundColor: done ? s.primary : s.surfaceContainerHighest,
-            child: Text('$n', style: TextStyle(fontSize: 12, color: done ? s.onPrimary : s.onSurface)),
-          ),
+        _number(n, done: done),
+        Expanded(
+          child: Text('${formatSeconds(widget.item.durationSeconds ?? 30)}${_perSide ? ' / side' : ''}'),
         ),
-        Expanded(child: Text(formatSeconds(widget.item.durationSeconds ?? 30))),
         if (!done)
-          TextButton.icon(
+          FilledButton.tonalIcon(
+            style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
             onPressed: () => _startWork(n, name),
             icon: const Icon(Icons.play_arrow_rounded),
             label: const Text('Start'),
           ),
-        _SetTick(set: n, done: done, onPressed: () => _toggleSet(n, !done)),
+        const SizedBox(width: Gap.sm),
+        SetTick(label: done ? 'Undo set $n' : 'Log set $n', done: done, onPressed: () => _toggleSet(n, !done)),
       ]),
-    );
-  }
-}
-
-/// Logs or un-logs a set: an outlined circle until it is done, then filled.
-class _SetTick extends StatelessWidget {
-  const _SetTick({required this.set, required this.done, required this.onPressed});
-
-  final int set;
-  final bool done;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: Gap.tap,
-      child: IconButton(
-        tooltip: done ? 'Undo set $set' : 'Log set $set',
-        style: IconButton.styleFrom(
-          backgroundColor: done ? s.primary : Colors.transparent,
-          foregroundColor: done ? s.onPrimary : s.primary,
-          side: done ? null : BorderSide(color: s.outline, width: 1.5),
-        ),
-        onPressed: onPressed,
-        icon: const Icon(Icons.check),
-      ),
     );
   }
 }
@@ -794,11 +823,15 @@ class _BottomBar extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis),
           ),
           const SizedBox(width: Gap.sm),
-          FilledButton.icon(
-            onPressed: onFinish,
-            icon: const Icon(Icons.flag_rounded),
-            label: const Text('Finish'),
-          ),
+          // Quiet until the work is done: it is used once, the ticks all the time.
+          if (totalSets > 0 && doneSets < totalSets)
+            OutlinedButton(onPressed: onFinish, child: const Text('Finish'))
+          else
+            FilledButton.icon(
+              onPressed: onFinish,
+              icon: const Icon(Icons.flag_rounded),
+              label: const Text('Finish'),
+            ),
         ]),
       ]),
     );
@@ -885,17 +918,20 @@ class _Feedback {
   final String notes;
 }
 
-class _FinishSheet extends StatefulWidget {
-  const _FinishSheet({required this.doneSets, required this.totalSets});
+/// Result, records and how it felt; saving ends the workout.
+class _FinishSheet extends ConsumerStatefulWidget {
+  const _FinishSheet({required this.minutes, required this.doneSets, required this.totalSets, required this.prs});
 
+  final int minutes;
   final int doneSets;
   final int totalSets;
+  final List<PersonalRecord> prs;
 
   @override
-  State<_FinishSheet> createState() => _FinishSheetState();
+  ConsumerState<_FinishSheet> createState() => _FinishSheetState();
 }
 
-class _FinishSheetState extends State<_FinishSheet> {
+class _FinishSheetState extends ConsumerState<_FinishSheet> {
   /// Values on the 1–10 scale the program and the coach use (an average of 8.5 asks for a deload).
   static const _efforts = {4: 'Easy', 6: 'Moderate', 8: 'Hard', 9: 'Very hard', 10: 'Max'};
 
@@ -915,6 +951,25 @@ class _FinishSheetState extends State<_FinishSheet> {
       padding: sheetPadding(context),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Finish workout', style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+        const SizedBox(height: Gap.xs),
+        Text('${widget.minutes} min · ${widget.doneSets} set${widget.doneSets == 1 ? '' : 's'}',
+            style: t.textTheme.bodyLarge?.copyWith(color: t.colorScheme.onSurfaceVariant)),
+        for (final pr in widget.prs)
+          Padding(
+            padding: const EdgeInsets.only(top: Gap.sm),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.emoji_events_rounded, size: 20, color: t.colorScheme.gold),
+              const SizedBox(width: Gap.sm),
+              Expanded(
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(
+                      text: ref.read(catalogProvider).exerciseName(pr.exerciseId),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  TextSpan(text: '\n${pr.describe()}', style: t.textTheme.bodySmall),
+                ])),
+              ),
+            ]),
+          ),
         if (widget.doneSets < widget.totalSets) ...[
           const SizedBox(height: Gap.sm),
           Row(children: [
@@ -958,80 +1013,5 @@ class _FinishSheetState extends State<_FinishSheet> {
         ),
       ]),
     );
-  }
-}
-
-class _SummaryDialog extends StatelessWidget {
-  const _SummaryDialog({
-    required this.prs,
-    required this.sets,
-    required this.volume,
-    required this.minutes,
-    required this.catalog,
-  });
-
-  final List<PersonalRecord> prs;
-  final int sets;
-  final double volume;
-  final int minutes;
-  final Catalog catalog;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return AlertDialog(
-      scrollable: true,
-      icon: Icon(prs.isEmpty ? Icons.check_circle_rounded : Icons.emoji_events_rounded,
-          size: 48, color: prs.isEmpty ? t.colorScheme.primary : t.colorScheme.gold),
-      title: Text(prs.isEmpty ? 'Workout saved!' : 'New personal records!'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: Gap.md - 4, horizontal: Gap.xs),
-          decoration: BoxDecoration(
-            color: t.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(Gap.radiusMd),
-          ),
-          child: Row(children: [
-            Expanded(child: _SummaryStat(value: '$minutes', label: 'min')),
-            Expanded(child: _SummaryStat(value: '$sets', label: 'sets')),
-            Expanded(child: _SummaryStat(value: volume.toStringAsFixed(0), label: 'kg volume')),
-          ]),
-        ),
-        if (prs.isNotEmpty) ...[
-          const SizedBox(height: Gap.md),
-          for (final pr in prs)
-            ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.emoji_events_outlined, color: t.colorScheme.gold),
-              title: Text(catalog.exerciseName(pr.exerciseId), style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(pr.describe()),
-            ),
-        ],
-      ]),
-      actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Done'))],
-    );
-  }
-}
-
-class _SummaryStat extends StatelessWidget {
-  const _SummaryStat({required this.value, required this.label});
-
-  final String value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(value, style: t.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-      ),
-      FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(label, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant)),
-      ),
-    ]);
   }
 }
