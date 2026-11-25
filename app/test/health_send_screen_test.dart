@@ -18,6 +18,16 @@ void main() {
     final sessions = await pumpUntil(tester, () => container.read(repositoryProvider).completedSessions());
     expect(sessions, hasLength(3));
     bridge.refuse.add(sessions.last.id);
+    // The watch recorded the middle one.
+    final mid = sessions[1];
+    bridge.others = [
+      (
+        app: 'com.sec.android.app.shealth',
+        start: mid.startedAt.subtract(const Duration(minutes: 2)),
+        end: mid.endedAt!.add(const Duration(minutes: 2)),
+        cardio: false,
+      ),
+    ];
 
     await go(tester, '/settings/health/send');
     expect(tester.takeException(), isNull);
@@ -29,8 +39,8 @@ void main() {
     await tester.tap(find.text('Send 3'));
     await settle(tester, frames: 40);
 
-    expect(bridge.written, unorderedEquals(sessions.take(2).map((s) => s.id)));
-    expect(find.textContaining('2 workouts saved, 1 workout not accepted'), findsOneWidget);
+    expect(bridge.written, [sessions.first.id]);
+    expect(find.textContaining('1 workout saved, 1 workout left to your watch, 1 workout not accepted'), findsOneWidget);
     expect(find.text('Send 1'), findsOneWidget, reason: 'the refused one stays selected');
     expect(find.text('Select not sent (1)'), findsOneWidget);
     expect(tester.takeException(), isNull);

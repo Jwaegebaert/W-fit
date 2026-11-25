@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../data/db/database.dart';
 import '../../providers.dart';
+import '../../services/health_service.dart' show HealthOutcome;
 import '../../widgets/common.dart';
 
 /// Pick finished workouts to write to Health Connect, also ones that were sent before (they are replaced as an
@@ -20,8 +21,11 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
   List<WorkoutSession>? _sessions;
   final _selected = <String>{};
 
-  /// Session id → accepted by Health Connect, for the workouts sent from this screen.
-  final _results = <String, bool>{};
+  /// Session id → what happened, for the workouts sent from this screen.
+  final _results = <String, HealthOutcome>{};
+
+  /// Sessions another app recorded too.
+  Set<String> _covered = const {};
   bool _busy = false;
 
   @override
@@ -32,7 +36,14 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
 
   Future<void> _load() async {
     final sessions = await ref.read(repositoryProvider).completedSessions();
-    if (mounted) setState(() => _sessions = sessions);
+    final sync = ref.read(healthSyncProvider);
+    final covered = {for (final s in sessions) if (await sync.coveredApp(s.id) != null) s.id};
+    if (mounted) {
+      setState(() {
+        _sessions = sessions;
+        _covered = covered;
+      });
+    }
   }
 
   Future<void> _send() async {
@@ -41,23 +52,26 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
       _busy = true;
       _results.clear();
     });
-    final r = await ref.read(healthSyncProvider).send(chosen, onResult: (id, saved) {
-      if (mounted) setState(() => _results[id] = saved);
+    final r = await ref.read(healthSyncProvider).send(chosen, onResult: (id, outcome) {
+      if (mounted) setState(() => _results[id] = outcome);
     });
     await _load();
     if (!mounted) return;
     setState(() {
       _busy = false;
-      _selected.removeWhere((id) => _results[id] == true); // failed ones stay selected for another try
+      // Failed ones stay selected for another try.
+      _selected.removeWhere((id) => _results[id] == HealthOutcome.saved || _results[id] == HealthOutcome.covered);
     });
     String n(int count) => '$count workout${count == 1 ? '' : 's'}';
     showSnack(
       context,
       r.unavailable
           ? 'Health Connect can\'t be used right now.'
-          : r.failed == 0
-              ? '${n(r.changed)} saved to Health Connect'
-              : '${n(r.changed)} saved, ${n(r.failed)} not accepted',
+          : [
+              '${n(r.changed)} saved',
+              if (r.covered > 0) '${n(r.covered)} left to your watch',
+              if (r.failed > 0) '${n(r.failed)} not accepted',
+            ].join(', '),
     );
   }
 
@@ -71,7 +85,7 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    final unsent = [for (final s in sessions) if (s.healthExportedAt == null) s.id];
+    final unsent = [for (final s in sessions) if (s.healthExportedAt == null && !_covered.contains(s.id)) s.id];
     return Scaffold(
       appBar: AppBar(
         title: const Text('Send workouts'),
@@ -87,8 +101,8 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Text(
-                    'Sends to Health Connect; whether a workout then shows up is up to Samsung Health. Skip workouts you '
-                    'also recorded on your watch, or Samsung Health may list them twice.',
+                    'Sends to Health Connect; whether a workout then shows up is up to Samsung Health. Workouts your watch '
+                    'recorded at the same time are left out.',
                     style: TextStyle(color: t.colorScheme.onSecondaryContainer),
                   ),
                 ),
@@ -119,8 +133,9 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
                       subtitle: Text('${DateFormat('EEE d MMM · HH:mm').format(s.startedAt.toLocal())}\n${_status(s)}'),
                       isThreeLine: true,
                       secondary: switch (_results[s.id]) {
-                        true => Icon(Icons.check_circle, color: t.colorScheme.primary),
-                        false => Icon(Icons.error_outline, color: t.colorScheme.error),
+                        HealthOutcome.saved => Icon(Icons.check_circle, color: t.colorScheme.primary),
+                        HealthOutcome.covered => Icon(Icons.watch_outlined, color: t.colorScheme.tertiary),
+                        HealthOutcome.failed => Icon(Icons.error_outline, color: t.colorScheme.error),
                         null => null,
                       },
                     ),
@@ -140,7 +155,8 @@ class _HealthSendScreenState extends ConsumerState<HealthSendScreen> {
   }
 
   String _status(WorkoutSession s) {
-    if (_results[s.id] == false) return 'Health Connect did not accept it';
+    if (_results[s.id] == HealthOutcome.failed) return 'Health Connect did not accept it';
+    if (_covered.contains(s.id)) return 'Recorded by another app, not sent${s.avgHeartRate == null ? '' : ' · ${s.avgHeartRate} bpm'}';
     final at = s.healthExportedAt;
     final sent = at == null ? 'Not sent yet' : 'Saved to Health Connect ${DateFormat('d MMM HH:mm').format(at.toLocal())}';
     return s.avgHeartRate == null ? sent : '$sent · ${s.avgHeartRate} bpm';

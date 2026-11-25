@@ -19,6 +19,8 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
   HealthAvailability? _availability;
   bool _enabled = false;
   bool _access = false;
+  bool _calories = false;
+  bool _hasWeight = false;
   bool _busy = false;
 
   @override
@@ -45,11 +47,15 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
     final bridge = ref.read(healthBridgeProvider);
     final availability = await bridge.availability();
     final access = availability == HealthAvailability.available && await bridge.hasAccess();
+    final calories = access && await bridge.canWriteCalories();
+    final weight = await ref.read(repositoryProvider).latestBodyWeight();
     final enabled = await sync.isEnabled();
     if (mounted) {
       setState(() {
         _availability = availability;
         _access = access;
+        _calories = calories;
+        _hasWeight = weight != null;
         _enabled = enabled;
       });
     }
@@ -67,7 +73,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
         }
         await sync.setEnabled(true);
         final r = await sync.catchUp();
-        if (mounted) showSnack(context, r.changed + r.failed == 0 ? 'Connected' : 'Connected · ${_describe(r)}');
+        if (mounted) showSnack(context, r.changed + r.failed + r.covered == 0 ? 'Connected' : 'Connected · ${_describe(r)}');
       } else {
         await sync.setEnabled(false);
       }
@@ -75,6 +81,12 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
       await _refresh();
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _allowCalories() async {
+    await ref.read(healthBridgeProvider).requestAccess();
+    await _refresh();
+    if (mounted && !_calories) showSnack(context, 'Calories were not allowed in Health Connect.');
   }
 
   Future<void> _syncNow() async {
@@ -91,8 +103,9 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
     String n(int count) => '$count workout${count == 1 ? '' : 's'}';
     return [
       if (r.changed > 0) '${n(r.changed)} updated',
+      if (r.covered > 0) '${n(r.covered)} left to your watch',
       if (r.failed > 0) 'Health Connect did not accept ${n(r.failed)}',
-      if (r.changed + r.failed == 0) 'Nothing new',
+      if (r.changed + r.failed + r.covered == 0) 'Nothing new',
     ].join(' · ');
   }
 
@@ -157,14 +170,26 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with WidgetsBinding
           ),
           if (on) ...[
             const SectionTitle('What is shared'),
-            const Card(
+            Card(
               child: Column(children: [
-                ListTile(
+                const ListTile(
                   leading: Icon(Icons.upload_rounded),
                   title: Text('Workouts → Health Connect'),
-                  subtitle: Text('Each finished workout as a strength-training session (title, start and end).'),
+                  subtitle: Text('Each finished workout as a strength-training session (title, start and end). Left out when '
+                      'your watch recorded the same workout.'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.local_fire_department_outlined),
+                  title: const Text('Estimated calories'),
+                  subtitle: Text(!_calories
+                      ? 'Tap to allow. Estimated from your body weight and the duration.'
+                      : _hasWeight
+                          ? 'Added to workouts your watch did not record. An estimate from body weight and duration.'
+                          : 'Log your body weight first; W-fit needs it for the estimate.'),
+                  trailing: _calories ? Icon(Icons.check, color: t.colorScheme.primary) : const Icon(Icons.chevron_right),
+                  onTap: _calories || _busy ? null : _allowCalories,
+                ),
+                const ListTile(
                   leading: Icon(Icons.monitor_heart_outlined),
                   title: Text('Heart rate → W-fit'),
                   subtitle: Text('Read only for the time of each workout; average and max are shown in History.'),

@@ -233,13 +233,9 @@ class Repository {
   }
 
   // ---------------- Health Connect ----------------
-  /// Finished sessions since [since] that still need a Health Connect export or a heart-rate read.
+  /// Finished sessions since [since], newest first.
   Future<List<WorkoutSession>> sessionsForHealth(DateTime since) => (db.select(db.workoutSessions)
-        ..where((t) =>
-            t.deleted.equals(false) &
-            t.endedAt.isNotNull() &
-            t.startedAt.isBiggerOrEqualValue(since) &
-            (t.healthExportedAt.isNull() | t.avgHeartRate.isNull()))
+        ..where((t) => t.deleted.equals(false) & t.endedAt.isNotNull() & t.startedAt.isBiggerOrEqualValue(since))
         ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
       .get();
 
@@ -247,6 +243,11 @@ class Repository {
   Future<void> markHealthExported(String sessionId) =>
       (db.update(db.workoutSessions)..where((t) => t.id.equals(sessionId)))
           .write(WorkoutSessionsCompanion(healthExportedAt: Value(_now)));
+
+  /// The session is no longer in Health Connect (another app recorded the same workout). Local only.
+  Future<void> clearHealthExported(String sessionId) =>
+      (db.update(db.workoutSessions)..where((t) => t.id.equals(sessionId)))
+          .write(const WorkoutSessionsCompanion(healthExportedAt: Value(null)));
 
   Future<void> setSessionHeartRate(String sessionId, {required int avg, required int max}) =>
       (db.update(db.workoutSessions)..where((t) => t.id.equals(sessionId))).write(WorkoutSessionsCompanion(
