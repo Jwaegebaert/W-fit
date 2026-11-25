@@ -343,6 +343,7 @@ class Repository {
     int? durationSeconds,
     int? rir,
     required bool completed,
+    DateTime? at, // when it happened, for sets that arrive late from the watch
   }) =>
       db.into(db.setLogs).insertOnConflictUpdate(SetLogsCompanion.insert(
             id: id ?? newId(),
@@ -356,8 +357,8 @@ class Repository {
             durationSeconds: Value(durationSeconds),
             rir: Value(rir),
             completed: Value(completed),
-            completedAt: Value(completed ? _now : null),
-            updatedAt: _now,
+            completedAt: Value(completed ? (at ?? _now) : null),
+            updatedAt: at ?? _now,
             deleted: const Value(false),
             dirty: const Value(true),
           ));

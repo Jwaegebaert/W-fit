@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/theme.dart';
 import 'domain/catalog.dart';
+import 'features/watch/watch_sync.dart';
 import 'providers.dart';
 import 'router.dart';
 
@@ -40,6 +41,7 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
     });
     ref.read(healthSyncProvider).catchUp();
     ref.read(coachServiceProvider).convertLegacyPlans();
+    ref.read(watchSyncProvider).start();
   }
 
   @override
@@ -53,6 +55,7 @@ class _WFitAppState extends ConsumerState<WFitApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       ref.read(syncControllerProvider.notifier).syncNow(onlyIfStale: true);
       ref.read(healthSyncProvider).catchUp(); // the watch's heart rate may have arrived meanwhile
+      ref.read(watchSyncProvider).catchUp(); // sets logged on the watch while the app was asleep
     }
   }
 

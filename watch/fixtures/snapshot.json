@@ -1,0 +1,133 @@
+{
+  "v": 1,
+  "sessionId": "s1",
+  "title": "Push B",
+  "startedAt": 1700000000000,
+  "current": 1,
+  "exercises": [
+    {
+      "order": 0,
+      "id": "band-external-rotation",
+      "name": "Band External Rotation",
+      "section": "warmup",
+      "sectionLabel": "Warm-up",
+      "target": "2 × 12–15 / side",
+      "weightText": null,
+      "sets": 2,
+      "targetReps": 15,
+      "seconds": null,
+      "perSide": true,
+      "rest": 0,
+      "weightLabel": null,
+      "needsWeight": false,
+      "weight": null,
+      "step": 2.5,
+      "checklist": true,
+      "logged": []
+    },
+    {
+      "order": 1,
+      "id": "barbell-bench-press",
+      "name": "Barbell Bench Press",
+      "section": "main",
+      "sectionLabel": "Workout",
+      "target": "3 × 6–10",
+      "weightText": "40 kg plates (+20 bar)",
+      "sets": 3,
+      "targetReps": 7,
+      "seconds": null,
+      "perSide": false,
+      "rest": 120,
+      "weightLabel": "Plates kg",
+      "needsWeight": true,
+      "weight": 40,
+      "step": 2.5,
+      "checklist": false,
+      "logged": [
+        {
+          "set": 1,
+          "weight": 40,
+          "reps": 8,
+          "seconds": null,
+          "at": 1700000100000
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "id": "assisted-dip",
+      "name": "Assisted Dip",
+      "section": "main",
+      "sectionLabel": "Workout",
+      "target": "3 × 8–12",
+      "weightText": "25 kg assist",
+      "sets": 3,
+      "targetReps": 9,
+      "seconds": null,
+      "perSide": false,
+      "rest": 75,
+      "weightLabel": "Assist kg",
+      "needsWeight": true,
+      "weight": 25,
+      "step": 5,
+      "checklist": false,
+      "logged": []
+    },
+    {
+      "order": 3,
+      "id": "bar-dip",
+      "name": "Parallel Bar Dip",
+      "section": "main",
+      "sectionLabel": "Workout",
+      "target": "3 × 6–12",
+      "weightText": null,
+      "sets": 3,
+      "targetReps": 12,
+      "seconds": null,
+      "perSide": false,
+      "rest": 90,
+      "weightLabel": "Extra kg",
+      "needsWeight": false,
+      "weight": null,
+      "step": 2.5,
+      "checklist": false,
+      "logged": []
+    },
+    {
+      "order": 4,
+      "id": "side-plank",
+      "name": "Side Plank",
+      "section": "core",
+      "sectionLabel": "Core",
+      "target": "2 × 25s / side",
+      "weightText": null,
+      "sets": 2,
+      "targetReps": null,
+      "seconds": 25,
+      "perSide": true,
+      "rest": 20,
+      "weightLabel": null,
+      "needsWeight": false,
+      "weight": null,
+      "step": 2.5,
+      "checklist": false,
+      "logged": []
+    }
+  ],
+  "timer": {
+    "kind": "rest",
+    "owner": "phone",
+    "changedAt": 1700000100000,
+    "phases": [
+      {
+        "label": "Rest",
+        "seconds": 120,
+        "endsAt": 1700000220000
+      }
+    ],
+    "set": null
+  },
+  "acked": [
+    "e1"
+  ]
+}

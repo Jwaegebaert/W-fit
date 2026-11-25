@@ -28,6 +28,9 @@ enum Section {
   static Section parse(String value) =>
       Section.values.firstWhere((s) => s.name == value, orElse: () => Section.main);
 
+  /// Warm-up and cool-down are ticked off as a list, without rest or weights.
+  bool get isChecklist => this == warmup || this == cooldown;
+
   /// Catalog categories that may fill this section.
   Set<String> get categories => switch (this) {
         Section.warmup => {'warmup'},
