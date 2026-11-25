@@ -60,8 +60,24 @@ class CountdownTest {
         val work = Countdown.work("Side plank", ref, perSide = true, from = 0)
         assertEquals(1f, work.fractionLeft(0), 0.001f)
         assertEquals(0.5f, work.fractionLeft(15_000), 0.001f)
-        assertEquals(1f, work.fractionLeft(30_000), 0.001f)
-        assertEquals(0f, work.fractionLeft(60_000), 0.001f)
+        assertEquals("time to switch", 1f, work.fractionLeft(30_000), 0.001f)
+        assertEquals(1f, work.fractionLeft(35_000), 0.001f)
+        assertEquals(0f, work.fractionLeft(65_000), 0.001f)
+    }
+
+    @Test
+    fun oneSidedRoundsHaveTimeToSwitchBetweenEverySide() {
+        val ref = SetRef("s", 0, "x", "cooldown", 1, 15, 0, true, count = 2)
+        val work = Countdown.work("Calf stretch", ref, perSide = true, from = 0)
+        assertEquals(
+            listOf("Side 1 (1/2) · Calf stretch", "Side 2 (1/2) · Calf stretch", "Side 1 (2/2) · Calf stretch", "Side 2 (2/2) · Calf stretch"),
+            work.phases.filterNot { it.pause }.map { it.label },
+        )
+        assertEquals(listOf(5, 5, 5), work.phases.filter { it.pause }.map { it.seconds })
+        assertEquals(75_000, work.endsAt)
+        assertTrue("extending keeps the switch a switch", work.extend(15, 1000).phases[1].pause)
+        val both = Countdown.work("Plank", SetRef("s", 0, "x", "core", 1, 30, 0, true), perSide = false, from = 0)
+        assertEquals(listOf("Plank"), both.phases.map { it.label })
     }
 }
 
@@ -74,6 +90,7 @@ class ProtocolTest {
         assertEquals(listOf("e1"), s.acked)
         assertEquals(Countdown.Kind.REST, s.timer!!.kind)
         val (warmup, bench, assisted, dip, plank) = s.exercises
+        val row = s.exercises[5]
         assertNull(warmup.weightLabel)
         assertTrue(warmup.perSide)
         assertEquals("Plates kg", bench.weightLabel)
@@ -83,6 +100,9 @@ class ProtocolTest {
         assertNull(dip.weight)
         assertEquals(25, plank.seconds)
         assertTrue(plank.isTimed)
+        assertTrue(row.numbered)
+        assertFalse(bench.numbered)
+        assertEquals("the plate used last", "9 × plate 6", row.setSummary())
     }
 
     /** Fails when the phone adds, drops or renames a field the watch should know. */
@@ -271,6 +291,22 @@ class WorkoutTest {
     }
 
     @Test
+    fun aOneSidedStretchRunsAllItsRoundsInOneGo() {
+        val calf = warmup.copy(section = "cooldown", seconds = 15, targetReps = null, perSide = true)
+        val w = Workout().receive(Snapshot(1, "s1", "Push", start, null, listOf(calf)))
+        val running = w.startWork(0, start)
+        assertTrue(running.settle(start + 74_000).events.isEmpty())
+        val settled = running.settle(start + 75_000)
+        assertEquals(listOf(1, 2), settled.events.map { it.set })
+        assertEquals(listOf(15, 15), settled.events.map { it.seconds })
+        assertTrue(settled.exercises[0].isDone)
+        assertNull("no rest", settled.running(start + 75_000))
+        val second = w.logSet(0, null, null, start, "x").startWork(0, start)
+        assertEquals("only what is left", 35_000 + start, second.timer!!.endsAt)
+        assertEquals("early end logs all rounds", 2, running.finishWork(start + 9000).events.size)
+    }
+
+    @Test
     fun theWatchNeverGoesBackToASkippedWarmup() {
         var w = withWarmup().show(1)
         for (i in 1..3) w = w.log(start + i * 1000)
@@ -308,13 +344,14 @@ class WorkoutTest {
         val w = workout.show(1).startWork(1, from)
         assertEquals("Side 1 · Side plank", w.running(from)!!.phaseAt(from)!!.label)
         assertTrue(w.settle(from + 31_000).events.isEmpty())
-        val settled = w.settle(from + 65_000)
+        assertEquals("Switch sides · Side plank", w.running(from + 31_000)!!.phaseAt(from + 31_000)!!.label)
+        val settled = w.settle(from + 70_000)
         val event = settled.events.single()
         assertEquals(30, event.seconds)
-        assertEquals("time of the end, not of the delivery", from + 60_000, event.at)
-        assertEquals(40, settled.running(from + 65_000)!!.remaining(from + 65_000))
-        assertEquals("only once", settled, settled.settle(from + 70_000))
-        val twice = w.settle(from + 65_000).let { Workout(it.snapshot, it.events, w.timer, it.focus) }.settle(from + 66_000)
+        assertEquals("time of the end, not of the delivery", from + 65_000, event.at)
+        assertEquals(40, settled.running(from + 70_000)!!.remaining(from + 70_000))
+        assertEquals("only once", settled, settled.settle(from + 75_000))
+        val twice = w.settle(from + 70_000).let { Workout(it.snapshot, it.events, w.timer, it.focus) }.settle(from + 71_000)
         assertEquals("same id after a restart", 1, twice.events.size)
     }
 
@@ -338,8 +375,8 @@ class WorkoutTest {
         val timer = Countdown.work("Side plank", ref, perSide = true, from = start + 1000, owner = Countdown.Owner.PHONE)
         val w = workout.receive(snapshot(timer = timer))
         assertTrue(w.running(start + 2000)!!.isWork)
-        assertEquals(Countdown.Kind.REST, w.running(start + 62_000)!!.kind)
-        assertTrue(w.settle(start + 62_000).events.isEmpty())
+        assertEquals(Countdown.Kind.REST, w.running(start + 67_000)!!.kind)
+        assertTrue(w.settle(start + 67_000).events.isEmpty())
     }
 
     @Test
@@ -348,8 +385,8 @@ class WorkoutTest {
         val w = workout.startWork(1, from)
         val extended = w.timer!!.extend(15, from + 5000)
         val updated = w.receive(snapshot(timer = extended))
-        assertTrue(updated.settle(from + 61_000).events.isEmpty())
-        assertEquals(from + 75_000, updated.settle(from + 80_000).events.single().at)
+        assertTrue(updated.settle(from + 66_000).events.isEmpty())
+        assertEquals(from + 80_000, updated.settle(from + 85_000).events.single().at)
     }
 
     @Test

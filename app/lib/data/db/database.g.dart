@@ -220,6 +220,18 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     requiredDuringInsert: false,
     defaultValue: const Constant('{}'),
   );
+  static const VerificationMeta _stackPlatesJsonMeta = const VerificationMeta(
+    'stackPlatesJson',
+  );
+  @override
+  late final GeneratedColumn<String> stackPlatesJson = GeneratedColumn<String>(
+    'stack_plates_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     updatedAt,
@@ -240,6 +252,7 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
     cooldownStretches,
     barWeightsJson,
     muscleFocusJson,
+    stackPlatesJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -378,6 +391,15 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         ),
       );
     }
+    if (data.containsKey('stack_plates_json')) {
+      context.handle(
+        _stackPlatesJsonMeta,
+        stackPlatesJson.isAcceptableOrUnknown(
+          data['stack_plates_json']!,
+          _stackPlatesJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -459,6 +481,10 @@ class $ProfilesTable extends Profiles with TableInfo<$ProfilesTable, Profile> {
         DriftSqlType.string,
         data['${effectivePrefix}muscle_focus_json'],
       )!,
+      stackPlatesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}stack_plates_json'],
+      )!,
     );
   }
 
@@ -495,6 +521,10 @@ class Profile extends DataClass implements Insertable<Profile> {
 
   /// Muscle focus as JSON ({"less":[...],"more":[...],"light":[...]}, see `MuscleFocus`); added in schema v4.
   final String muscleFocusJson;
+
+  /// Machines with a numbered weight stack and the kg of one plate as JSON ({"seated_row_machine": 5}); added in
+  /// schema v6.
+  final String stackPlatesJson;
   const Profile({
     required this.updatedAt,
     required this.deleted,
@@ -514,6 +544,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     required this.cooldownStretches,
     required this.barWeightsJson,
     required this.muscleFocusJson,
+    required this.stackPlatesJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -540,6 +571,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     map['cooldown_stretches'] = Variable<int>(cooldownStretches);
     map['bar_weights_json'] = Variable<String>(barWeightsJson);
     map['muscle_focus_json'] = Variable<String>(muscleFocusJson);
+    map['stack_plates_json'] = Variable<String>(stackPlatesJson);
     return map;
   }
 
@@ -567,6 +599,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       cooldownStretches: Value(cooldownStretches),
       barWeightsJson: Value(barWeightsJson),
       muscleFocusJson: Value(muscleFocusJson),
+      stackPlatesJson: Value(stackPlatesJson),
     );
   }
 
@@ -594,6 +627,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       cooldownStretches: serializer.fromJson<int>(json['cooldownStretches']),
       barWeightsJson: serializer.fromJson<String>(json['barWeightsJson']),
       muscleFocusJson: serializer.fromJson<String>(json['muscleFocusJson']),
+      stackPlatesJson: serializer.fromJson<String>(json['stackPlatesJson']),
     );
   }
   @override
@@ -618,6 +652,7 @@ class Profile extends DataClass implements Insertable<Profile> {
       'cooldownStretches': serializer.toJson<int>(cooldownStretches),
       'barWeightsJson': serializer.toJson<String>(barWeightsJson),
       'muscleFocusJson': serializer.toJson<String>(muscleFocusJson),
+      'stackPlatesJson': serializer.toJson<String>(stackPlatesJson),
     };
   }
 
@@ -640,6 +675,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     int? cooldownStretches,
     String? barWeightsJson,
     String? muscleFocusJson,
+    String? stackPlatesJson,
   }) => Profile(
     updatedAt: updatedAt ?? this.updatedAt,
     deleted: deleted ?? this.deleted,
@@ -659,6 +695,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     cooldownStretches: cooldownStretches ?? this.cooldownStretches,
     barWeightsJson: barWeightsJson ?? this.barWeightsJson,
     muscleFocusJson: muscleFocusJson ?? this.muscleFocusJson,
+    stackPlatesJson: stackPlatesJson ?? this.stackPlatesJson,
   );
   Profile copyWithCompanion(ProfilesCompanion data) {
     return Profile(
@@ -694,6 +731,9 @@ class Profile extends DataClass implements Insertable<Profile> {
       muscleFocusJson: data.muscleFocusJson.present
           ? data.muscleFocusJson.value
           : this.muscleFocusJson,
+      stackPlatesJson: data.stackPlatesJson.present
+          ? data.stackPlatesJson.value
+          : this.stackPlatesJson,
     );
   }
 
@@ -717,7 +757,8 @@ class Profile extends DataClass implements Insertable<Profile> {
           ..write('restMode: $restMode, ')
           ..write('cooldownStretches: $cooldownStretches, ')
           ..write('barWeightsJson: $barWeightsJson, ')
-          ..write('muscleFocusJson: $muscleFocusJson')
+          ..write('muscleFocusJson: $muscleFocusJson, ')
+          ..write('stackPlatesJson: $stackPlatesJson')
           ..write(')'))
         .toString();
   }
@@ -742,6 +783,7 @@ class Profile extends DataClass implements Insertable<Profile> {
     cooldownStretches,
     barWeightsJson,
     muscleFocusJson,
+    stackPlatesJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -764,7 +806,8 @@ class Profile extends DataClass implements Insertable<Profile> {
           other.restMode == this.restMode &&
           other.cooldownStretches == this.cooldownStretches &&
           other.barWeightsJson == this.barWeightsJson &&
-          other.muscleFocusJson == this.muscleFocusJson);
+          other.muscleFocusJson == this.muscleFocusJson &&
+          other.stackPlatesJson == this.stackPlatesJson);
 }
 
 class ProfilesCompanion extends UpdateCompanion<Profile> {
@@ -786,6 +829,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
   final Value<int> cooldownStretches;
   final Value<String> barWeightsJson;
   final Value<String> muscleFocusJson;
+  final Value<String> stackPlatesJson;
   final Value<int> rowid;
   const ProfilesCompanion({
     this.updatedAt = const Value.absent(),
@@ -806,6 +850,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.cooldownStretches = const Value.absent(),
     this.barWeightsJson = const Value.absent(),
     this.muscleFocusJson = const Value.absent(),
+    this.stackPlatesJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProfilesCompanion.insert({
@@ -827,6 +872,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     this.cooldownStretches = const Value.absent(),
     this.barWeightsJson = const Value.absent(),
     this.muscleFocusJson = const Value.absent(),
+    this.stackPlatesJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : updatedAt = Value(updatedAt);
   static Insertable<Profile> custom({
@@ -848,6 +894,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Expression<int>? cooldownStretches,
     Expression<String>? barWeightsJson,
     Expression<String>? muscleFocusJson,
+    Expression<String>? stackPlatesJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -869,6 +916,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       if (cooldownStretches != null) 'cooldown_stretches': cooldownStretches,
       if (barWeightsJson != null) 'bar_weights_json': barWeightsJson,
       if (muscleFocusJson != null) 'muscle_focus_json': muscleFocusJson,
+      if (stackPlatesJson != null) 'stack_plates_json': stackPlatesJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -892,6 +940,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     Value<int>? cooldownStretches,
     Value<String>? barWeightsJson,
     Value<String>? muscleFocusJson,
+    Value<String>? stackPlatesJson,
     Value<int>? rowid,
   }) {
     return ProfilesCompanion(
@@ -913,6 +962,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
       cooldownStretches: cooldownStretches ?? this.cooldownStretches,
       barWeightsJson: barWeightsJson ?? this.barWeightsJson,
       muscleFocusJson: muscleFocusJson ?? this.muscleFocusJson,
+      stackPlatesJson: stackPlatesJson ?? this.stackPlatesJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -974,6 +1024,9 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
     if (muscleFocusJson.present) {
       map['muscle_focus_json'] = Variable<String>(muscleFocusJson.value);
     }
+    if (stackPlatesJson.present) {
+      map['stack_plates_json'] = Variable<String>(stackPlatesJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1001,6 +1054,7 @@ class ProfilesCompanion extends UpdateCompanion<Profile> {
           ..write('cooldownStretches: $cooldownStretches, ')
           ..write('barWeightsJson: $barWeightsJson, ')
           ..write('muscleFocusJson: $muscleFocusJson, ')
+          ..write('stackPlatesJson: $stackPlatesJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3659,6 +3713,15 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _plateMeta = const VerificationMeta('plate');
+  @override
+  late final GeneratedColumn<double> plate = GeneratedColumn<double>(
+    'plate',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     updatedAt,
@@ -3676,6 +3739,7 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     rir,
     completed,
     completedAt,
+    plate,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3799,6 +3863,12 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         ),
       );
     }
+    if (data.containsKey('plate')) {
+      context.handle(
+        _plateMeta,
+        plate.isAcceptableOrUnknown(data['plate']!, _plateMeta),
+      );
+    }
     return context;
   }
 
@@ -3868,6 +3938,10 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
       ),
+      plate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}plate'],
+      ),
     );
   }
 
@@ -3893,6 +3967,9 @@ class SetLog extends DataClass implements Insertable<SetLog> {
   final int? rir;
   final bool completed;
   final DateTime? completedAt;
+
+  /// Plate number on a machine with a numbered stack; [weightKg] is the weight it stood for. Added in schema v6.
+  final double? plate;
   const SetLog({
     required this.updatedAt,
     required this.deleted,
@@ -3909,6 +3986,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     this.rir,
     required this.completed,
     this.completedAt,
+    this.plate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3938,6 +4016,9 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<DateTime>(completedAt);
     }
+    if (!nullToAbsent || plate != null) {
+      map['plate'] = Variable<double>(plate);
+    }
     return map;
   }
 
@@ -3964,6 +4045,9 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      plate: plate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(plate),
     );
   }
 
@@ -3988,6 +4072,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       rir: serializer.fromJson<int?>(json['rir']),
       completed: serializer.fromJson<bool>(json['completed']),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      plate: serializer.fromJson<double?>(json['plate']),
     );
   }
   @override
@@ -4009,6 +4094,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       'rir': serializer.toJson<int?>(rir),
       'completed': serializer.toJson<bool>(completed),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'plate': serializer.toJson<double?>(plate),
     };
   }
 
@@ -4028,6 +4114,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     Value<int?> rir = const Value.absent(),
     bool? completed,
     Value<DateTime?> completedAt = const Value.absent(),
+    Value<double?> plate = const Value.absent(),
   }) => SetLog(
     updatedAt: updatedAt ?? this.updatedAt,
     deleted: deleted ?? this.deleted,
@@ -4046,6 +4133,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     rir: rir.present ? rir.value : this.rir,
     completed: completed ?? this.completed,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    plate: plate.present ? plate.value : this.plate,
   );
   SetLog copyWithCompanion(SetLogsCompanion data) {
     return SetLog(
@@ -4072,6 +4160,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      plate: data.plate.present ? data.plate.value : this.plate,
     );
   }
 
@@ -4092,7 +4181,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           ..write('durationSeconds: $durationSeconds, ')
           ..write('rir: $rir, ')
           ..write('completed: $completed, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('plate: $plate')
           ..write(')'))
         .toString();
   }
@@ -4114,6 +4204,7 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     rir,
     completed,
     completedAt,
+    plate,
   );
   @override
   bool operator ==(Object other) =>
@@ -4133,7 +4224,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           other.durationSeconds == this.durationSeconds &&
           other.rir == this.rir &&
           other.completed == this.completed &&
-          other.completedAt == this.completedAt);
+          other.completedAt == this.completedAt &&
+          other.plate == this.plate);
 }
 
 class SetLogsCompanion extends UpdateCompanion<SetLog> {
@@ -4152,6 +4244,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
   final Value<int?> rir;
   final Value<bool> completed;
   final Value<DateTime?> completedAt;
+  final Value<double?> plate;
   final Value<int> rowid;
   const SetLogsCompanion({
     this.updatedAt = const Value.absent(),
@@ -4169,6 +4262,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.rir = const Value.absent(),
     this.completed = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.plate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SetLogsCompanion.insert({
@@ -4187,6 +4281,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.rir = const Value.absent(),
     this.completed = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.plate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : updatedAt = Value(updatedAt),
        id = Value(id),
@@ -4211,6 +4306,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Expression<int>? rir,
     Expression<bool>? completed,
     Expression<DateTime>? completedAt,
+    Expression<double>? plate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4229,6 +4325,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       if (rir != null) 'rir': rir,
       if (completed != null) 'completed': completed,
       if (completedAt != null) 'completed_at': completedAt,
+      if (plate != null) 'plate': plate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4249,6 +4346,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Value<int?>? rir,
     Value<bool>? completed,
     Value<DateTime?>? completedAt,
+    Value<double?>? plate,
     Value<int>? rowid,
   }) {
     return SetLogsCompanion(
@@ -4267,6 +4365,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       rir: rir ?? this.rir,
       completed: completed ?? this.completed,
       completedAt: completedAt ?? this.completedAt,
+      plate: plate ?? this.plate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4319,6 +4418,9 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
+    if (plate.present) {
+      map['plate'] = Variable<double>(plate.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4343,6 +4445,7 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
           ..write('rir: $rir, ')
           ..write('completed: $completed, ')
           ..write('completedAt: $completedAt, ')
+          ..write('plate: $plate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6218,6 +6321,7 @@ typedef $$ProfilesTableCreateCompanionBuilder =
       Value<int> cooldownStretches,
       Value<String> barWeightsJson,
       Value<String> muscleFocusJson,
+      Value<String> stackPlatesJson,
       Value<int> rowid,
     });
 typedef $$ProfilesTableUpdateCompanionBuilder =
@@ -6240,6 +6344,7 @@ typedef $$ProfilesTableUpdateCompanionBuilder =
       Value<int> cooldownStretches,
       Value<String> barWeightsJson,
       Value<String> muscleFocusJson,
+      Value<String> stackPlatesJson,
       Value<int> rowid,
     });
 
@@ -6339,6 +6444,11 @@ class $$ProfilesTableFilterComposer
 
   ColumnFilters<String> get muscleFocusJson => $composableBuilder(
     column: $table.muscleFocusJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stackPlatesJson => $composableBuilder(
+    column: $table.stackPlatesJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6441,6 +6551,11 @@ class $$ProfilesTableOrderingComposer
     column: $table.muscleFocusJson,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get stackPlatesJson => $composableBuilder(
+    column: $table.stackPlatesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ProfilesTableAnnotationComposer
@@ -6519,6 +6634,11 @@ class $$ProfilesTableAnnotationComposer
     column: $table.muscleFocusJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get stackPlatesJson => $composableBuilder(
+    column: $table.stackPlatesJson,
+    builder: (column) => column,
+  );
 }
 
 class $$ProfilesTableTableManager
@@ -6567,6 +6687,7 @@ class $$ProfilesTableTableManager
                 Value<int> cooldownStretches = const Value.absent(),
                 Value<String> barWeightsJson = const Value.absent(),
                 Value<String> muscleFocusJson = const Value.absent(),
+                Value<String> stackPlatesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProfilesCompanion(
                 updatedAt: updatedAt,
@@ -6587,6 +6708,7 @@ class $$ProfilesTableTableManager
                 cooldownStretches: cooldownStretches,
                 barWeightsJson: barWeightsJson,
                 muscleFocusJson: muscleFocusJson,
+                stackPlatesJson: stackPlatesJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6609,6 +6731,7 @@ class $$ProfilesTableTableManager
                 Value<int> cooldownStretches = const Value.absent(),
                 Value<String> barWeightsJson = const Value.absent(),
                 Value<String> muscleFocusJson = const Value.absent(),
+                Value<String> stackPlatesJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProfilesCompanion.insert(
                 updatedAt: updatedAt,
@@ -6629,6 +6752,7 @@ class $$ProfilesTableTableManager
                 cooldownStretches: cooldownStretches,
                 barWeightsJson: barWeightsJson,
                 muscleFocusJson: muscleFocusJson,
+                stackPlatesJson: stackPlatesJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -7956,6 +8080,7 @@ typedef $$SetLogsTableCreateCompanionBuilder =
       Value<int?> rir,
       Value<bool> completed,
       Value<DateTime?> completedAt,
+      Value<double?> plate,
       Value<int> rowid,
     });
 typedef $$SetLogsTableUpdateCompanionBuilder =
@@ -7975,6 +8100,7 @@ typedef $$SetLogsTableUpdateCompanionBuilder =
       Value<int?> rir,
       Value<bool> completed,
       Value<DateTime?> completedAt,
+      Value<double?> plate,
       Value<int> rowid,
     });
 
@@ -8059,6 +8185,11 @@ class $$SetLogsTableFilterComposer
 
   ColumnFilters<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get plate => $composableBuilder(
+    column: $table.plate,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -8146,6 +8277,11 @@ class $$SetLogsTableOrderingComposer
     column: $table.completedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get plate => $composableBuilder(
+    column: $table.plate,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SetLogsTableAnnotationComposer
@@ -8209,6 +8345,9 @@ class $$SetLogsTableAnnotationComposer
     column: $table.completedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<double> get plate =>
+      $composableBuilder(column: $table.plate, builder: (column) => column);
 }
 
 class $$SetLogsTableTableManager
@@ -8254,6 +8393,7 @@ class $$SetLogsTableTableManager
                 Value<int?> rir = const Value.absent(),
                 Value<bool> completed = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<double?> plate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SetLogsCompanion(
                 updatedAt: updatedAt,
@@ -8271,6 +8411,7 @@ class $$SetLogsTableTableManager
                 rir: rir,
                 completed: completed,
                 completedAt: completedAt,
+                plate: plate,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8290,6 +8431,7 @@ class $$SetLogsTableTableManager
                 Value<int?> rir = const Value.absent(),
                 Value<bool> completed = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<double?> plate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SetLogsCompanion.insert(
                 updatedAt: updatedAt,
@@ -8307,6 +8449,7 @@ class $$SetLogsTableTableManager
                 rir: rir,
                 completed: completed,
                 completedAt: completedAt,
+                plate: plate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

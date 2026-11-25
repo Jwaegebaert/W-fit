@@ -202,7 +202,8 @@ class CoachService {
   /// muscle balance, limitations and trends for [date] (default today) and [day] (default: next in rotation).
   Future<CoachSnapshot> snapshot({DateTime? date, DayType? day}) async {
     final planDate = dateOnly(date ?? DateTime.now());
-    final catalog = _catalog;
+    final profile = await _repo.getProfile();
+    final catalog = _catalog.withPlates(LoadModel.parsePlates(profile.stackPlatesJson));
     final completed = await _repo.completedSessions();
     final sets = await _repo.loggedSets(since: addDays(planDate, -84));
     final plans = {for (final p in await _repo.plannedHistory()) p.id: p};
@@ -225,7 +226,6 @@ class CoachService {
     final trends = exerciseTrends(sets, excludeSessionIds: pre.deloadSessionIds);
     final program = computeProgramState(infos, now: planDate, day: day, trends: trends, catalog: catalog);
     final weeks = weeklyMuscleVolume(sets, catalog, weeks: 8, now: planDate);
-    final profile = await _repo.getProfile();
     return CoachSnapshot(
       date: planDate,
       catalog: catalog,
@@ -338,19 +338,19 @@ class CoachService {
     return (await _repo.plannedById(id))!;
   }
 
-  static const _legacyHoldsKey = 'legacy_holds_converted';
+  static const _shortStretchesKey = 'short_stretches_converted';
 
-  /// Once per device: converts the one-sided hold times of open plans made before catalog v4 (`convertLegacyHolds`).
-  /// A one-off, because a later plan may ask for a longer hold on purpose. Never throws.
+  /// Once per device: shortens the one-sided stretches of open plans made before catalog v5 (`shortenStretches`). A
+  /// plan that is being trained right now stays as it is. Never throws.
   Future<void> convertLegacyPlans() async {
     try {
-      if (await _repo.db.getValue(_legacyHoldsKey) != null) return;
+      if (await _repo.db.getValue(_shortStretchesKey) != null) return;
       for (final p in await _repo.plannedHistory(from: addDays(dateOnly(DateTime.now()), -carryForwardDays))) {
-        if (p.status != 'planned') continue;
-        final blocks = convertLegacyHolds(Repository.decodeBlocks(p.blocksJson), _catalog);
+        if (!await _isOpen(p.id)) continue;
+        final blocks = shortenStretches(Repository.decodeBlocks(p.blocksJson), _catalog);
         if (blocks != null) await _repo.updatePlannedBlocks(p.id, blocks);
       }
-      await _repo.db.setValue(_legacyHoldsKey, '1');
+      await _repo.db.setValue(_shortStretchesKey, '1');
     } catch (_) {
       // Best effort; retried on the next start.
     }
@@ -553,7 +553,10 @@ class CoachService {
         final e = s.catalog.exercise(i.exerciseId);
         if (e == null || s.policy.excludes(e)) continue;
         final h = s.history[e.id] ?? const [];
-        final item = i.copyWith(perSide: e.unilateral);
+        // The server works in steps of half a kilo; a numbered stack only has whole plates.
+        final kg = i.targetWeightKg;
+        final item = stretchInRounds(
+            i.copyWith(perSide: e.unilateral, targetWeightKg: kg == null ? null : e.snapKg(kg)), e);
         items.add(item.targetWeightKg == null && e.isWeighted && h.isNotEmpty
             ? item.copyWith(
                 targetWeightKg: adviseProgression(e, h,
@@ -782,13 +785,21 @@ class CoachService {
   // ---------------- progression & swaps ----------------
 
   Future<ProgressionAdvice> advice(String exerciseId, PlanItem item, {String? excludeSessionId}) async {
-    final e = _catalog.exercise(exerciseId);
+    final profile = await _repo.getProfile();
+    final e = _onPlates(_catalog.exercise(exerciseId), profile);
     if (e == null) return const ProgressionAdvice(message: '');
     final history = await _repo.exerciseHistory(exerciseId, excludeSessionId: excludeSessionId);
-    final focus = MuscleFocus.decode((await _repo.getProfile()).muscleFocusJson);
+    final focus = MuscleFocus.decode(profile.muscleFocusJson);
     return adviseProgression(e, history,
             repMin: item.repMin, repMax: item.repMax, light: e.primary.any(focus.isLight))
         .forPlanWeight(item.targetWeightKg, repMin: item.repMin, assisted: e.isAssisted);
+  }
+
+  /// [e] with the plates of this gym's machine when its stack is numbered.
+  Exercise? _onPlates(Exercise? e, Profile profile) {
+    if (e == null) return null;
+    final plate = LoadModel.parsePlates(profile.stackPlatesJson)[_catalog.stackOf(e)];
+    return plate == null ? e : e.withPlate(plate);
   }
 
   Future<List<SwapSuggestion>> ruleSwaps(
@@ -842,7 +853,7 @@ class CoachService {
             fromAi: fromAi,
             item: PlanItem(
               exerciseId: e.id,
-              sets: (s['sets'] as num?)?.toInt() ?? e.sets,
+              sets: e.category == 'cooldown' ? e.sets : (s['sets'] as num?)?.toInt() ?? e.sets,
               repMin: e.isTimed ? null : (s['repMin'] as num?)?.toInt() ?? e.repMin,
               repMax: e.isTimed ? null : (s['repMax'] as num?)?.toInt() ?? e.repMax,
               durationSeconds: e.durationSeconds,
@@ -861,7 +872,8 @@ class CoachService {
     var item = s.item ?? PlanItem.fromExercise(s.exercise);
     if (s.exercise.isWeighted) {
       final h = await _repo.exerciseHistory(s.exercise.id, maxSessions: 2);
-      final w = h.isEmpty ? null : adviseProgression(s.exercise, h).weightKg;
+      final e = _onPlates(s.exercise, await _repo.getProfile())!;
+      final w = h.isEmpty ? null : adviseProgression(e, h).weightKg;
       item = item.copyWith(targetWeightKg: w, clearWeight: w == null);
     } else {
       item = item.copyWith(clearWeight: true);

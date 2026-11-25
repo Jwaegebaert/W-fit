@@ -14,11 +14,13 @@ exercise, runs the rest and work timers with vibration, and logs sets.
 | The numbers (pencil) | Change reps and weight (buttons or bezel), log, or undo the last set |
 | Done (warm-up, cool-down) | Ticks off the whole exercise, without rest; *Undo* takes it back |
 | ♥ 128 | Live heart rate, if allowed; only while the workout is on screen |
-| Start 1/2 | Work timer; one-sided holds run both sides, then the set is logged |
+| Start 1/2 | Work timer; one-sided holds run both sides with 5 s to switch, then the set is logged. One-sided stretches run both rounds in one go |
 | −15, +15, Skip / Stop | Change or end the timer; *Log now* ends a hold early and logs it |
 | Swipe right on the timer | Back to the exercise; the timer keeps running and shows on top |
 
-Vibration: three pulses = rest over, two short = switch sides, one long = hold done.
+Vibration: three pulses = rest over, two short = switch sides, one short = other side starts, one long = hold done.
+
+On machines with a numbered stack the watch shows and logs plate numbers; the phone turns them into kg.
 
 Finishing or discarding a workout, swaps and notes stay on the phone. The watch never records a workout of its own, so
 Samsung Health and Health Connect get no second entry.
@@ -35,7 +37,7 @@ services stores and delivers when the devices are back in reach.
 
 - **Sets.** Matched on session, exercise position, exercise and set number; the newest entry wins (whole seconds). An
   event can arrive late, twice or out of order. A set for a finished workout is still added; for a discarded one dropped.
-- **Timers.** Absolute end times plus the planned sequence (side 1, side 2, rest), so both devices calculate the same
+- **Timers.** Absolute end times plus the planned sequence (side 1, switch, side 2, rest), so both devices calculate the same
   thing. The newest change wins. Only the device that started a work timer logs its set.
 - **Vibration.** An alarm clock alarm per phase (`USE_EXACT_ALARM`): works with the screen off and the app closed.
 - **Warm-up and cool-down** follow the phone's checklist: all sets at once, no rest, no weight. The watch never sends you

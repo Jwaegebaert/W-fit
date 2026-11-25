@@ -382,6 +382,9 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   int _extraSets = 0;
   ProgressionAdvice? _advice;
 
+  /// Kg of one plate when this machine has a numbered stack: the weight fields hold plate numbers then.
+  double? _plateKg;
+
   int get _rowCount {
     final maxLogged = widget.logged.fold<int>(0, (m, s) => s.setNumber > m ? s.setNumber : m);
     final base = widget.item.sets + _extraSets;
@@ -391,6 +394,59 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   @override
   void initState() {
     super.initState();
+    _plateKg = ref.read(loadModelProvider).plateKg(widget.item.exerciseId);
+    _loadAdvice();
+  }
+
+  @override
+  void didUpdateWidget(ExerciseCard old) {
+    super.didUpdateWidget(old);
+    // Weights logged before turned out to be plate numbers (said so in the equipment settings).
+    for (final s in widget.logged) {
+      final i = s.setNumber - 1;
+      final was = old.logged.where((o) => o.id == s.id).firstOrNull;
+      if (was != null && was.plate == null && s.plate != null && i < _weight.length && !_ownWeight.contains(s.setNumber)) {
+        _weight[i].text = _loggedText(s);
+      }
+    }
+  }
+
+  /// A logged weight the way this card shows it: kg or a plate number.
+  String _loggedText(SetLog s) => switch (_plateKg) {
+        final plate? => formatPlate(s.plate ?? (s.weightKg ?? 0) / plate),
+        _ => formatKg(s.weightKg),
+      };
+
+  /// A weight to lift: kg or a whole plate number.
+  String _targetText(double kg) => switch (_plateKg) {
+        final plate? => '${(kg / plate).round()}',
+        _ => formatKg(kg),
+      };
+
+  /// What is typed for set [n], as the weight to store.
+  ({double? kg, double? plate}) _entered(int n) {
+    final v = double.tryParse(_weight[n - 1].text.replaceAll(',', '.'));
+    final plate = _plateKg;
+    return plate == null || v == null ? (kg: v, plate: null) : (kg: v * plate, plate: v);
+  }
+
+  /// The machine was set to plate numbers or back to kg: what is typed follows. Other plate weights change no numbers.
+  void _changeUnit(double? plateKg) {
+    final before = _plateKg;
+    if (plateKg == before) return;
+    setState(() {
+      _plateKg = plateKg;
+      if (before != null && plateKg != null) return;
+      for (var n = 1; n <= _weight.length; n++) {
+        final log = _loggedFor(n);
+        final v = double.tryParse(_weight[n - 1].text.replaceAll(',', '.'));
+        if (log?.weightKg != null) {
+          _weight[n - 1].text = _loggedText(log!);
+        } else if (v != null) {
+          _weight[n - 1].text = _targetText(before == null ? v : v * before);
+        }
+      }
+    });
     _loadAdvice();
   }
 
@@ -402,7 +458,7 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
       final w = widget.item.targetWeightKg ?? a.weightKg;
       if (w == null) return;
       for (var i = 0; i < _weight.length; i++) {
-        if (_weight[i].text.isEmpty && _loggedFor(i + 1) == null) _weight[i].text = formatKg(w);
+        if (_weight[i].text.isEmpty && _loggedFor(i + 1) == null) _weight[i].text = _targetText(w);
       }
     });
   }
@@ -429,8 +485,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
       final suggested = widget.item.targetWeightKg ?? _advice?.weightKg;
       _weight.add(TextEditingController(
         text: log?.weightKg != null
-            ? formatKg(log!.weightKg)
-            : (prevWeight != null && prevWeight.isNotEmpty ? prevWeight : (suggested != null ? formatKg(suggested) : '')),
+            ? _loggedText(log!)
+            : (prevWeight != null && prevWeight.isNotEmpty ? prevWeight : (suggested != null ? _targetText(suggested) : '')),
       ));
       _reps.add(TextEditingController(text: log?.reps?.toString() ?? ''));
     }
@@ -453,17 +509,18 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
     final e = ref.read(catalogProvider).exercise(widget.item.exerciseId);
     final idx = setNumber - 1;
     final isTimed = widget.item.isTimed;
-    double? weight = double.tryParse(_weight[idx].text.replaceAll(',', '.'));
+    var weight = _entered(setNumber);
     int? reps = int.tryParse(_reps[idx].text);
     if (complete && !isTimed && reps == null) {
       reps = _targetReps;
       _reps[idx].text = '$reps';
     }
-    if (e != null && (!_weightColumn(e) || (!e.isWeighted && weight == 0))) weight = null;
+    if (e != null && (!_weightColumn(e) || (!e.isWeighted && weight.kg == 0))) weight = (kg: null, plate: null);
     if (complete) HapticFeedback.lightImpact();
     await ref.read(setLoggerProvider).log(
           _setRef(setNumber),
-          weightKg: isTimed ? null : weight,
+          weightKg: isTimed ? null : weight.kg,
+          plate: isTimed ? null : weight.plate,
           reps: isTimed ? null : reps,
           durationSeconds: isTimed ? widget.item.durationSeconds : null,
           completed: complete,
@@ -476,7 +533,7 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
     if (log.exerciseOrder != widget.order || log.exerciseId != widget.item.exerciseId || idx >= _reps.length) return;
     _reps[idx].text = log.reps?.toString() ?? '';
     if (log.weightKg == null) return;
-    _weight[idx].text = formatKg(log.weightKg);
+    _weight[idx].text = _loggedText(log);
     _weightToLaterSets(log.setNumber);
   }
 
@@ -484,6 +541,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
     final existing = _loggedFor(setNumber);
     if (existing == null || !existing.completed) return;
     final idx = setNumber - 1;
+    final hasWeight = _weightColumn(ref.read(catalogProvider).exercise(widget.item.exerciseId));
+    final weight = _entered(setNumber);
     await ref.read(repositoryProvider).logSet(
           id: existing.id,
           sessionId: widget.sessionId,
@@ -491,9 +550,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
           section: widget.section,
           exerciseOrder: widget.order,
           setNumber: setNumber,
-          weightKg: _weightColumn(ref.read(catalogProvider).exercise(widget.item.exerciseId))
-              ? double.tryParse(_weight[idx].text.replaceAll(',', '.'))
-              : null,
+          weightKg: hasWeight ? weight.kg : null,
+          plate: hasWeight ? weight.plate : null,
           reps: int.tryParse(_reps[idx].text),
           durationSeconds: existing.durationSeconds,
           completed: true,
@@ -531,7 +589,13 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   void _tickReps(int n, {required bool done}) {
     final e = ref.read(catalogProvider).exercise(widget.item.exerciseId);
     if (!done && _weightMissing(n, e)) {
-      showSnack(context, e?.bar != null ? 'Enter the plates first (0 for the empty bar).' : 'Enter the weight first.');
+      showSnack(
+          context,
+          e?.bar != null
+              ? 'Enter the plates first (0 for the empty bar).'
+              : _plateKg != null
+                  ? 'Enter the plate number first.'
+                  : 'Enter the weight first.');
       _weightFocus[n - 1].requestFocus();
       return;
     }
@@ -567,6 +631,7 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
     ref.listen(watchSetProvider, (_, log) {
       if (log != null) _showFromWatch(log);
     });
+    ref.listen(loadModelProvider, (_, loads) => _changeUnit(loads.plateKg(widget.item.exerciseId)));
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -589,7 +654,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
                     [
                       widget.item.copyWith(perSide: _perSide).targetLabel,
                       // The open card has the weight in its fields.
-                      if (!widget.expanded && widget.item.targetWeightKg != null) '${formatKg(widget.item.targetWeightKg)} kg',
+                      if (widget.item.targetWeightKg case final kg? when !widget.expanded)
+                        _plateKg == null ? '${formatKg(kg)} kg' : 'plate ${_targetText(kg)}',
                       if (!widget.expanded && done > 0 && !complete) '$done done',
                     ].join(' · '),
                     style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant),
@@ -622,8 +688,6 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   Widget _buildBody(BuildContext context, Exercise? e, String name) {
     final t = Theme.of(context);
     final isTimed = widget.item.isTimed;
-    // The set to do now gets the − and + buttons.
-    final active = [for (var n = 1; n <= _rowCount; n++) n].where((n) => !(_loggedFor(n)?.completed ?? false)).firstOrNull;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -652,10 +716,7 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
               ]),
             ),
           ),
-        for (var n = 1; n <= _rowCount; n++) ...[
-          isTimed ? _timedRow(n, name) : _repsRow(n, showWeight: _weightColumn(e)),
-          if (!isTimed && n == active) _steppers(n, e, showWeight: _weightColumn(e)),
-        ],
+        for (var n = 1; n <= _rowCount; n++) isTimed ? _timedRow(n, name) : _repsRow(n, showWeight: _weightColumn(e)),
         Wrap(spacing: Gap.sm, children: [
           TextButton.icon(
             onPressed: () {
@@ -677,6 +738,8 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
   }
 
   String _weightHeader(Exercise? e) => switch (e?.load) {
+        LoadType.assist || LoadType.weight when _plateKg != null =>
+          '${e!.isAssisted ? 'Assist plate' : 'Plate'} (${formatKg(_plateKg)} kg each)',
         LoadType.assist => 'Assist kg',
         LoadType.optional => 'Extra kg',
         _ => e?.bar == null
@@ -719,39 +782,6 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
 
   static void _selectAll(TextEditingController c) =>
       c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
-
-  void _stepWeight(int n, double by) {
-    final now = double.tryParse(_weight[n - 1].text.replaceAll(',', '.')) ?? 0;
-    final next = now + by;
-    _weight[n - 1].text = formatKg(next < 0 ? 0 : next);
-    _weightTyped(n);
-  }
-
-  void _stepReps(int n, int by) {
-    final next = (int.tryParse(_reps[n - 1].text) ?? _targetReps) + by;
-    setState(() => _reps[n - 1].text = '${next < 0 ? 0 : next}');
-    _updateIfLogged(n);
-  }
-
-  /// − and + under the fields of the set to do now.
-  Widget _steppers(int n, Exercise? e, {required bool showWeight}) {
-    final step = (e?.incrementKg ?? 0) > 0 ? e!.incrementKg : 2.5;
-    Widget pair(String what, VoidCallback less, VoidCallback more) => Expanded(
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-            IconButton(tooltip: 'Less $what', icon: const Icon(Icons.remove_rounded), onPressed: less),
-            IconButton(tooltip: 'More $what', icon: const Icon(Icons.add_rounded), onPressed: more),
-          ]),
-        );
-    return Row(children: [
-      const SizedBox(width: _numberWidth),
-      if (showWeight) ...[
-        pair('weight', () => _stepWeight(n, -step), () => _stepWeight(n, step)),
-        const SizedBox(width: 8),
-      ],
-      pair('reps', () => _stepReps(n, -1), () => _stepReps(n, 1)),
-      const SizedBox(width: 8 + Gap.tap),
-    ]);
-  }
 
   Widget _repsRow(int n, {required bool showWeight}) {
     final log = _loggedFor(n);
@@ -881,7 +911,8 @@ class _TimerBannerState extends ConsumerState<_TimerBanner> {
     final t = Theme.of(context);
     final timer = widget.timer;
     final now = ref.read(nowMsProvider)();
-    final color = timer.isWork ? t.colorScheme.attention : t.colorScheme.primary;
+    final pause = timer.phaseAt(now)?.pause ?? false; // changing sides
+    final color = timer.isWork && !pause ? t.colorScheme.attention : t.colorScheme.primary;
     final ctrl = ref.read(workoutTimerProvider.notifier);
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
@@ -895,7 +926,14 @@ class _TimerBannerState extends ConsumerState<_TimerBanner> {
               child: CircularProgressIndicator(
                   value: timer.progress(now), strokeWidth: 4, color: color, backgroundColor: color.withValues(alpha: 0.2)),
             ),
-            Icon(timer.isWork ? Icons.directions_run : Icons.self_improvement, color: color, size: 22),
+            Icon(
+                pause
+                    ? Icons.swap_horiz_rounded
+                    : timer.isWork
+                        ? Icons.directions_run
+                        : Icons.self_improvement,
+                color: color,
+                size: 22),
           ]),
         ),
         const SizedBox(width: Gap.md - 4),

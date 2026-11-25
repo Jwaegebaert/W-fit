@@ -37,6 +37,9 @@ public sealed class Profile : SyncEntity
 
     /// <summary>Muscle focus as JSON ({"less":[...],"more":[...],"light":[...]}).</summary>
     public string MuscleFocusJson { get; set; } = "{}";
+
+    /// <summary>Kg of one plate per machine with a numbered stack as JSON ({"seated_row_machine":5}).</summary>
+    public string StackPlatesJson { get; set; } = "{}";
 }
 
 public sealed class EquipmentStatus : SyncEntity
@@ -114,6 +117,9 @@ public sealed class SetLog : SyncEntity
     public int ExerciseOrder { get; set; }
     public int SetNumber { get; set; }
     public double? WeightKg { get; set; }
+
+    /// <summary>Plate number on a machine with a numbered stack.</summary>
+    public double? Plate { get; set; }
     public int? Reps { get; set; }
     public int? DurationSeconds { get; set; }
     public int? Rir { get; set; }

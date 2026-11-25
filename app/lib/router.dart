@@ -15,6 +15,7 @@ import 'features/settings/health_screen.dart';
 import 'features/settings/health_send_screen.dart';
 import 'features/settings/injuries_screen.dart';
 import 'features/settings/muscle_focus_screen.dart';
+import 'features/settings/numbered_stacks_screen.dart';
 import 'features/settings/profile_screen.dart';
 import 'features/settings/schedule_screen.dart';
 import 'features/settings/settings_screen.dart';
@@ -71,6 +72,8 @@ final router = GoRouter(
     GoRoute(path: '/settings/schedule', parentNavigatorKey: _rootKey, builder: (_, _) => const ScheduleScreen()),
     GoRoute(path: '/settings/injuries', parentNavigatorKey: _rootKey, builder: (_, _) => const InjuriesScreen()),
     GoRoute(path: '/settings/equipment', parentNavigatorKey: _rootKey, builder: (_, _) => const EquipmentScreen()),
+    GoRoute(
+        path: '/settings/equipment/stacks', parentNavigatorKey: _rootKey, builder: (_, _) => const NumberedStacksScreen()),
     GoRoute(path: '/settings/focus', parentNavigatorKey: _rootKey, builder: (_, _) => const MuscleFocusScreen()),
     GoRoute(path: '/settings/health', parentNavigatorKey: _rootKey, builder: (_, _) => const HealthScreen()),
     GoRoute(path: '/settings/health/send', parentNavigatorKey: _rootKey, builder: (_, _) => const HealthSendScreen()),

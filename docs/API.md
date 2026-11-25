@@ -34,6 +34,7 @@ Every synced record has `updatedAt` (client clock, last-write-wins) and `deleted
   "restMode": "normal",          // short (x0.7) | normal | long (x1.3) rest between sets
   "cooldownStretches": 3,         // 0-3; 0 = no cool-down block
   "barWeights": { "smith_machine": 15 },  // user-set empty-bar kg (max 10, 0-60 kg); bar exercises log plates only
+  "stackPlates": { "seated_row_machine": 5 },  // kg of one plate on machines with a numbered stack (max 40, 0-50 kg); left out = unchanged
   "muscleFocus": { "less": ["side_delts"], "more": ["glutes"], "light": ["lower_back"] },  // tracked muscles; more wins over less
   "heightCm": 180, "birthYear": 1995, "injuries": "", "notes": "",
   "updatedAt": "...", "deleted": false }
@@ -69,7 +70,9 @@ Every synced record has `updatedAt` (client clock, last-write-wins) and `deleted
 
 // SetLog
 { "id": "guid", "sessionId": "guid", "exerciseId": "dumbbell-bench-press", "section": "main",
-  "exerciseOrder": 1, "setNumber": 1, "weightKg": 16.0, "reps": 10, "durationSeconds": null,
+  "exerciseOrder": 1, "setNumber": 1, "weightKg": 16.0,
+  "plate": null,                  // plate number on a numbered stack; weightKg is what it weighs
+  "reps": 10, "durationSeconds": null,
   "rir": 2, "completed": true, "completedAt": "...", "updatedAt": "...", "deleted": false }
 
 // BodyMetric

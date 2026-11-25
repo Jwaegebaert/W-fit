@@ -470,6 +470,13 @@ namespace WFit.Api.Data.Migrations
                     b.Property<int>("SessionMinutes")
                         .HasColumnType("int");
 
+                    b.Property<string>("StackPlatesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasDefaultValue("{}");
+
                     b.PrimitiveCollection<string>("TrainingDays")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -509,6 +516,9 @@ namespace WFit.Api.Data.Migrations
 
                     b.Property<int>("ExerciseOrder")
                         .HasColumnType("int");
+
+                    b.Property<double?>("Plate")
+                        .HasColumnType("float");
 
                     b.Property<int?>("Reps")
                         .HasColumnType("int");

@@ -26,6 +26,8 @@ including warm-up and cool-down. The main goal is balanced strength and muscle a
   [free-exercise-db](https://github.com/yuhonas/free-exercise-db)), and tapping a piece of equipment shows a simple
   line drawing of it.
 - **Your gym, your equipment.** Switch off whatever your gym doesn't have, or start from a quick preset.
+- **Numbered machines.** Stacks marked 2, 4, 6 instead of kg (like older Cybex ones) are logged by plate number; you set
+  once what a plate weighs and your stats and coach use the real kg.
 - **Live tracking.** Log weight and reps per set. Weights are pre-filled from your history, rest timers start on their
   own and the screen stays awake while you train.
 - **Instant swaps.** Machine taken? Mark it as *Occupied* for today, *Not in my gym* for good, or *Prefer another* if

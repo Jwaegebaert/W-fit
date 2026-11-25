@@ -17,7 +17,7 @@ public class MigrationTests
     {
         using var db = SqlServerContext();
         Assert.False(db.Database.HasPendingModelChanges(), "Run `dotnet ef migrations add <Name>` – the model differs from the snapshot.");
-        Assert.Equal("SessionHeartRate", db.Database.GetMigrations().Last().Split('_', 2)[1]);
+        Assert.Equal("NumberedStacks", db.Database.GetMigrations().Last().Split('_', 2)[1]);
     }
 
     [Fact]
@@ -29,6 +29,15 @@ public class MigrationTests
         Assert.Equal("normal", added["RestMode"].DefaultValue);
         Assert.Equal(3, added["CooldownStretches"].DefaultValue);
         Assert.Equal("{}", added["BarWeightsJson"].DefaultValue);
+    }
+
+    [Fact]
+    public void NumberedStacks_keeps_existing_rows_valid()
+    {
+        var added = new NumberedStacks().UpOperations.OfType<AddColumnOperation>().ToDictionary(o => o.Name);
+
+        Assert.Equal(("Profiles", (object)"{}"), (added["StackPlatesJson"].Table, added["StackPlatesJson"].DefaultValue!));
+        Assert.Equal(("SetLogs", true), (added["Plate"].Table, added["Plate"].IsNullable));
     }
 
     [Fact]

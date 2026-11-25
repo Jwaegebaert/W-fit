@@ -22,6 +22,7 @@ class SetRef {
     required this.seconds,
     required this.rest,
     required this.last,
+    this.count = 1,
   });
 
   factory SetRef.fromJson(Map<String, dynamic> j) => SetRef(
@@ -33,6 +34,7 @@ class SetRef {
         seconds: (j['seconds'] as num).toInt(),
         rest: (j['rest'] as num).toInt(),
         last: j['last'] as bool,
+        count: (j['count'] as num?)?.toInt() ?? 1,
       );
 
   final String sessionId;
@@ -50,6 +52,25 @@ class SetRef {
   /// Last set of the exercise: the rest leads to the next exercise.
   final bool last;
 
+  /// Sets one work countdown runs through in a row, starting with [set] (one-sided stretches: all of them).
+  final int count;
+
+  /// One reference per set the countdown covers.
+  Iterable<SetRef> get each sync* {
+    for (var n = 0; n < count; n++) {
+      yield SetRef(
+        sessionId: sessionId,
+        order: order,
+        exerciseId: exerciseId,
+        section: section,
+        set: set + n,
+        seconds: seconds,
+        rest: rest,
+        last: last && n == count - 1,
+      );
+    }
+  }
+
   bool isSameSet(SetRef o) =>
       sessionId == o.sessionId && order == o.order && exerciseId == o.exerciseId && set == o.set;
 
@@ -62,16 +83,18 @@ class SetRef {
         'seconds': seconds,
         'rest': rest,
         'last': last,
+        if (count > 1) 'count': count,
       };
 }
 
 class CountdownPhase {
-  const CountdownPhase({required this.label, required this.seconds, required this.endsAt});
+  const CountdownPhase({required this.label, required this.seconds, required this.endsAt, this.pause = false});
 
   factory CountdownPhase.fromJson(Map<String, dynamic> j) => CountdownPhase(
         label: j['label'] as String,
         seconds: (j['seconds'] as num).toInt(),
         endsAt: (j['endsAt'] as num).toInt(),
+        pause: j['pause'] as bool? ?? false,
       );
 
   final String label;
@@ -80,7 +103,10 @@ class CountdownPhase {
   /// Epoch milliseconds.
   final int endsAt;
 
-  Map<String, dynamic> toJson() => {'label': label, 'seconds': seconds, 'endsAt': endsAt};
+  /// Time to change sides inside a work countdown, not work itself.
+  final bool pause;
+
+  Map<String, dynamic> toJson() => {'label': label, 'seconds': seconds, 'endsAt': endsAt, if (pause) 'pause': true};
 }
 
 class Countdown {
@@ -113,28 +139,35 @@ class Countdown {
         phases: [CountdownPhase(label: label, seconds: seconds, endsAt: from + seconds * 1000)],
       );
 
-  /// Work countdown for [set]; one-sided exercises run one phase per side.
+  /// Work countdown for [set]; one-sided exercises run one phase per side with [sideSwitchSeconds] in between, and go
+  /// round again for every further set it covers.
   factory Countdown.work(
     String name,
     SetRef set, {
     required bool perSide,
     required int from,
     required CountdownOwner owner,
-  }) =>
-      Countdown(
-        kind: CountdownKind.work,
-        owner: owner,
-        changedAt: from,
-        set: set,
-        phases: [
-          for (var side = 1; side <= (perSide ? 2 : 1); side++)
-            CountdownPhase(
-              label: perSide ? 'Side $side · $name' : name,
-              seconds: set.seconds,
-              endsAt: from + side * set.seconds * 1000,
-            ),
-        ],
-      );
+  }) {
+    final phases = <CountdownPhase>[];
+    var end = from;
+    void add(String label, int seconds, {bool pause = false}) {
+      end += seconds * 1000;
+      phases.add(CountdownPhase(label: label, seconds: seconds, endsAt: end, pause: pause));
+    }
+
+    for (var round = 1; round <= set.count; round++) {
+      final of = set.count > 1 ? ' ($round/${set.count})' : '';
+      for (var side = 1; side <= (perSide ? 2 : 1); side++) {
+        if (perSide && phases.isNotEmpty) add('$switchLabel · $name', sideSwitchSeconds, pause: true);
+        add(perSide ? 'Side $side$of · $name' : '$name$of', set.seconds);
+      }
+    }
+    return Countdown(kind: CountdownKind.work, owner: owner, changedAt: from, set: set, phases: phases);
+  }
+
+  /// Time to change sides in a one-sided hold.
+  static const sideSwitchSeconds = 5;
+  static const switchLabel = 'Switch sides';
 
   static const restLabel = 'Rest';
   static const restNextLabel = 'Rest · next exercise';
@@ -195,6 +228,7 @@ class Countdown {
                   label: phases[p].label,
                   seconds: p == i ? math.max(0, phases[p].seconds + seconds) : phases[p].seconds,
                   endsAt: phases[p].endsAt + shift,
+                  pause: phases[p].pause,
                 ),
       ],
     );

@@ -140,7 +140,7 @@ void main() {
     await tester.pump();
     expect(find.text('Side 1 · Side Plank'), findsOneWidget);
     await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const SizedBox()));
-    for (var i = 0; i < 12; i++) {
+    for (var i = 0; i < 32; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 250)));
       await tester.pump(const Duration(milliseconds: 250));
     }

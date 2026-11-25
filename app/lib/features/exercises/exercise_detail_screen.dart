@@ -12,6 +12,7 @@ import '../../widgets/equipment_sheet.dart';
 import '../../widgets/exercise_visuals.dart';
 import '../../widgets/preference_sheet.dart';
 import '../settings/equipment_screen.dart' show showBarWeightDialog;
+import '../settings/numbered_stacks_screen.dart' show stackSummary;
 
 class ExerciseDetailScreen extends ConsumerWidget {
   const ExerciseDetailScreen({super.key, required this.exerciseId});
@@ -27,6 +28,12 @@ class ExerciseDetailScreen extends ConsumerWidget {
       return bar > 0
           ? ('Bar: ${fmt(bar)} kg', 'Log only the plates, both sides together.')
           : ('Bar weight not set', '$name bars differ per gym. Tap to set yours.');
+    }
+    if (ref.watch(loadModelProvider).plateKg(e.id) case final plate?) {
+      return (
+        'Numbered plates: ${stackSummary(plate)}',
+        'Log the plate number. Your stats and your coach use the real weight.',
+      );
     }
     return switch (e.load) {
       LoadType.assist => ('Assisted machine', 'Log the assistance. More kg makes it easier, so you progress by lowering it.'),

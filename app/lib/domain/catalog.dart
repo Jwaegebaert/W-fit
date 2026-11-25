@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart' show rootBundle;
 
@@ -70,6 +71,9 @@ class Equipment {
 
   bool get hasBar => barWeightKg != null;
 
+  /// Machine whose weight stack may be numbered instead of marked in kg (see [LoadModel.plates]).
+  bool get hasStack => group == 'machines';
+
   /// One sentence on what it looks like / how to recognise it in a gym.
   final String? description;
 }
@@ -101,6 +105,7 @@ class Exercise {
     this.stress = const [],
     LoadType? load,
     this.bar,
+    this.plateKg,
   }) : load = load ?? (incrementKg > 0 ? LoadType.weight : LoadType.none);
 
   factory Exercise.fromJson(Map<String, dynamic> j) => Exercise(
@@ -129,6 +134,36 @@ class Exercise {
         stress: (j['stress'] as List?)?.cast<String>() ?? const [],
         load: LoadType.parse(j['load'] as String?),
         bar: j['bar'] as String?,
+      );
+
+  /// This exercise on a machine with a numbered stack of [kg] plates: progress goes plate by plate.
+  Exercise withPlate(double kg) => Exercise(
+        id: id,
+        name: name,
+        category: category,
+        splits: splits,
+        primary: primary,
+        secondary: secondary,
+        pattern: pattern,
+        equipment: equipment,
+        difficulty: difficulty,
+        compound: compound,
+        unilateral: unilateral,
+        isTimed: isTimed,
+        sets: sets,
+        repMin: repMin,
+        repMax: repMax,
+        durationSeconds: durationSeconds,
+        rest: rest,
+        incrementKg: kg,
+        badminton: badminton,
+        instructions: instructions,
+        tip: tip,
+        mistakes: mistakes,
+        stress: stress,
+        load: load,
+        bar: bar,
+        plateKg: kg,
       );
 
   /// Equipment id that marks floor work (lying, kneeling or sitting on a mat / the floor).
@@ -172,6 +207,16 @@ class Exercise {
   /// only the plates; statistics add the bar weight.
   final String? bar;
 
+  /// Weight of one plate when this gym's machine has a numbered stack: the athlete sees and logs plate numbers, all
+  /// weights stay in kg. Null for kg. Set by [Catalog.withPlates].
+  final double? plateKg;
+
+  /// [kg] as a whole number of plates (at least one, unless the plates assist); unchanged without a numbered stack.
+  double snapKg(double kg) {
+    final plate = plateKg;
+    return plate == null ? kg : math.max(isAssisted ? 0 : 1, (kg / plate).round()) * plate;
+  }
+
   bool get isWeighted => incrementKg > 0;
   bool get isAssisted => load == LoadType.assist;
 
@@ -201,14 +246,30 @@ enum LoadType {
   static LoadType? parse(String? v) => v == null ? null : LoadType.values.where((t) => t.name == v).firstOrNull;
 }
 
-/// Turns logged kg into the real load: logged plates + the empty bar, and no load for assisted machines.
+/// "7" or, for a weight logged before the stack was numbered, "6.5".
+String formatPlate(double number) {
+  final n = (number * 10).round() / 10;
+  return n == n.roundToDouble() ? n.toStringAsFixed(0) : n.toStringAsFixed(1);
+}
+
+/// Turns logged kg into the real load: logged plates + the empty bar, and no load for assisted machines. Also knows the
+/// machines with a numbered stack, where the athlete works with plate numbers instead of kg.
 class LoadModel {
-  const LoadModel(this.catalog, [this.barOverrides = const {}]);
+  const LoadModel(this.catalog, [this.barOverrides = const {}, this.plates = const {}]);
 
   final Catalog catalog;
 
   /// equipmentId → bar weight set by the user (Equipment screen); falls back to the catalog default.
   final Map<String, double> barOverrides;
+
+  /// equipmentId → kg of one plate, for machines with a numbered stack.
+  final Map<String, double> plates;
+
+  /// Kg of one plate when [exerciseId] is done on a numbered stack; null when it is logged in kg.
+  double? plateKg(String exerciseId) {
+    final e = plates.isEmpty ? null : catalog.exercise(exerciseId);
+    return e == null ? null : plates[catalog.stackOf(e)];
+  }
 
   /// Empty-bar weight for a bar equipment id.
   double barWeight(String equipmentId) =>
@@ -222,9 +283,12 @@ class LoadModel {
 
   bool isAssisted(String exerciseId) => catalog.exercise(exerciseId)?.isAssisted ?? false;
 
-  /// Prescribed weight for display: "40 kg", "40 kg plates (+20 bar)" or "25 kg assist".
+  /// Prescribed weight for display: "40 kg", "40 kg plates (+20 bar)", "25 kg assist" or "plate 7 (35 kg)".
   String weightLabel(Exercise? e, double kg) {
     String fmt(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    if (e == null ? null : plateKg(e.id) case final plate?) {
+      return 'plate ${formatPlate(kg / plate)} (${fmt(kg)} kg${e!.isAssisted ? ' assist' : ''})';
+    }
     if (e?.isAssisted ?? false) return '${fmt(kg)} kg assist';
     final bar = e?.bar == null ? 0.0 : barWeight(e!.bar!);
     return bar > 0 ? '${fmt(kg)} kg plates (+${fmt(bar)} bar)' : '${fmt(kg)} kg';
@@ -250,6 +314,10 @@ class LoadModel {
       return const {};
     }
   }
+
+  /// Parses the profile's `stackPlatesJson` ({"seated_row_machine": 5, ...}).
+  static Map<String, double> parsePlates(String? json) =>
+      {for (final e in parseOverrides(json).entries) if (e.value > 0) e.key: e.value};
 }
 
 class Catalog {
@@ -280,6 +348,22 @@ class Catalog {
 
   Exercise? exercise(String id) => _exerciseById[id];
   Equipment? equipmentById(String id) => _equipmentById[id];
+
+  /// Machine whose stack [e] is loaded with; null for free weights, bars and bodyweight work.
+  String? stackOf(Exercise e) => !e.isWeighted || e.isTimed || e.bar != null
+      ? null
+      : e.equipment.where((id) => _equipmentById[id]?.hasStack ?? false).firstOrNull;
+
+  /// This catalog for a gym where the machines in [plates] have numbered stacks (see [LoadModel.plates]).
+  Catalog withPlates(Map<String, double> plates) => plates.isEmpty
+      ? this
+      : Catalog(
+          version: version,
+          equipment: equipment,
+          exercises: [
+            for (final e in exercises) if (plates[stackOf(e)] case final kg?) e.withPlate(kg) else e,
+          ],
+        );
 
   String exerciseName(String id) => _exerciseById[id]?.name ?? id;
 }

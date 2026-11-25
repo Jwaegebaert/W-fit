@@ -68,6 +68,22 @@ public class CoachBriefTests
         Assert.Equal(CoachBriefRules.MaxIdList, brief.Equipment!.Unavailable!.Count);
     }
 
+    [Theory]
+    [InlineData(4.54, 4.54)]
+    [InlineData(0.0, null)]
+    [InlineData(900.0, null)]
+    public void Plate_weight_reaches_the_coach_only_when_plausible(double kg, double? expected)
+    {
+        var brief = CoachBriefRules.Sanitize(new CoachBrief
+        {
+            ExerciseHistory = [new BriefExerciseHistory { ExerciseId = "seated-cable-row", PlateKg = kg }],
+        });
+
+        Assert.Equal(expected, brief.ExerciseHistory![0]!.PlateKg);
+        Assert.Contains("plateKg", AiPrompts.WorkoutSystem);
+        Assert.Equal(expected is not null, AiPrompts.Serialize(brief).Contains("\"plateKg\":4.54"));
+    }
+
     [Fact]
     public void Empty_brief_is_safe()
     {

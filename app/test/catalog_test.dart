@@ -79,8 +79,8 @@ void main() {
   final main = catalog.exercises.where(isMain).toList();
 
   group('catalog structure', () {
-    test('version 4 with unique kebab-case ids and every v2 id kept', () {
-      expect(catalog.version, 4);
+    test('version 5 with unique kebab-case ids and every v2 id kept', () {
+      expect(catalog.version, 5);
       final ids = catalog.exercises.map((e) => e.id).toList();
       expect(ids.toSet().length, ids.length, reason: 'duplicate exercise ids');
       for (final id in ids) {
@@ -304,6 +304,25 @@ void main() {
     test('one-sided timed exercises store their time per side', () {
       for (final e in catalog.exercises.where((e) => e.unilateral && e.isTimed)) {
         expect(e.durationSeconds, lessThanOrEqualTo(45), reason: '${e.id}: per-side hold');
+      }
+    });
+
+    test('one-sided stretches are short and done twice, also in their instructions', () {
+      final stretches = catalog.exercises.where((e) => e.category == 'cooldown' && e.unilateral && e.isTimed).toList();
+      expect(stretches, hasLength(18));
+      for (final e in stretches) {
+        expect((e.sets, e.durationSeconds), (2, 15), reason: e.id);
+        expect(e.instructions.join(' '), allOf(contains('15 seconds'), contains('two rounds')), reason: e.id);
+      }
+    });
+
+    test('a stack belongs to machine exercises with a weight, never to bars or bodyweight', () {
+      String? stack(String id) => catalog.stackOf(catalog.exercise(id)!);
+      expect(stack('seated-cable-row'), 'seated_row_machine');
+      expect(stack('assisted-pull-up'), 'assisted_pullup_machine');
+      expect(stack('cable-wrist-curl'), 'cable_machine', reason: 'not the bench it also needs');
+      for (final id in ['smith-squat', 'barbell-row', 'dumbbell-bench-press', 'pull-up', 'side-plank']) {
+        expect(stack(id), isNull, reason: id);
       }
     });
   });

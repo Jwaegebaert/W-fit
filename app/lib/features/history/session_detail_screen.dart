@@ -25,9 +25,10 @@ extension on Repository {
   Future<void> touchSession(String id) => (db.update(db.workoutSessions)..where((t) => t.id.equals(id)))
       .write(WorkoutSessionsCompanion(updatedAt: Value(DateTime.now().toUtc()), dirty: const Value(true)));
 
-  Future<void> correctSet(String id, {double? weightKg, int? reps, int? durationSeconds}) =>
+  Future<void> correctSet(String id, {double? weightKg, double? plate, int? reps, int? durationSeconds}) =>
       (db.update(db.setLogs)..where((t) => t.id.equals(id))).write(SetLogsCompanion(
         weightKg: Value(weightKg),
+        plate: Value(plate),
         reps: Value(reps),
         durationSeconds: Value(durationSeconds),
         updatedAt: Value(DateTime.now().toUtc()),
@@ -147,11 +148,12 @@ class _ExerciseTile extends ConsumerWidget {
     final parts = <(String, List<String>)>[];
     for (final s in sets) {
       final kg = loads.totalKg(id, s.weightKg) ?? 0;
-      final load = kg > 0
+      final weight = kg > 0
           ? '${formatKg(kg)} kg'
           : (s.weightKg ?? 0) > 0
               ? '${formatKg(s.weightKg)} kg assist'
               : '';
+      final load = s.plate != null && weight.isNotEmpty ? 'plate ${formatPlate(s.plate!)} ($weight)' : weight;
       final amount = s.durationSeconds != null && s.reps == null ? formatSeconds(s.durationSeconds!) : '${s.reps ?? '–'}';
       if (parts.isNotEmpty && parts.last.$1 == load) {
         parts.last.$2.add(amount);
@@ -182,7 +184,21 @@ class _EditSets extends ConsumerStatefulWidget {
 }
 
 class _EditSetsState extends ConsumerState<_EditSets> {
-  late final _weight = [for (final s in widget.sets) TextEditingController(text: s.weightKg == null ? '' : formatKg(s.weightKg))];
+  /// Kg of one plate when the machine has a numbered stack.
+  late final _plateKg = ref.read(loadModelProvider).plateKg(widget.sets.first.exerciseId);
+
+  /// Sets logged by plate number are corrected by plate number, older ones in kg.
+  bool _numbered(SetLog s) => s.plate != null && _plateKg != null;
+
+  late final _weight = [
+    for (final s in widget.sets)
+      TextEditingController(
+          text: _numbered(s)
+              ? formatPlate(s.plate!)
+              : s.weightKg == null
+                  ? ''
+                  : formatKg(s.weightKg)),
+  ];
   late final _amount = [
     for (final s in widget.sets)
       TextEditingController(text: _timed(s) ? '${s.durationSeconds ?? ''}' : s.reps?.toString() ?? ''),
@@ -207,9 +223,12 @@ class _EditSetsState extends ConsumerState<_EditSets> {
         continue;
       }
       final amount = int.tryParse(_amount[i].text);
+      final weight = double.tryParse(_weight[i].text.replaceAll(',', '.'));
+      final numbered = _numbered(s);
       await repo.correctSet(
         s.id,
-        weightKg: double.tryParse(_weight[i].text.replaceAll(',', '.')),
+        weightKg: numbered && weight != null ? weight * _plateKg! : weight,
+        plate: numbered ? weight : null,
         reps: _timed(s) ? null : amount,
         durationSeconds: _timed(s) ? amount : s.durationSeconds,
       );
@@ -246,7 +265,7 @@ class _EditSetsState extends ConsumerState<_EditSets> {
               padding: const EdgeInsets.only(bottom: Gap.sm),
               child: Row(children: [
                 SizedBox(width: 28, child: Text('${s.setNumber}', style: t.textTheme.titleSmall)),
-                if (showWeight) ...[Expanded(child: field(_weight[i], weightLabel)), const SizedBox(width: Gap.sm)],
+                if (showWeight) ...[Expanded(child: field(_weight[i], _numbered(s) ? 'Plate' : weightLabel)), const SizedBox(width: Gap.sm)],
                 Expanded(child: field(_amount[i], timed ? 'Seconds' : 'Reps')),
                 IconButton(
                   tooltip: 'Remove set ${s.setNumber}',

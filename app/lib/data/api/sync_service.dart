@@ -176,6 +176,8 @@ class SyncService {
               cooldownStretches: Value(_i(p['cooldownStretches']) ?? 3),
               barWeightsJson: Value(p['barWeights'] is Map ? jsonEncode(p['barWeights']) : '{}'),
               muscleFocusJson: Value(p['muscleFocus'] is Map ? jsonEncode(p['muscleFocus']) : '{}'),
+              // A server from before numbered stacks leaves this out: keep what this phone has.
+              stackPlatesJson: p['stackPlates'] is Map ? Value(jsonEncode(p['stackPlates'])) : const Value.absent(),
               updatedAt: _dt(p['updatedAt']),
               deleted: Value(p['deleted'] as bool? ?? false),
               dirty: const Value(false),
@@ -257,6 +259,7 @@ class SyncService {
             exerciseOrder: _i(r['exerciseOrder']) ?? 0,
             setNumber: _i(r['setNumber']) ?? 1,
             weightKg: Value(_d(r['weightKg'])),
+            plate: r.containsKey('plate') ? Value(_d(r['plate'])) : const Value.absent(),
             reps: Value(_i(r['reps'])),
             durationSeconds: Value(_i(r['durationSeconds'])),
             rir: Value(_i(r['rir'])),
@@ -324,6 +327,7 @@ Map<String, dynamic> profileToJson(Profile p) => {
       'cooldownStretches': p.cooldownStretches,
       'barWeights': LoadModel.parseOverrides(p.barWeightsJson),
       'muscleFocus': MuscleFocus.decode(p.muscleFocusJson).toJson(),
+      'stackPlates': LoadModel.parsePlates(p.stackPlatesJson),
       'updatedAt': _iso(p.updatedAt),
       'deleted': p.deleted,
     };
@@ -408,6 +412,7 @@ Map<String, dynamic> setToJson(SetLog s) => {
       'exerciseOrder': s.exerciseOrder,
       'setNumber': s.setNumber,
       'weightKg': s.weightKg,
+      'plate': s.plate,
       'reps': s.reps,
       'durationSeconds': s.durationSeconds,
       'rir': s.rir,

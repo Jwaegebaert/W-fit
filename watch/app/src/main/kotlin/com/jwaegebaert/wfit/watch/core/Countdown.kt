@@ -1,5 +1,9 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package com.jwaegebaert.wfit.watch.core
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.math.max
@@ -33,7 +37,13 @@ data class Countdown(
     }
 
     @Serializable
-    data class Phase(val label: String, val seconds: Int, val endsAt: Long)
+    data class Phase(
+        val label: String,
+        val seconds: Int,
+        val endsAt: Long,
+        /** Time to change sides inside a work countdown, not work itself. */
+        @EncodeDefault(EncodeDefault.Mode.NEVER) val pause: Boolean = false,
+    )
 
     val isWork: Boolean get() = kind == Kind.WORK
 
@@ -104,18 +114,29 @@ data class Countdown(
         fun rest(label: String, seconds: Int, from: Long, owner: Owner = Owner.WATCH) =
             Countdown(Kind.REST, owner, from, listOf(Phase(label, seconds, from + seconds * 1000L)))
 
-        /** Work countdown for [set]; one-sided exercises run one phase per side. */
+        /** Time to change sides in a one-sided hold. */
+        const val SIDE_SWITCH_SECONDS = 5
+        const val SWITCH = "Switch sides"
+
+        /**
+         * Work countdown for [set]; one-sided exercises run one phase per side with [SIDE_SWITCH_SECONDS] in between,
+         * and go round again for every further set it covers.
+         */
         fun work(name: String, set: SetRef, perSide: Boolean, from: Long, owner: Owner = Owner.WATCH): Countdown {
-            val sides = if (perSide) 2 else 1
-            return Countdown(
-                Kind.WORK,
-                owner,
-                from,
-                (1..sides).map { side ->
-                    Phase(if (perSide) "Side $side · $name" else name, set.seconds, from + side * set.seconds * 1000L)
-                },
-                set,
-            )
+            val phases = mutableListOf<Phase>()
+            var end = from
+            fun add(label: String, seconds: Int, pause: Boolean = false) {
+                end += seconds * 1000L
+                phases += Phase(label, seconds, end, pause)
+            }
+            for (round in 1..set.count) {
+                val of = if (set.count > 1) " ($round/${set.count})" else ""
+                for (side in 1..(if (perSide) 2 else 1)) {
+                    if (perSide && phases.isNotEmpty()) add("$SWITCH · $name", SIDE_SWITCH_SECONDS, pause = true)
+                    add(if (perSide) "Side $side$of · $name" else "$name$of", set.seconds)
+                }
+            }
+            return Countdown(Kind.WORK, owner, from, phases, set)
         }
 
         fun newest(a: Countdown?, b: Countdown?): Countdown? = when {
@@ -141,4 +162,6 @@ data class SetRef(
     val rest: Int,
     /** Last set of the exercise: the rest leads to the next exercise. */
     val last: Boolean,
+    /** Sets one work countdown runs through in a row, starting with [set] (one-sided stretches: all of them). */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val count: Int = 1,
 )

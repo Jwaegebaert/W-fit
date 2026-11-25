@@ -14,6 +14,7 @@ object Buzz {
         val vibrator = vibrator(context)
         val pattern = when (kind) {
             CountdownAlarm.KIND_SIDE -> longArrayOf(0, 150, 100, 150) // switch sides
+            CountdownAlarm.KIND_GO -> longArrayOf(0, 300) // other side starts
             CountdownAlarm.KIND_WORK -> longArrayOf(0, 600) // hold done
             else -> longArrayOf(0, 300, 150, 300, 150, 300) // rest over
         }

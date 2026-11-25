@@ -248,18 +248,37 @@ void main() {
     await unpumpWFit(tester);
   });
 
-  testWidgets('− and + change the set to do now in the steps of the exercise', (tester) async {
+  testWidgets('a numbered machine is logged by plate number and stored with its weight', (tester) async {
     final (_, repo, session) = await start(tester);
+    Future<void> setPlate(double? kg, {bool numbersLogged = false}) async {
+      await pumpUntil(tester, () async {
+        await repo.setStackPlate('chest_press_machine', kg, numbersLogged: numbersLogged);
+        return 1;
+      });
+      await settle(tester);
+    }
+
     await openCard(tester, press);
-    final step = catalog.exercise(press)!.incrementKg;
-    await tap(tester, find.descendant(of: card(press), matching: find.byTooltip('More weight')));
-    await tap(tester, find.descendant(of: card(press), matching: find.byTooltip('More weight')));
-    final target = int.parse(tester.widget<TextField>(fields(press).at(1)).decoration!.hintText!);
-    await tap(tester, find.descendant(of: card(press), matching: find.byTooltip('Less reps')));
-    expect(text(tester, fields(press).at(2)), formatKg(step * 2), reason: 'the later sets follow');
+    expect(find.descendant(of: card(press), matching: find.byIcon(Icons.remove_rounded)), findsNothing);
+    await tester.enterText(fields(press).at(0), '40');
+    await setPlate(5); // during the workout: what is typed becomes a plate number
+    expect(find.text('Plate (5 kg each)'), findsOneWidget);
+    expect([for (final i in [0, 2, 4]) text(tester, fields(press).at(i))], ['8', '8', '8']);
+
+    await tester.enterText(fields(press).at(0), '7');
     await tap(tester, tick(press, 1));
-    final set = (await logged(tester, repo, session, press)).single;
-    expect((set.weightKg, set.reps), (step * 2, target - 1));
+    var set = (await logged(tester, repo, session, press)).single;
+    expect((set.plate, set.weightKg), (7, 35));
+
+    await setPlate(6); // the plates turn out heavier: same number, other weight
+    expect([for (final i in [0, 2]) text(tester, fields(press).at(i))], ['7', '7']);
+    set = (await logged(tester, repo, session, press)).single;
+    expect((set.plate, set.weightKg), (7, 42));
+    await tap(tester, tick(press, 2));
+    expect((await logged(tester, repo, session, press)).last.weightKg, 42);
+
+    await setPlate(null);
+    expect([for (final i in [0, 2, 4]) text(tester, fields(press).at(i))], ['42', '42', '42']);
     await unpumpWFit(tester);
   });
 

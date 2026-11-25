@@ -44,7 +44,7 @@ class SectionChecklist extends ConsumerWidget {
   int _done(int order, PlanItem item) =>
       [for (var n = 1; n <= item.sets; n++) _set(order, item, n)].where((s) => s?.completed ?? false).length;
 
-  SetRef _setRef(int order, PlanItem item, int n) => SetRef(
+  SetRef _setRef(int order, PlanItem item, int n, {int count = 1}) => SetRef(
         sessionId: sessionId,
         order: order,
         exerciseId: item.exerciseId,
@@ -52,7 +52,8 @@ class SectionChecklist extends ConsumerWidget {
         set: n,
         seconds: item.durationSeconds ?? 30,
         rest: 0, // no rest in a warm-up or cool-down
-        last: n >= item.sets,
+        last: n + count - 1 >= item.sets,
+        count: count,
       );
 
   Future<void> _tick(SetLogger logger, int order, PlanItem item, bool completed) async {
@@ -77,10 +78,14 @@ class SectionChecklist extends ConsumerWidget {
     }
   }
 
-  /// Runs the timer of the next open set (one per side when needed) and logs it at the end.
+  /// Runs the timer of the next open set and logs it at the end. One-sided exercises run all open sets in one go, side
+  /// after side, so a stretch needs one tap.
   void _start(WidgetRef ref, int order, PlanItem item, String name, {required bool perSide}) {
     final n = [for (var n = 1; n <= item.sets; n++) n].firstWhere((n) => !(_set(order, item, n)?.completed ?? false));
-    ref.read(workoutTimerProvider.notifier).startWork(name, _setRef(order, item, n), perSide: perSide);
+    final open = [for (var m = n; m <= item.sets; m++) m].takeWhile((m) => !(_set(order, item, m)?.completed ?? false));
+    ref
+        .read(workoutTimerProvider.notifier)
+        .startWork(name, _setRef(order, item, n, count: perSide ? open.length : 1), perSide: perSide);
   }
 
   @override

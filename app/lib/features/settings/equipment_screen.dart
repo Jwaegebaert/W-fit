@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import '../../domain/catalog.dart';
@@ -110,6 +111,7 @@ class EquipmentScreen extends ConsumerWidget {
     final t = Theme.of(context);
     final s = t.colorScheme;
     bool has(Equipment e) => status[e.id] ?? true;
+    final numbered = [for (final e in catalog.equipment) if (loads.plates.containsKey(e.id)) e.name];
     final unset = catalog.equipment.where((e) => e.hasBar && has(e) && loads.barWeight(e.id) <= 0).toList();
 
     return Scaffold(
@@ -127,7 +129,8 @@ class EquipmentScreen extends ConsumerWidget {
           text: 'Switch off what your gym does not have; workouts and your coach then never use it. For something that is '
               'just busy, use Swap during the workout.\n\n'
               'For bar exercises you log only the plates. Your records and stats add the empty bar; tap a bar to set its '
-              'weight.',
+              'weight.\n\n'
+              'For machines with numbers instead of kg on the stack you log the plate number; see Numbered machines.',
         ),
       ]),
       body: ListView(padding: pagePadding(context), children: [
@@ -142,6 +145,21 @@ class EquipmentScreen extends ConsumerWidget {
               onTap: () => showBarWeightDialog(context, ref, e.id),
             ),
           ),
+        Card(
+          margin: const EdgeInsets.only(bottom: Gap.item),
+          clipBehavior: Clip.antiAlias,
+          child: ListTile(
+            leading: const Icon(Icons.format_list_numbered_rounded),
+            title: const Text('Numbered machines'),
+            subtitle: Text(
+              numbered.isEmpty ? 'For stacks marked 2, 4, 6 instead of kg' : numbered.join(', '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/settings/equipment/stacks'),
+          ),
+        ),
         for (final g in equipmentGroupLabels.entries)
           if (catalog.equipment.where((e) => e.group == g.key && !e.alwaysAvailable).toList() case final group
               when group.isNotEmpty)
@@ -158,7 +176,9 @@ class EquipmentScreen extends ConsumerWidget {
                       title: Text(e.name),
                       subtitle: e.hasBar
                           ? Text(loads.barWeight(e.id) > 0 ? 'Bar ${formatKg(loads.barWeight(e.id))} kg' : 'Bar weight not set')
-                          : null,
+                          : loads.plates[e.id] == null
+                              ? null
+                              : Text('Numbered, ${formatKg(loads.plates[e.id])} kg per plate'),
                       onTap: () => showEquipmentSheet(context, e.id),
                       trailing: Semantics(
                         label: '${e.name} available',

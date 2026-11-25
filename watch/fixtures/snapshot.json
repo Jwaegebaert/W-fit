@@ -112,6 +112,35 @@
       "step": 2.5,
       "checklist": false,
       "logged": []
+    },
+    {
+      "order": 5,
+      "id": "seated-cable-row",
+      "name": "Seated Cable Row",
+      "section": "main",
+      "sectionLabel": "Workout",
+      "target": "3 × 8–12",
+      "weightText": "plate 7 (35 kg)",
+      "sets": 3,
+      "targetReps": 9,
+      "seconds": null,
+      "perSide": false,
+      "rest": 90,
+      "weightLabel": "Plate",
+      "needsWeight": true,
+      "weight": 7,
+      "step": 1,
+      "checklist": false,
+      "logged": [
+        {
+          "set": 1,
+          "weight": 6,
+          "reps": 12,
+          "seconds": null,
+          "at": 1700000090000
+        }
+      ],
+      "numbered": true
     }
   ],
   "timer": {

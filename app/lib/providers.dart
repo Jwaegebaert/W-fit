@@ -30,11 +30,13 @@ final repositoryProvider = Provider<Repository>((ref) {
   return Repository(ref.watch(databaseProvider), catalog: catalog);
 });
 
-/// Bar weights (catalog defaults + the user's overrides) for turning logged plates into real load.
-final loadModelProvider = Provider<LoadModel>((ref) => LoadModel(
-      ref.watch(catalogProvider),
-      LoadModel.parseOverrides(ref.watch(profileProvider).value?.barWeightsJson),
-    ));
+/// Bar weights (catalog defaults + the user's overrides) for turning logged plates into real load, and the machines
+/// with numbered stacks.
+final loadModelProvider = Provider<LoadModel>((ref) {
+  final (bars, plates) =
+      ref.watch(profileProvider.select((p) => (p.value?.barWeightsJson, p.value?.stackPlatesJson)));
+  return LoadModel(ref.watch(catalogProvider), LoadModel.parseOverrides(bars), LoadModel.parsePlates(plates));
+});
 
 final apiConfigStoreProvider = Provider<ApiConfigStore>((ref) => ApiConfigStore());
 

@@ -44,6 +44,7 @@ public sealed class WFitDbContext(DbContextOptions<WFitDbContext> options) : DbC
             e.Property(x => x.CooldownStretches).HasDefaultValue(3);
             e.Property(x => x.BarWeightsJson).HasMaxLength(Len.Text).HasDefaultValue("{}");
             e.Property(x => x.MuscleFocusJson).HasMaxLength(Len.Text).HasDefaultValue("{}");
+            e.Property(x => x.StackPlatesJson).HasMaxLength(Len.Text).HasDefaultValue("{}");
             Sync(e);
         });
 

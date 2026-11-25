@@ -148,25 +148,23 @@ void main() {
       expect(change.reason, contains('Go light'));
     });
 
-    test('stretch times from before the per-side change are converted once, newer plans are left alone', () async {
+    test('long one-sided stretches of open plans become two short rounds; other holds stay', () async {
       PlanItem hold(String id, int sec) => PlanItem(exerciseId: id, sets: 1, durationSeconds: sec, restSeconds: 0);
       final date = DateTime.now().add(const Duration(days: 1));
       Future<String> save(DateTime d, List<PlanItem> items) => repo.savePlanned(
           date: d, day: DayType.legs, title: 'Legs', source: 'ai', coachNote: '', blocks: [PlanBlock(section: Section.cooldown, items: items)]);
-      Future<List<int?>> seconds(String id) async => [
-            for (final b in Repository.decodeBlocks((await repo.plannedById(id))!.blocksJson)) ...b.items.map((i) => i.durationSeconds),
+      Future<List<(int, int?)>> holds(String id) async => [
+            for (final b in Repository.decodeBlocks((await repo.plannedById(id))!.blocksJson))
+              ...b.items.map((i) => (i.sets, i.durationSeconds)),
           ];
-      final old = await save(date, [hold('hamstring-stretch', 60), hold('pigeon-stretch', 90), hold('side-plank', 25), hold('suitcase-carry', 40)]);
-      // Already per side, but the server dropped the perSide marker: must not be halved.
-      final current = await save(date.add(const Duration(days: 2)), [hold('hamstring-stretch', 30), hold('pigeon-stretch', 45)]);
-      final coach = c.read(coachServiceProvider);
-      await coach.convertLegacyPlans();
-      expect(await seconds(old), [30, 45, 25, 30]);
-      expect(await seconds(current), [30, 45]);
-
-      final later = await save(date.add(const Duration(days: 4)), [hold('hamstring-stretch', 60)]);
-      await coach.convertLegacyPlans();
-      expect(await seconds(later), [60], reason: 'a longer hold asked for later is kept');
+      final open = await save(date, [
+        hold('hamstring-stretch', 30), hold('pigeon-stretch', 45), hold('childs-pose', 45), hold('side-plank', 25), //
+      ]);
+      final training = await save(date.add(const Duration(days: 2)), [hold('hamstring-stretch', 30)]);
+      await repo.startSession(plannedWorkoutId: training, day: DayType.legs, title: 'Legs');
+      await c.read(coachServiceProvider).convertLegacyPlans();
+      expect(await holds(open), [(2, 15), (2, 15), (1, 45), (1, 25)]);
+      expect(await holds(training), [(1, 30)], reason: 'not in the middle of the workout');
     });
 
     test('less / more change the sets within the limits; nothing else moves', () async {

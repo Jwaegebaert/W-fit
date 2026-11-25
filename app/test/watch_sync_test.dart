@@ -61,7 +61,7 @@ void main() {
           item: item,
           section: section,
           exercise: catalog.exercise(item.exerciseId),
-          loads: LoadModel(catalog),
+          loads: LoadModel(catalog, const {}, const {'seated_row_machine': 5}),
           advice: advice,
           logged: logged,
         );
@@ -83,6 +83,9 @@ void main() {
               advice: const ProgressionAdvice(weightKg: 25, targetReps: 9, message: '')),
           exercise(3, Section.main, item('bar-dip')),
           exercise(4, Section.core, item('side-plank')),
+          exercise(5, Section.main, item('seated-cable-row', weight: 35),
+              advice: const ProgressionAdvice(weightKg: 35, targetReps: 9, message: ''),
+              logged: const [WatchSet(set: 1, weight: 6, reps: 12, at: 1700000090000)]),
         ],
       );
       final file = File('$_fixtures/snapshot.json');
@@ -125,6 +128,8 @@ void main() {
       expect((parsed[2] as WatchEvent).isLog, isFalse);
       expect((parsed[3] as Countdown).kind, CountdownKind.rest);
       expect((parsed[4] as Countdown).kind, CountdownKind.none);
+      final stretch = parsed[5] as Countdown;
+      expect((stretch.set!.count, stretch.phases[1].pause, stretch.phases[2].pause), (2, true, false));
     });
 
     test('damaged and unknown messages are ignored', () {
@@ -295,6 +300,22 @@ void main() {
       final logs = await sets();
       expect(logs.first.weightKg, isNull);
       expect((logs.last.durationSeconds, logs.last.section), (25, 'core'));
+    });
+
+    test('on a numbered stack the watch works with plate numbers, the phone stores the weight', () async {
+      await repo().setStackPlate('seated_row_machine', 4.5);
+      await repo().updatePlannedBlocks(planId, [
+        PlanBlock(section: Section.main, items: [item('seated-cable-row', weight: 31.5)]),
+      ]);
+      await settle();
+      expect(bridge.exercise(0), allOf(containsPair('numbered', true), containsPair('weight', 7), containsPair('step', 1)));
+      expect(bridge.exercise(0)['weightText'], 'plate 7 (31.5 kg)');
+      await receive(event(exerciseId: 'seated-cable-row', weight: 8));
+      final log = (await sets()).single;
+      expect((log.plate, log.weightKg), (8, 36));
+      expect((bridge.exercise(0)['logged'] as List).single, containsPair('weight', 8));
+      await receive(event(id: 'e2', type: 'unlog', exerciseId: 'seated-cable-row', weight: null, reps: null));
+      expect(((await sets()).single.plate, (await sets()).single.weightKg), (8, 36), reason: 'undo keeps the numbers');
     });
 
     test('a late set is added to a finished workout and dropped from a discarded one', () async {

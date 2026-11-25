@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 object CountdownAlarm {
     const val EXTRA_KIND = "kind"
     const val KIND_SIDE = "side"
+    const val KIND_GO = "go"
     const val KIND_WORK = "work"
     const val KIND_REST = "rest"
 
@@ -32,6 +33,7 @@ object CountdownAlarm {
         }
         val kind = when {
             !running.isWork -> KIND_REST
+            phase.pause -> KIND_GO
             running.phaseIndex(now) < running.phases.lastIndex -> KIND_SIDE
             else -> KIND_WORK
         }
@@ -57,7 +59,7 @@ class CountdownReceiver : BroadcastReceiver() {
             try {
                 store.load()
                 store.settle() // logs the set of a finished hold
-                CountdownAlarm.schedule(context, store.runningCountdown()) // second side, or the rest after it
+                CountdownAlarm.schedule(context, store.runningCountdown()) // next side, or the rest after it
                 OngoingWorkout.update(context, store.workout.value, WorkoutStore.now())
             } finally {
                 pending.finish()

@@ -44,7 +44,7 @@ data class ExerciseInfo(
     val seconds: Int? = null,
     val perSide: Boolean,
     val rest: Int,
-    /** "Plates kg", "Assist kg", "Extra kg" or "kg"; null when the exercise has no weight field. */
+    /** "Plates kg", "Assist kg", "Extra kg", "kg", "Plate" or "Assist plate"; null when there is no weight field. */
     val weightLabel: String? = null,
     /** Working sets on weighted exercises cannot be logged without a weight. */
     val needsWeight: Boolean = false,
@@ -53,6 +53,8 @@ data class ExerciseInfo(
     /** Warm-up or cool-down: ticked off as a whole, all sets at once and without rest. */
     val checklist: Boolean = false,
     val logged: List<LoggedSet> = emptyList(),
+    /** Machine with a numbered stack: every weight, also in events, is a plate number and not kg. */
+    val numbered: Boolean = false,
 ) {
     val isTimed: Boolean get() = seconds != null
     val isWarmup: Boolean get() = section == "warmup"

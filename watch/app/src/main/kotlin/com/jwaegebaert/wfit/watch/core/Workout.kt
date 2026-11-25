@@ -1,6 +1,7 @@
 package com.jwaegebaert.wfit.watch.core
 
 import java.util.Locale
+import kotlin.math.max
 
 /**
  * What the watch knows: the phone's last [snapshot], its own [events] the phone has not confirmed yet, and its own
@@ -93,12 +94,15 @@ data class Workout(
         }.copy(focus = order)
     }
 
-    /** Starts the work countdown of a timed set. */
+    /** Starts the work countdown of a timed set; a one-sided warm-up or stretch runs all its open sets in one go. */
     fun startWork(order: Int, now: Long): Workout {
         val e = exercises.getOrNull(order) ?: return this
         val session = sessionId ?: return this
         val seconds = e.seconds ?: return this
-        val ref = SetRef(session, order, e.id, e.section, e.nextSet, seconds, e.rest, e.nextSet >= e.setCount)
+        val open = (e.nextSet..e.sets).takeWhile { n -> e.logged.none { it.set == n } }
+        val count = if (e.checklist && e.perSide) max(1, open.size) else 1
+        val last = e.nextSet + count - 1 >= e.setCount
+        val ref = SetRef(session, order, e.id, e.section, e.nextSet, seconds, e.rest, last, count)
         return copy(timer = Countdown.work(e.name, ref, e.perSide, now))
     }
 
@@ -132,19 +136,22 @@ data class Workout(
 
     fun show(order: Int): Workout = if (order in exercises.indices) copy(focus = order) else this
 
-    private fun logWork(ref: SetRef, at: Long, startedAt: Long): Workout = add(
-        WatchEvent(
-            type = WatchEvent.LOG,
-            id = "work-$startedAt-${ref.order}-${ref.set}",
-            at = at,
-            sessionId = ref.sessionId,
-            order = ref.order,
-            exerciseId = ref.exerciseId,
-            section = ref.section,
-            set = ref.set,
-            seconds = ref.seconds,
-        ),
-    )
+    private fun logWork(ref: SetRef, at: Long, startedAt: Long): Workout =
+        (ref.set until ref.set + ref.count).fold(this) { w, set ->
+            w.add(
+                WatchEvent(
+                    type = WatchEvent.LOG,
+                    id = "work-$startedAt-${ref.order}-$set",
+                    at = at,
+                    sessionId = ref.sessionId,
+                    order = ref.order,
+                    exerciseId = ref.exerciseId,
+                    section = ref.section,
+                    set = set,
+                    seconds = ref.seconds,
+                ),
+            )
+        }
 
     private fun restLabel(last: Boolean) = if (last) Countdown.REST_NEXT else Countdown.REST
 
@@ -206,10 +213,14 @@ fun formatKg(kg: Double): String =
 /** "1:05". */
 fun formatClock(seconds: Int): String = String.format(Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60)
 
-/** "7 × 42.5 kg", "12 / side", "25s / side". */
+/** "7 × 42.5 kg", "7 × plate 12", "12 / side", "25s / side". */
 fun ExerciseInfo.setSummary(weight: Double? = nextWeight, reps: Int = nextReps): String {
     val side = if (perSide) " / side" else ""
     if (seconds != null) return "${seconds}s$side"
-    val kg = if (weightLabel != null && weight != null) " × ${formatKg(weight)} kg" else ""
-    return "$reps$side$kg"
+    val load = when {
+        weightLabel == null || weight == null -> ""
+        numbered -> " × plate ${formatKg(weight)}"
+        else -> " × ${formatKg(weight)} kg"
+    }
+    return "$reps$side$load"
 }

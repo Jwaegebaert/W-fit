@@ -119,7 +119,10 @@ final watchSnapshotProvider = Provider.autoDispose<WatchSnapshot?>((ref) {
               if (s.completed && s.exerciseOrder == order && s.exerciseId == p.item.exerciseId)
                 WatchSet(
                   set: s.setNumber,
-                  weight: s.weightKg,
+                  weight: switch (loads.plateKg(s.exerciseId)) {
+                    final plateKg? => s.plate ?? (s.weightKg == null ? null : (s.weightKg! / plateKg * 10).round() / 10),
+                    _ => s.weightKg,
+                  },
                   reps: s.reps,
                   seconds: s.durationSeconds,
                   at: (s.completedAt ?? s.updatedAt).millisecondsSinceEpoch,
@@ -198,6 +201,9 @@ class WatchSync {
     // Same rules as the exercise card: no kg without a weight field, and no "0 kg" for bodyweight exercises.
     final exercise = _ref.read(catalogProvider).exercise(e.exerciseId);
     final noWeight = exercise != null && (!exercise.logsWeight || (!exercise.isWeighted && e.weight == 0));
+    final weight = noWeight ? null : e.weight;
+    // On a numbered stack the watch works with plate numbers too.
+    final plateKg = weight == null ? null : (await repo.loadModel())?.plateKg(e.exerciseId);
     await logger.log(
       SetRef(
         sessionId: e.sessionId,
@@ -209,7 +215,8 @@ class WatchSync {
         rest: 0, // the watch sends its own countdown
         last: false,
       ),
-      weightKg: e.isLog ? (noWeight ? null : e.weight) : existing?.weightKg,
+      weightKg: e.isLog ? (plateKg == null ? weight : weight! * plateKg) : existing?.weightKg,
+      plate: e.isLog ? (plateKg == null ? null : weight) : existing?.plate,
       reps: e.isLog ? e.reps : existing?.reps,
       durationSeconds: e.isLog ? e.seconds : existing?.durationSeconds,
       completed: e.isLog,

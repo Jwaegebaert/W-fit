@@ -3,5 +3,6 @@
   {"v": 1, "type": "log", "id": "e2", "at": 1700000300000, "sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 1, "weight": null, "reps": null, "seconds": 25},
   {"v": 1, "type": "unlog", "id": "e3", "at": 1700000400000, "sessionId": "s1", "order": 1, "exerciseId": "barbell-bench-press", "section": "main", "set": 2, "weight": null, "reps": null, "seconds": null},
   {"v": 1, "type": "timer", "timer": {"kind": "rest", "owner": "watch", "changedAt": 1700000200000, "phases": [{"label": "Rest", "seconds": 120, "endsAt": 1700000320000}], "set": null}},
-  {"v": 1, "type": "timer", "timer": {"kind": "none", "owner": "watch", "changedAt": 1700000210000, "phases": [], "set": null}}
+  {"v": 1, "type": "timer", "timer": {"kind": "none", "owner": "watch", "changedAt": 1700000210000, "phases": [], "set": null}},
+  {"v": 1, "type": "timer", "timer": {"kind": "work", "owner": "watch", "changedAt": 1700000500000, "phases": [{"label": "Side 1 · Lat stretch", "seconds": 15, "endsAt": 1700000515000}, {"label": "Switch sides · Lat stretch", "seconds": 5, "endsAt": 1700000520000, "pause": true}, {"label": "Side 2 · Lat stretch", "seconds": 15, "endsAt": 1700000535000}], "set": {"sessionId": "s1", "order": 6, "exerciseId": "lat-stretch", "section": "cooldown", "set": 1, "seconds": 15, "rest": 0, "last": true, "count": 2}}}
 ]

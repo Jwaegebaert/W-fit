@@ -882,7 +882,7 @@ class _PlanBuilder {
     if (base == null) return;
     var w = base + steps * e.incrementKg;
     if (deload) w *= 0.9;
-    p.weight = w > 0 ? roundToStep(w, e.incrementKg) : base;
+    p.weight = e.snapKg(w > 0 ? roundToStep(w, e.incrementKg) : base);
   }
 
   void _buildMain() {

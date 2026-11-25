@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../domain/progression.dart' show formatKg;
 import '../features/settings/equipment_screen.dart' show showBarWeightDialog;
+import '../features/settings/numbered_stacks_screen.dart' show showPlateDialog, stackSummary;
 import '../providers.dart';
 import 'common.dart';
 import 'exercise_visuals.dart';
@@ -87,6 +88,18 @@ class EquipmentSheet extends ConsumerWidget {
                 style: t.textTheme.titleSmall,
               ),
               onTap: () => showBarWeightDialog(context, ref, equipmentId),
+            ),
+          ),
+        if (eq?.hasStack ?? false)
+          Card(
+            margin: const EdgeInsets.only(top: Gap.sm),
+            color: s.surfaceContainerHigh,
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              title: const Text('Weight stack'),
+              subtitle: Text(stackSummary(ref.watch(loadModelProvider).plates[equipmentId])),
+              trailing: const Icon(Icons.edit_outlined),
+              onTap: () => showPlateDialog(context, ref, equipmentId),
             ),
           ),
         const SizedBox(height: Gap.sm),

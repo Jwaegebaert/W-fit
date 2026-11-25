@@ -35,6 +35,10 @@ class Profiles extends Table with SyncColumns {
   /// Muscle focus as JSON ({"less":[...],"more":[...],"light":[...]}, see `MuscleFocus`); added in schema v4.
   TextColumn get muscleFocusJson => text().withDefault(const Constant('{}'))();
 
+  /// Machines with a numbered weight stack and the kg of one plate as JSON ({"seated_row_machine": 5}); added in
+  /// schema v6.
+  TextColumn get stackPlatesJson => text().withDefault(const Constant('{}'))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -111,6 +115,9 @@ class SetLogs extends Table with SyncColumns {
   IntColumn get rir => integer().nullable()();
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
   DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// Plate number on a machine with a numbered stack; [weightKg] is the weight it stood for. Added in schema v6.
+  RealColumn get plate => real().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -189,8 +196,9 @@ class AppDatabase extends _$AppDatabase {
   /// v1: initial schema. v2: `feedback_entries` table and `planned_workouts.meta_json`.
   /// v3: profile `rest_mode`, `cooldown_stretches` and `bar_weights_json`. v4: profile `muscle_focus_json`.
   /// v5: session heart rate (`avg_heart_rate`, `max_heart_rate`) and `health_exported_at`.
+  /// v6: numbered weight stacks: profile `stack_plates_json` and set `plate`.
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   static final _feedbackStatusIndex = Index('idx_feedback_status',
       'CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback_entries (status, deleted)');
@@ -220,6 +228,10 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(workoutSessions, workoutSessions.avgHeartRate);
             await m.addColumn(workoutSessions, workoutSessions.maxHeartRate);
             await m.addColumn(workoutSessions, workoutSessions.healthExportedAt);
+          }
+          if (from < 6) {
+            await m.addColumn(profiles, profiles.stackPlatesJson);
+            await m.addColumn(setLogs, setLogs.plate);
           }
         },
       );

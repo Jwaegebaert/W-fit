@@ -69,7 +69,7 @@ experience level (beginner ⇒ difficulty ≤ 2, prefer 1).
 
 **Session template (60 min default).** Warm-up ≈ 6–8 min (1 cardio + 2–3 activation/mobility drills), main block
 fills the remaining budget, optional core ≈ 6 min (2 exercises with different patterns), cooldown ≈ 4 min
-(3 stretches). Exercise time ≈ `sets × (40 s work + rest) + 60 s setup`.
+(3 stretches; one-sided ones 2 × 15 s per side). Exercise time ≈ `sets × (40 s work + rest) + 60 s setup`.
 **Machine and floor rules.** Designed for a machine-heavy gym with limited floor space:
 - *Main lifts:* machines, cable stations and the Smith machine get a small bonus, kept below the anchor-continuity
   bonus so an established block (and its progression) is never reshuffled by it.

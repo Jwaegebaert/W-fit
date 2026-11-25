@@ -23,6 +23,9 @@ public sealed record ProfileDto : ISyncDto
     public int CooldownStretches { get; init; } = 3;
     public Dictionary<string, double>? BarWeights { get; init; }
     public MuscleFocusDto? MuscleFocus { get; init; }
+
+    /// <summary>Kg of one plate per machine with a numbered stack; null (older app) keeps what is stored.</summary>
+    public Dictionary<string, double>? StackPlates { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
     public bool Deleted { get; init; }
 }
@@ -135,6 +138,9 @@ public sealed record SetLogDto : ISyncDto
     public int ExerciseOrder { get; init; }
     public int SetNumber { get; init; }
     public double? WeightKg { get; init; }
+
+    /// <summary>Plate number on a machine with a numbered stack (<see cref="WeightKg"/> is what it weighs).</summary>
+    public double? Plate { get; init; }
     public int? Reps { get; init; }
     public int? DurationSeconds { get; init; }
     public int? Rir { get; init; }

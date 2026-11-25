@@ -143,6 +143,9 @@ public sealed record BriefExerciseHistory
 
     /// <summary>Empty-bar weight on top of the logged kg (bar exercises log plates only).</summary>
     public double? BarKg { get; init; }
+
+    /// <summary>Kg of one plate on a machine with a numbered stack (the athlete sees plate numbers).</summary>
+    public double? PlateKg { get; init; }
     public List<BriefExposure?>? Exposures { get; init; }
 }
 
@@ -251,6 +254,7 @@ public static class CoachBriefRules
                 {
                     ExerciseId = Short(h.ExerciseId, 64), Trend = Short(h.Trend, 16), LastPerformed = Short(h.LastPerformed, 10),
                     BarKg = h.BarKg is { } bar ? Math.Clamp(bar, 0, 60) : null,
+                    PlateKg = h.PlateKg is > 0 and <= 50 ? h.PlateKg : null,
                     Exposures = h.Exposures?.OfType<BriefExposure>().Take(MaxExposures)
                         .Select(x => x with { Date = Short(x.Date, 10), Sets = Short(x.Sets, 200) }).ToList<BriefExposure?>(),
                 }).ToList<BriefExerciseHistory?>(),

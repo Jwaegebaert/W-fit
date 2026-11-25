@@ -43,37 +43,43 @@
   },
   {
     "name": "one-sided hold: side 1",
-    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Switch sides · Side plank", "seconds": 5, "endsAt": 1035000, "pause": true}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1065000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
     "now": 1010000,
-    "expect": {"kind": "work", "label": "Side 1 · Side plank", "remaining": 20, "endsAt": 1060000}
+    "expect": {"kind": "work", "label": "Side 1 · Side plank", "remaining": 20, "endsAt": 1065000}
   },
   {
-    "name": "one-sided hold: side 2 starts when side 1 ends",
-    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "name": "one-sided hold: time to switch when side 1 ends",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Switch sides · Side plank", "seconds": 5, "endsAt": 1035000, "pause": true}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1065000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
     "now": 1030000,
-    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 30, "endsAt": 1060000}
+    "expect": {"kind": "work", "label": "Switch sides · Side plank", "remaining": 5, "endsAt": 1065000}
+  },
+  {
+    "name": "one-sided hold: side 2 starts after the switch",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Switch sides · Side plank", "seconds": 5, "endsAt": 1035000, "pause": true}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1065000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "now": 1035000,
+    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 30, "endsAt": 1065000}
   },
   {
     "name": "extending side 1 moves side 2 along",
-    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Switch sides · Side plank", "seconds": 5, "endsAt": 1035000, "pause": true}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1065000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
     "extend": 15,
     "extendAt": 1020000,
-    "now": 1046000,
-    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 29, "endsAt": 1075000}
+    "now": 1051000,
+    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 29, "endsAt": 1080000}
   },
   {
     "name": "extending side 2 leaves side 1 alone",
-    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Switch sides · Side plank", "seconds": 5, "endsAt": 1035000, "pause": true}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1065000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
     "extend": 15,
     "extendAt": 1040000,
     "now": 1040000,
-    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 35, "endsAt": 1075000}
+    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 40, "endsAt": 1080000}
   },
   {
     "name": "rest follows the work, counted from the end of the work",
-    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
-    "now": 1065000,
-    "expect": {"kind": "rest", "label": "Rest", "remaining": 40, "endsAt": 1105000}
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Switch sides · Side plank", "seconds": 5, "endsAt": 1035000, "pause": true}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1065000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "now": 1070000,
+    "expect": {"kind": "rest", "label": "Rest", "remaining": 40, "endsAt": 1110000}
   },
   {
     "name": "rest after the last set leads to the next exercise",

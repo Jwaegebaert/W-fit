@@ -18,7 +18,7 @@ class WorkoutTimer extends Notifier<Countdown?> {
   /// message from the watch cannot bring it back.
   Countdown? _register;
 
-  /// Phase whose end was signalled last, so each side of a one-sided hold is felt once.
+  /// Phase whose end was signalled last, so every side and side switch of a one-sided hold is felt once.
   int _phase = 0;
 
   @override

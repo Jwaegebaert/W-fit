@@ -36,6 +36,7 @@ public static class SyncMapper
         SessionMinutes = e.SessionMinutes, IncludeCore = e.IncludeCore, HeightCm = e.HeightCm, BirthYear = e.BirthYear,
         Injuries = e.Injuries, Notes = e.Notes, RestMode = e.RestMode, CooldownStretches = e.CooldownStretches,
         BarWeights = ParseBarWeights(e.BarWeightsJson), MuscleFocus = ParseMuscleFocus(e.MuscleFocusJson),
+        StackPlates = ParseStackPlates(e.StackPlatesJson),
         UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
     };
 
@@ -73,7 +74,7 @@ public static class SyncMapper
     public static SetLogDto ToDto(this SetLog e) => new()
     {
         Id = e.Id, SessionId = e.SessionId, ExerciseId = e.ExerciseId, Section = e.Section, ExerciseOrder = e.ExerciseOrder,
-        SetNumber = e.SetNumber, WeightKg = e.WeightKg, Reps = e.Reps, DurationSeconds = e.DurationSeconds, Rir = e.Rir,
+        SetNumber = e.SetNumber, WeightKg = e.WeightKg, Plate = e.Plate, Reps = e.Reps, DurationSeconds = e.DurationSeconds, Rir = e.Rir,
         Completed = e.Completed, CompletedAt = e.CompletedAt, UpdatedAt = e.UpdatedAt, Deleted = e.Deleted,
     };
 
@@ -99,6 +100,8 @@ public static class SyncMapper
         e.CooldownStretches = Math.Clamp(d.CooldownStretches, 0, 3);
         e.BarWeightsJson = JsonSerializer.Serialize(CleanBarWeights(d.BarWeights), JsonDefaults.Options);
         e.MuscleFocusJson = JsonSerializer.Serialize(CleanMuscleFocus(d.MuscleFocus), JsonDefaults.Options);
+        if (d.StackPlates is not null)
+            e.StackPlatesJson = JsonSerializer.Serialize(CleanStackPlates(d.StackPlates), JsonDefaults.Options);
     }
 
     /// <summary>Tracked muscles only; a muscle is either less or more (more wins), light is independent.</summary>
@@ -127,16 +130,25 @@ public static class SyncMapper
         (weights ?? []).Where(kv => kv.Key.Length is > 0 and <= 40 && kv.Value is >= 0 and <= 60)
             .Take(10).ToDictionary(kv => kv.Key, kv => kv.Value);
 
-    public static Dictionary<string, double> ParseBarWeights(string? json)
+    /// <summary>Plate weights keyed by equipment id (max 40 entries, above 0 up to 50 kg).</summary>
+    public static Dictionary<string, double> CleanStackPlates(Dictionary<string, double>? plates) =>
+        (plates ?? []).Where(kv => kv.Key.Length is > 0 and <= 40 && kv.Value is > 0 and <= 50)
+            .Take(40).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    public static Dictionary<string, double> ParseBarWeights(string? json) => CleanBarWeights(ParseWeights(json));
+
+    public static Dictionary<string, double> ParseStackPlates(string? json) => CleanStackPlates(ParseWeights(json));
+
+    private static Dictionary<string, double>? ParseWeights(string? json)
     {
-        if (string.IsNullOrWhiteSpace(json)) return [];
+        if (string.IsNullOrWhiteSpace(json)) return null;
         try
         {
-            return CleanBarWeights(JsonSerializer.Deserialize<Dictionary<string, double>>(json, JsonDefaults.Options));
+            return JsonSerializer.Deserialize<Dictionary<string, double>>(json, JsonDefaults.Options);
         }
         catch (JsonException)
         {
-            return [];
+            return null;
         }
     }
 
@@ -222,6 +234,7 @@ public static class SyncMapper
         e.ExerciseOrder = d.ExerciseOrder;
         e.SetNumber = d.SetNumber;
         e.WeightKg = d.WeightKg;
+        e.Plate = d.Plate;
         e.Reps = d.Reps;
         e.DurationSeconds = d.DurationSeconds;
         e.Rir = d.Rir;

@@ -45,6 +45,7 @@ class WatchExercise {
     required this.step,
     required this.checklist,
     required this.logged,
+    this.numbered = false,
   });
 
   /// Builds the entry for a plan item, following the same rules as the phone's exercise card.
@@ -59,7 +60,8 @@ class WatchExercise {
   }) {
     final perSide = item.perSide || (exercise?.unilateral ?? false);
     final checklist = section.isChecklist;
-    final label = item.isTimed || checklist ? null : weightLabelFor(exercise);
+    final plateKg = loads.plateKg(item.exerciseId);
+    final label = item.isTimed || checklist ? null : weightLabelFor(exercise, numbered: plateKg != null);
     final weight = label == null ? null : item.targetWeightKg ?? advice?.weightKg;
     return WatchExercise(
       order: order,
@@ -79,10 +81,11 @@ class WatchExercise {
           exercise != null &&
           exercise.isWeighted &&
           exercise.load != LoadType.optional,
-      weight: weight,
-      step: (exercise?.incrementKg ?? 0) > 0 ? exercise!.incrementKg : 2.5,
+      weight: weight == null || plateKg == null ? weight : (weight / plateKg).roundToDouble(),
+      step: plateKg != null ? 1 : ((exercise?.incrementKg ?? 0) > 0 ? exercise!.incrementKg : 2.5),
       checklist: checklist,
       logged: logged,
+      numbered: plateKg != null && label != null,
     );
   }
 
@@ -105,7 +108,7 @@ class WatchExercise {
   final bool perSide;
   final int rest;
 
-  /// "Plates kg", "Assist kg", "Extra kg" or "kg"; null when the exercise has no weight field.
+  /// "Plates kg", "Assist kg", "Extra kg", "kg", "Plate" or "Assist plate"; null when the exercise has no weight field.
   final String? weightLabel;
 
   /// Working sets on weighted exercises cannot be logged without a weight.
@@ -116,6 +119,9 @@ class WatchExercise {
   /// Warm-up or cool-down: ticked off as a whole, all sets at once.
   final bool checklist;
   final List<WatchSet> logged;
+
+  /// Machine with a numbered stack: every weight here and in the watch's events is a plate number, not kg.
+  final bool numbered;
 
   Map<String, dynamic> toJson() => {
         'order': order,
@@ -136,13 +142,15 @@ class WatchExercise {
         'step': step,
         'checklist': checklist,
         'logged': [for (final s in logged) s.toJson()],
+        if (numbered) 'numbered': true,
       };
 }
 
 /// Header of the weight field; null when the exercise has none.
-String? weightLabelFor(Exercise? e) => switch (e?.load) {
+String? weightLabelFor(Exercise? e, {bool numbered = false}) => switch (e?.load) {
       LoadType.none => null,
-      LoadType.assist => 'Assist kg',
+      LoadType.assist => numbered ? 'Assist plate' : 'Assist kg',
+      LoadType.weight when numbered => 'Plate',
       LoadType.optional => 'Extra kg',
       _ => e?.bar != null ? 'Plates kg' : 'kg',
     };

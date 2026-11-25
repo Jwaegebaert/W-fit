@@ -98,7 +98,7 @@ class PlanItem {
       };
 
   /// Estimated seconds this item takes, including rest and setup. Per-side timed holds run twice (their duration is
-  /// per side); rep sets keep the 40 s average either way – it already covers a one-sided set of 8–15 reps.
+  /// per side; the setup time covers switching sides); rep sets keep the 40 s average either way – it already covers a one-sided set of 8–15 reps.
   int estimateSeconds() {
     final work = isTimed ? (durationSeconds ?? 30) * (perSide ? 2 : 1) : 40;
     final setup = isTimed ? 15 : 60;
@@ -228,19 +228,23 @@ class PlanMeta {
   String encode() => jsonEncode(toJson());
 }
 
-/// Plans made before catalog v4 stored one-sided stretches as the total for both sides (60 s = 30 s per side) and the
-/// suitcase carry as 40 s; the catalog and the timer now count per side. Returns [blocks] with those old times
-/// converted, or null when nothing needs converting.
-List<PlanBlock>? convertLegacyHolds(List<PlanBlock> blocks, Catalog catalog) {
+/// One-sided stretches are short and done twice (15 s per side, two rounds), whoever wrote the plan.
+PlanItem stretchInRounds(PlanItem i, Exercise e) =>
+    e.category == 'cooldown' && e.unilateral && e.isTimed && i.isTimed
+        ? i.copyWith(sets: e.sets, durationSeconds: e.durationSeconds, restSeconds: e.rest, perSide: true)
+        : i;
+
+/// Plans made before catalog v5 hold one-sided stretches once for 30 s or more per side. Returns [blocks] with
+/// [stretchInRounds] applied, or null when nothing changes.
+List<PlanBlock>? shortenStretches(List<PlanBlock> blocks, Catalog catalog) {
   var changed = false;
   PlanItem convert(PlanItem i) {
     final e = catalog.exercise(i.exerciseId);
-    final now = e?.durationSeconds;
-    if (e == null || now == null || !e.unilateral || !e.isTimed) return i;
-    final legacy = e.category == 'cooldown' ? now * 2 : (e.id == 'suitcase-carry' ? 40 : null);
-    if (legacy == null || i.durationSeconds != legacy) return i;
+    if (e == null) return i;
+    final now = stretchInRounds(i, e);
+    if (now.sets == i.sets && now.durationSeconds == i.durationSeconds) return i;
     changed = true;
-    return i.copyWith(durationSeconds: now, perSide: true);
+    return now;
   }
 
   final out = [for (final b in blocks) PlanBlock(section: b.section, items: b.items.map(convert).toList())];

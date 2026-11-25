@@ -63,6 +63,69 @@ class Repository {
     await saveProfile(ProfilesCompanion(barWeightsJson: Value(jsonEncode(current))));
   }
 
+  /// Exercises loaded with the stack of [equipmentId].
+  List<String> _stackExercises(String equipmentId) => [
+        for (final e in catalog?.exercises ?? const <Exercise>[])
+          if (catalog!.stackOf(e) == equipmentId) e.id,
+      ];
+
+  /// Weights logged on [equipmentId] without a plate number.
+  Future<int> countKgSets(String equipmentId) async => (await (db.select(db.setLogs)
+            ..where((t) =>
+                t.exerciseId.isIn(_stackExercises(equipmentId)) &
+                t.deleted.equals(false) &
+                t.plate.isNull() &
+                t.weightKg.isBiggerThanValue(0)))
+          .get())
+      .length;
+
+  /// Says that [equipmentId] has a numbered stack with plates of [kg], or that it is marked in kg ([kg] null).
+  ///
+  /// Sets logged by plate number get the weight those plates turn out to have, and weights in open plans become whole
+  /// plates. With [numbersLogged] the weights logged so far were plate numbers all along.
+  Future<void> setStackPlate(String equipmentId, double? kg, {bool numbersLogged = false}) => db.transaction(() async {
+        final plates = Map<String, double>.of(LoadModel.parsePlates((await getProfile()).stackPlatesJson));
+        final before = plates.remove(equipmentId);
+        if (kg != null) {
+          plates[equipmentId] = kg;
+          final ids = _stackExercises(equipmentId);
+          final sets = await (db.select(db.setLogs)
+                ..where((t) => t.exerciseId.isIn(ids) & t.deleted.equals(false) & t.weightKg.isNotNull()))
+              .get();
+          for (final s in sets) {
+            final plate = s.plate ?? (numbersLogged && s.weightKg! > 0 ? s.weightKg : null);
+            if (plate == null || (plate == s.plate && plate * kg == s.weightKg)) continue;
+            await (db.update(db.setLogs)..where((t) => t.id.equals(s.id))).write(SetLogsCompanion(
+              plate: Value(plate),
+              weightKg: Value(plate * kg),
+              updatedAt: Value(_now),
+              dirty: const Value(true),
+            ));
+          }
+          // What the plan's weights were meant as: plates of the old weight, plate numbers, or kg.
+          final planned = before ?? (numbersLogged ? 1 : kg);
+          final open = await (db.select(db.plannedWorkouts)
+                ..where((t) => t.deleted.equals(false) & t.status.equals('planned')))
+              .get();
+          for (final p in open) {
+            var changed = false;
+            PlanItem convert(PlanItem i) {
+              final target = i.targetWeightKg;
+              if (target == null || !ids.contains(i.exerciseId)) return i;
+              changed = true;
+              return i.copyWith(targetWeightKg: catalog!.exercise(i.exerciseId)!.withPlate(kg).snapKg(target / planned * kg));
+            }
+
+            final blocks = [
+              for (final b in decodeBlocks(p.blocksJson))
+                PlanBlock(section: b.section, items: [for (final i in b.items) convert(i)]),
+            ];
+            if (changed) await updatePlannedBlocks(p.id, blocks);
+          }
+        }
+        await saveProfile(ProfilesCompanion(stackPlatesJson: Value(jsonEncode(plates))));
+      });
+
   // ---------------- equipment ----------------
   Stream<Map<String, bool>> watchEquipment() => (db.select(db.equipmentStatuses)
         ..where((t) => t.deleted.equals(false)))
@@ -339,6 +402,7 @@ class Repository {
     required int exerciseOrder,
     required int setNumber,
     double? weightKg,
+    double? plate,
     int? reps,
     int? durationSeconds,
     int? rir,
@@ -353,6 +417,7 @@ class Repository {
             exerciseOrder: exerciseOrder,
             setNumber: setNumber,
             weightKg: Value(weightKg),
+            plate: Value(plate),
             reps: Value(reps),
             durationSeconds: Value(durationSeconds),
             rir: Value(rir),
@@ -403,11 +468,14 @@ class Repository {
     }).toList();
   }
 
-  /// Bar weights (catalog defaults + the user's overrides) and assisted machines; null without a catalog.
+  /// Bar weights (catalog defaults + the user's overrides), assisted machines and numbered stacks; null without a
+  /// catalog.
   Future<LoadModel?> loadModel() async {
     final c = catalog;
     if (c == null) return null;
-    return LoadModel(c, LoadModel.parseOverrides((await getProfile()).barWeightsJson));
+    final profile = await getProfile();
+    return LoadModel(
+        c, LoadModel.parseOverrides(profile.barWeightsJson), LoadModel.parsePlates(profile.stackPlatesJson));
   }
 
   /// Sets for one exercise grouped by session, most recent first.

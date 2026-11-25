@@ -26,6 +26,7 @@ class SetLogger {
   Future<void> log(
     SetRef set, {
     double? weightKg,
+    double? plate,
     int? reps,
     int? durationSeconds,
     bool completed = true,
@@ -41,6 +42,7 @@ class SetLogger {
       exerciseOrder: set.order,
       setNumber: set.set,
       weightKg: weightKg,
+      plate: plate,
       reps: reps,
       durationSeconds: durationSeconds,
       rir: existing?.rir,
@@ -54,9 +56,12 @@ class SetLogger {
     }
   }
 
-  /// A timed set whose work countdown ended at [at]. The countdown starts the rest itself.
-  Future<void> logTimed(SetRef set, {required DateTime at}) =>
-      log(set, durationSeconds: set.seconds, at: at, startRest: false);
+  /// The timed sets of a work countdown that ended at [at]. The countdown starts the rest itself.
+  Future<void> logTimed(SetRef set, {required DateTime at}) async {
+    for (final s in set.each) {
+      await log(s, durationSeconds: s.seconds, at: at, startRest: false);
+    }
+  }
 }
 
 final setLoggerProvider = Provider<SetLogger>(SetLogger.new);

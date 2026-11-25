@@ -102,6 +102,9 @@ void main() {
         await pass(29);
         expect(running()!.phaseAt(now)!.label, 'Side 1 · Side Plank');
         await pass(2);
+        expect(running()!.phaseAt(now)!.label, 'Switch sides · Side Plank');
+        expect((running()!.phaseAt(now)!.pause, running()!.remaining(now)), (true, 4));
+        await pass(5);
         expect(running()!.phaseAt(now)!.label, 'Side 2 · Side Plank');
         expect(await sets(), isEmpty, reason: 'only side 1 is done');
         await pass(30);
@@ -114,6 +117,28 @@ void main() {
         await pass(60);
         expect(running(), isNull);
         expect(await sets(), hasLength(1));
+      });
+    });
+
+    testWidgets('a one-sided stretch runs its rounds in one go and logs them all', (tester) async {
+      await run(tester, () async {
+        final ref = SetRef(
+            sessionId: sessionId, order: 6, exerciseId: 'lat-stretch', section: 'cooldown',
+            set: 1, seconds: 15, rest: 0, last: true, count: 2, //
+        );
+        timer().startWork('Lat Stretch', ref, perSide: true);
+        final work = running()!;
+        expect(work.phases.map((p) => p.pause), [false, true, false, true, false, true, false]);
+        expect(work.phases[4].label, 'Side 1 (2/2) · Lat Stretch');
+        expect(work.endsAt - now, (4 * 15 + 3 * 5) * 1000);
+        expect(work.extend(15, now).phases[1].pause, isTrue);
+        now += 74000;
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        expect(await sets(), isEmpty);
+        now += 1000;
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        expect((await sets()).map((s) => (s.setNumber, s.durationSeconds, s.completed)), [(1, 15, true), (2, 15, true)]);
+        expect(running(), isNull);
       });
     });
 
@@ -133,7 +158,7 @@ void main() {
       await run(tester, () async {
         timer().adopt(Countdown.work('Side Plank', hold(), perSide: true, from: now, owner: CountdownOwner.watch));
         expect(running()!.isWork, isTrue);
-        now += 61000;
+        now += 66000;
         await Future<void>.delayed(const Duration(milliseconds: 600));
         expect(running()!.kind, CountdownKind.rest);
         expect(await sets(), isEmpty);

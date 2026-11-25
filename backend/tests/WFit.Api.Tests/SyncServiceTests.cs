@@ -67,6 +67,32 @@ public class SyncServiceTests
         Assert.Equal(["lower_back"], p.MuscleFocus.Light);
     }
 
+    [Fact]
+    public async Task Numbered_stacks_round_trip_and_survive_an_older_app()
+    {
+        var setId = NewId();
+        var response = await Service().SyncAsync(new SyncRequest
+        {
+            Changes = new SyncChanges
+            {
+                Profile = new ProfileDto { StackPlates = new() { ["seated_row_machine"] = 4.54, ["leg_curl"] = 0, ["leg_press"] = 80 }, UpdatedAt = TestEnv.Now },
+                Sets = [new SetLogDto { Id = setId, SessionId = NewId(), ExerciseId = "seated-cable-row", WeightKg = 31.78, Plate = 7, Reps = 10, Completed = true, UpdatedAt = TestEnv.Now }],
+            },
+        }, default);
+
+        Assert.Equal(new Dictionary<string, double> { ["seated_row_machine"] = 4.54 }, response.Changes.Profile!.StackPlates);
+        var set = Assert.Single(response.Changes.Sets);
+        Assert.Equal((31.78, 7d), (set.WeightKg, set.Plate));
+
+        // An app that does not know the setting leaves it alone; an empty one clears it.
+        await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { Profile = new ProfileDto { Name = "Alex", UpdatedAt = TestEnv.Now.AddMinutes(1) } } }, default);
+        var kept = await Service().SyncAsync(new SyncRequest(), default);
+        Assert.Equal("Alex", kept.Changes.Profile!.Name);
+        Assert.Single(kept.Changes.Profile.StackPlates!);
+        await Service().SyncAsync(new SyncRequest { Changes = new SyncChanges { Profile = new ProfileDto { StackPlates = [], UpdatedAt = TestEnv.Now.AddMinutes(2) } } }, default);
+        Assert.Empty((await Service().SyncAsync(new SyncRequest(), default)).Changes.Profile!.StackPlates!);
+    }
+
     [Theory]
     [InlineData(128, 128)]
     [InlineData(30, 30)]

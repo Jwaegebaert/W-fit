@@ -50,7 +50,7 @@ class SettingsScreen extends ConsumerWidget {
         ),
         const SectionTitle('Gym'),
         Card(
-          child: tile(Icons.fitness_center, 'Equipment & bar weights',
+          child: tile(Icons.fitness_center, 'Equipment & weights',
               unavailable == 0 ? 'Everything available' : '$unavailable unavailable', '/settings/equipment'),
         ),
         const SectionTitle('Connections'),

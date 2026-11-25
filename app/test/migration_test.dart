@@ -60,13 +60,13 @@ Future<Set<String>> _indexes(AppDatabase db) async =>
 void main() {
   setUpAll(() => driftRuntimeOptions.dontWarnAboutMultipleDatabases = true);
 
-  test('v1 -> v5 keeps all data and adds feedback_entries, planned_workouts.meta_json and profile settings', () async {
+  test('v1 -> v6 keeps all data and adds feedback_entries, planned_workouts.meta_json and profile settings', () async {
     final db = AppDatabase(NativeDatabase.memory(setup: (raw) => _createV1(raw.execute)));
     addTearDown(db.close);
     final repo = Repository(db);
 
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.read<int>('user_version'), 5);
+    expect(version.read<int>('user_version'), 6);
     await db.validateDatabaseSchema();
 
     // Existing data survives.
@@ -77,6 +77,7 @@ void main() {
     expect(profile.cooldownStretches, 3);
     expect(profile.barWeightsJson, '{}');
     expect(profile.muscleFocusJson, '{}');
+    expect(profile.stackPlatesJson, '{}');
     expect(await repo.getEquipment(), {'leg_press': false});
     expect(await repo.getPreferences(), {'push-up': 'disliked'});
     final plan = (await repo.plannedById('p1'))!;
@@ -91,6 +92,7 @@ void main() {
     final sets = await repo.setsForSession('s1');
     expect(sets.single.rir, 2);
     expect(sets.single.weightKg, 100.0);
+    expect(sets.single.plate, isNull);
     expect((await repo.loggedSets()).single.reps, 10);
     expect(await repo.latestBodyWeight(), 78.5);
     expect(await db.getValue('sync_since'), '2026-11-04T00:00:00Z');
@@ -107,7 +109,7 @@ void main() {
     );
   });
 
-  test('migrated schema matches a freshly created v5 database', () async {
+  test('migrated schema matches a freshly created v6 database', () async {
     final migrated = AppDatabase(NativeDatabase.memory(setup: (raw) => _createV1(raw.execute)));
     final fresh = AppDatabase(NativeDatabase.memory());
     addTearDown(migrated.close);

@@ -59,6 +59,19 @@ double roundToStep(double value, double step) {
   return (value / unit).round() * unit;
 }
 
+/// [kg] rounded to what can be loaded for [e].
+double _round(Exercise e, double kg) => e.plateKg == null ? roundToStep(kg, e.incrementKg) : e.snapKg(kg);
+
+/// About 10 % lighter; on a numbered stack at least one plate.
+double _lighter(Exercise e, double kg) => switch (e.plateKg) {
+      final plate? => math.max(1, (kg * 0.9 / plate + 0.01).floor()) * plate,
+      _ => roundToStep(kg * 0.9, e.incrementKg),
+    };
+
+/// "35 kg", or "plate 7" on a numbered stack.
+String _load(Exercise e, double kg) =>
+    e.plateKg == null ? '${_fmt(kg)} kg' : 'plate ${formatPlate(kg / e.plateKg!)}';
+
 class ProgressionAdvice {
   const ProgressionAdvice({this.weightKg, this.targetReps, required this.message, this.lastSummary});
 
@@ -120,22 +133,22 @@ ProgressionAdvice adviseProgression(
     if (easy != null && (e.isAssisted ? easy > weight : easy < weight)) {
       weight = easy;
       reps = lo;
-      message = 'Go light: ${_fmt(easy)} kg${e.isAssisted ? ' assistance' : ''} for $lo+ easy reps.';
+      message = 'Go light: ${_load(e, easy)}${e.isAssisted ? ' assistance' : ''} for $lo+ easy reps.';
     }
   }
 
   // Assisted machines run the other way: more assistance kg = easier.
   final dir = e.isAssisted ? -1 : 1;
   if (incrementSteps != 0 && weight != null && e.isWeighted) {
-    final adjusted = roundToStep(weight + dir * incrementSteps * e.incrementKg, e.incrementKg);
+    final adjusted = _round(e, weight + dir * incrementSteps * e.incrementKg);
     weight = adjusted > 0 || e.isAssisted ? math.max(0.0, adjusted) : weight;
     message = e.isAssisted
         ? (incrementSteps < 0
-            ? 'Last time felt too hard – a bit more assistance (${_fmt(weight)} kg).'
-            : 'Last time felt too easy – a bit less assistance (${_fmt(weight)} kg).')
+            ? 'Last time felt too hard – a bit more assistance (${_load(e, weight)}).'
+            : 'Last time felt too easy – a bit less assistance (${_load(e, weight)}).')
         : (incrementSteps < 0
-            ? 'Last time felt too hard – one step lighter (${_fmt(weight)} kg).'
-            : 'Last time felt too easy – one extra step (${_fmt(weight)} kg).');
+            ? 'Last time felt too hard – one step lighter (${_load(e, weight)}).'
+            : 'Last time felt too easy – one extra step (${_load(e, weight)}).');
   } else if (incrementSteps != 0 && !e.isWeighted && history.isNotEmpty) {
     message = incrementSteps < 0
         ? 'Last time felt too hard – slow down and stop 3 reps short.'
@@ -144,19 +157,24 @@ ProgressionAdvice adviseProgression(
 
   if (deload) {
     if (weight != null && e.isWeighted) {
-      weight = e.isAssisted ? weight + e.incrementKg : roundToStep(weight * 0.9, e.incrementKg);
+      weight = e.isAssisted ? weight + e.incrementKg : _lighter(e, weight);
     }
     reps = history.isEmpty ? reps : lo;
     message = weight == null
         ? 'Deload: keep it light, one set fewer, stop 3–4 reps short.'
         : e.isAssisted
-            ? 'Deload: a bit more assistance (${_fmt(weight)} kg), one set fewer, stop 3–4 reps short.'
-            : 'Deload: ~90 % load (${_fmt(weight)} kg), one set fewer, stop 3–4 reps short.';
+            ? 'Deload: a bit more assistance (${_load(e, weight)}), one set fewer, stop 3–4 reps short.'
+            : 'Deload: ~90 % load (${_load(e, weight)}), one set fewer, stop 3–4 reps short.';
   } else if (targetRir != null && history.isNotEmpty) {
     message = '$message Stop with ~${rirPhrase(targetRir)}.';
   }
 
-  return ProgressionAdvice(weightKg: weight, targetReps: reps, message: message, lastSummary: base.lastSummary);
+  return ProgressionAdvice(
+    weightKg: weight == null ? null : e.snapKg(weight),
+    targetReps: reps,
+    message: message,
+    lastSummary: base.lastSummary,
+  );
 }
 
 /// Weight for ~12 reps with 3 in reserve when the last session stayed below [lo] reps; null when the last weight
@@ -175,7 +193,7 @@ double? _lightWeight(Exercise e, List<List<LoggedSet>> history, int lo) {
   if (oneRm <= 0) return null;
   // Epley for 15 reps (12 + 3 in reserve).
   final plates = oneRm / 1.5 - last.first.barKg;
-  return math.max(0.0, roundToStep(plates, e.incrementKg));
+  return math.max(0.0, _round(e, plates));
 }
 
 ProgressionAdvice _baseAdvice(
@@ -210,13 +228,14 @@ ProgressionAdvice _baseAdvice(
   // Bar exercises log plates only: an empty bar (0 kg of plates) is still a loaded set.
   final emptyBar = topWeight == 0 && !assisted && last.any((x) => x.barKg > 0 && x.weightKg != null);
   final summary = topWeight > 0
-      ? (assisted ? '${_fmt(topWeight)} kg assist × $reps' : '${_fmt(topWeight)} kg × $reps')
+      ? '${_load(e, topWeight)}${assisted ? ' assist' : ''} × $reps'
       : emptyBar
           ? 'Empty bar (0 kg plates) × $reps'
           : '$reps reps';
   final inc = e.incrementKg;
-  double harder(double w) => assisted ? math.max(0.0, roundToStep(w - inc, inc)) : roundToStep(w + inc, inc);
-  final stepUp = assisted ? 'take ${_fmt(inc)} kg less assistance' : 'add ${_fmt(inc)} kg';
+  double harder(double w) => assisted ? math.max(0.0, _round(e, w - inc)) : _round(e, w + inc);
+  final step = e.plateKg == null ? '${_fmt(inc)} kg' : 'one plate';
+  final stepUp = assisted ? 'take $step less assistance' : 'add $step';
 
   if (!e.isWeighted || (topWeight == 0 && !emptyBar)) {
     final allTop = working.every((x) => (x.reps ?? 0) >= hi);
@@ -263,16 +282,16 @@ ProgressionAdvice _baseAdvice(
       return ProgressionAdvice(
         weightKg: topWeight,
         targetReps: lo,
-        message: 'Below $lo reps twice – keep ${_fmt(topWeight)} kg${assisted ? ' assistance' : ''} and own every rep; '
+        message: 'Below $lo reps twice – keep ${_load(e, topWeight)}${assisted ? ' assistance' : ''} and own every rep; '
             'the deload resets the load.',
         lastSummary: summary,
       );
     }
     return ProgressionAdvice(
-      weightKg: assisted ? topWeight + inc : roundToStep(topWeight * 0.9, inc),
+      weightKg: assisted ? topWeight + inc : _lighter(e, topWeight),
       targetReps: lo,
       message: assisted
-          ? 'Below $lo reps twice in a row – add ${_fmt(inc)} kg assistance and rebuild with good form.'
+          ? 'Below $lo reps twice in a row – add $step${e.plateKg == null ? '' : ' of'} assistance and rebuild with good form.'
           : 'Below $lo reps twice in a row – drop ~10% and rebuild with good form.',
       lastSummary: summary,
     );

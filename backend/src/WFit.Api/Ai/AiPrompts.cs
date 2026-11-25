@@ -21,7 +21,9 @@ public static class AiPrompts
         exercise per session (early, low volume); mobility/stability drills in the warm-up are welcome.
         Loads: kg is what the athlete logs. "bar" exercises: kg = plates only (both sides together); exerciseHistory.barKg is
         the empty bar on top - never add it to targetWeightKg. "assist" exercises: kg = machine assistance, less is harder
-        (progress = -1 increment, too_hard = +1). No "inc" = no load: targetWeightKg null. "perSide": reps/seconds per side.
+        (progress = -1 increment, too_hard = +1). exerciseHistory.plateKg = numbered stack: sets and targetWeightKg stay in kg, the
+        increment is plateKg instead of "inc" and targetWeightKg a multiple of it; the athlete sees plate numbers (kg / plateKg), so
+        write "plate 7" instead of kg to them and read their numbers as plates. No "inc" = no load: targetWeightKg null. "perSide": reps/seconds per side.
         brief.profile.muscleFocus (the athlete's own choice; balance targets already reflect it): "less" = no extra work for
         that muscle, trim it first; "more" = prioritise it; "light" = no heavy loading for it: 10-15 reps, machines/cables,
         no barbell lift as its main exercise.
@@ -57,7 +59,7 @@ public static class AiPrompts
         5. Use exerciseFeedback, session notes, rating/effort and userNote (high effort or low rating -> no load jumps).
         6. Shape: warmup ~8 min (1 easy cardio + 2-3 activation/mobility drills for today's muscles); main 4-7 exercises (power
            first if any, heavy compounds 6-10 reps, other compounds 8-12, isolation 10-15); core ~6 min (2 different patterns)
-           only if includeCore; cooldown exactly brief.profile.cooldownStretches stretches (0 = omit the block; default 3). candidates.flex (other splits, for priority muscles): at most 1, as a short accessory, only when today's split can't cover the priority. Time per exercise ~ sets x (40 s + rest) + 60 s (perSide: 80 s); estimatedMinutes <=
+           only if includeCore; cooldown exactly brief.profile.cooldownStretches stretches (0 = omit the block; default 3), with their catalog sets and sec (perSide: short holds, two rounds). candidates.flex (other splits, for priority muscles): at most 1, as a short accessory, only when today's split can't cover the priority. Time per exercise ~ sets x (40 s + rest) + 60 s (perSide: 80 s); estimatedMinutes <=
            sessionMinutes. Rest: compounds 120-180 s, isolation 60-90 s, power 90-120 s, warm-up/cooldown 0-30 s; x0.7 if
            brief.profile.restMode is short, x1.3 if long. Max 1 floor
            exercise ("floor") per warmup/core/cooldown block. Rep items: repMin/repMax, durationSeconds null; timed items:
