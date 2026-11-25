@@ -34,6 +34,7 @@
 | Path | Purpose |
 |---|---|
 | `app/` | Flutter Android app |
+| `watch/` | Wear OS companion app (Kotlin, own Gradle build), see [WATCH.md](WATCH.md) |
 | `backend/` | .NET 10 isolated Azure Functions API + tests |
 | `infra/` | Bicep templates + deploy script |
 | `docs/API.md` | REST contract |

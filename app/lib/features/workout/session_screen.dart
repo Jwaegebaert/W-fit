@@ -13,13 +13,17 @@ import '../../domain/catalog.dart';
 import '../../domain/plan.dart';
 import '../../domain/progression.dart';
 import '../../domain/stats.dart';
+import '../../domain/watch_protocol.dart';
+import '../../domain/workout_countdown.dart';
 import '../../providers.dart';
 import '../../widgets/common.dart';
 import '../../widgets/report_issue_sheet.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../settings/equipment_screen.dart' show showBarWeightDialog;
+import '../watch/watch_sync.dart';
 import 'coach_strip.dart';
 import 'section_checklist.dart';
+import 'set_logger.dart';
 import 'set_tick.dart';
 import 'swap_sheet.dart';
 import 'workout_timer.dart';
@@ -67,6 +71,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     if (i < 0) return;
     if (_entries[i].isDone(before) || !_entries[i].isDone(after)) return;
     final next = [..._entries.skip(i + 1), ..._entries.take(i)].where((e) => e.isCard && !e.isDone(after)).firstOrNull?.key;
+    ref.read(openExerciseProvider.notifier).clear(); // the watch moves on by itself
     setState(() {
       _expandedKey = next;
       _collapsed.remove(next);
@@ -129,7 +134,9 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
           section: block.section,
           excludeIds: usedIds,
         );
-        if (changed && mounted) setState(() => _expandedKey = null);
+        if (!changed || !mounted) return;
+        ref.read(openExerciseProvider.notifier).clear();
+        setState(() => _expandedKey = null);
       }
 
       if (_Entry.isChecklist(block.section)) {
@@ -167,6 +174,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               } else {
                 _collapsed.remove(key);
                 _expandedKey = key;
+                ref.read(openExerciseProvider.notifier).open(session.id, itemOrder);
               }
             }),
             onSwap: plan == null ? null : () => swap(i),
@@ -282,7 +290,7 @@ class _Entry {
   String get key => '$order:$exerciseId';
 
   /// Warm-up and cool-down are a list to tick off, the rest are cards to log sets on.
-  static bool isChecklist(Section s) => s == Section.warmup || s == Section.cooldown;
+  static bool isChecklist(Section s) => s.isChecklist;
   bool get isCard => !isChecklist(section);
 
   int doneOf(List<SetLog> logged) {
@@ -428,12 +436,22 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
     }
   }
 
-  int get _targetReps => _advice?.targetReps ?? widget.item.repMax ?? widget.item.repMin ?? 10;
+  int get _targetReps => targetRepsFor(widget.item, _advice);
 
-  Future<void> _toggleSet(int setNumber, bool complete, {int? durationSeconds}) async {
+  SetRef _setRef(int setNumber) => SetRef(
+        sessionId: widget.sessionId,
+        order: widget.order,
+        exerciseId: widget.item.exerciseId,
+        section: widget.section.name,
+        set: setNumber,
+        seconds: widget.item.durationSeconds ?? 30,
+        rest: widget.item.restSeconds,
+        last: setNumber >= _rowCount,
+      );
+
+  Future<void> _toggleSet(int setNumber, bool complete) async {
     final e = ref.read(catalogProvider).exercise(widget.item.exerciseId);
     final idx = setNumber - 1;
-    final existing = _loggedFor(setNumber);
     final isTimed = widget.item.isTimed;
     double? weight = double.tryParse(_weight[idx].text.replaceAll(',', '.'));
     int? reps = int.tryParse(_reps[idx].text);
@@ -442,26 +460,24 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
       _reps[idx].text = '$reps';
     }
     if (e != null && (!_weightColumn(e) || (!e.isWeighted && weight == 0))) weight = null;
-    await ref.read(repositoryProvider).logSet(
-          id: existing?.id,
-          sessionId: widget.sessionId,
-          exerciseId: widget.item.exerciseId,
-          section: widget.section,
-          exerciseOrder: widget.order,
-          setNumber: setNumber,
+    if (complete) HapticFeedback.lightImpact();
+    await ref.read(setLoggerProvider).log(
+          _setRef(setNumber),
           weightKg: isTimed ? null : weight,
           reps: isTimed ? null : reps,
-          durationSeconds: isTimed ? (durationSeconds ?? widget.item.durationSeconds) : null,
+          durationSeconds: isTimed ? widget.item.durationSeconds : null,
           completed: complete,
         );
-    if (complete) {
-      HapticFeedback.lightImpact();
-      final isLast = setNumber >= _rowCount;
-      final rest = widget.item.restSeconds;
-      if (rest > 0) {
-        ref.read(workoutTimerProvider.notifier).start(isLast ? 'Rest · next exercise' : 'Rest', rest);
-      }
-    }
+  }
+
+  /// A set came in from the watch: show its values instead of what this row was filled with.
+  void _showFromWatch(SetLog log) {
+    final idx = log.setNumber - 1;
+    if (log.exerciseOrder != widget.order || log.exerciseId != widget.item.exerciseId || idx >= _reps.length) return;
+    _reps[idx].text = log.reps?.toString() ?? '';
+    if (log.weightKg == null) return;
+    _weight[idx].text = formatKg(log.weightKg);
+    _weightToLaterSets(log.setNumber);
   }
 
   Future<void> _updateIfLogged(int setNumber) async {
@@ -484,28 +500,23 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
         );
   }
 
-  /// Work timer for a timed set; per-side exercises run one timer per side before the set is logged.
-  void _startWork(int setNumber, String name) {
-    final secs = widget.item.durationSeconds ?? 30;
-    final timer = ref.read(workoutTimerProvider.notifier);
-    void log() => _toggleSet(setNumber, true, durationSeconds: secs);
-    if (!_perSide) {
-      timer.start(name, secs, isWork: true, onDone: log);
-      return;
-    }
-    timer.start('Side 1 · $name', secs, isWork: true, onDone: () {
-      if (mounted) timer.start('Side 2 · $name', secs, isWork: true, onDone: log);
-    });
-  }
+  /// Work timer for a timed set; per-side exercises run one phase per side before the set is logged.
+  void _startWork(int setNumber, String name) =>
+      ref.read(workoutTimerProvider.notifier).startWork(name, _setRef(setNumber), perSide: _perSide);
 
-  /// A weight typed in set [n] also goes to the sets after it, up to the first one that was typed or logged already.
+  /// A weight typed in set [n] also goes to the sets after it.
   void _weightTyped(int n) {
     _ownWeight.add(n);
+    _weightToLaterSets(n);
+    _updateIfLogged(n);
+  }
+
+  /// Copies the weight of set [n] to the sets after it, up to the first one that was typed or logged already.
+  void _weightToLaterSets(int n) {
     for (var next = n + 1; next <= _weight.length; next++) {
       if (_ownWeight.contains(next)) break;
       if (_loggedFor(next) == null) _weight[next - 1].text = _weight[n - 1].text;
     }
-    _updateIfLogged(n);
   }
 
   /// Working sets on weighted exercises need a weight: an empty one would be missing from records and advice.
@@ -553,6 +564,9 @@ class _ExerciseCardState extends ConsumerState<ExerciseCard> {
     final done = widget.logged.where((s) => s.completed).length;
     final complete = done >= widget.item.sets;
     _ensureControllers();
+    ref.listen(watchSetProvider, (_, log) {
+      if (log != null) _showFromWatch(log);
+    });
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -841,7 +855,7 @@ class _BottomBar extends ConsumerWidget {
 class _TimerBanner extends ConsumerStatefulWidget {
   const _TimerBanner({required this.timer});
 
-  final TimerState timer;
+  final Countdown timer;
 
   @override
   ConsumerState<_TimerBanner> createState() => _TimerBannerState();
@@ -866,6 +880,7 @@ class _TimerBannerState extends ConsumerState<_TimerBanner> {
   Widget build(BuildContext context) {
     final t = Theme.of(context);
     final timer = widget.timer;
+    final now = ref.read(nowMsProvider)();
     final color = timer.isWork ? t.colorScheme.attention : t.colorScheme.primary;
     final ctrl = ref.read(workoutTimerProvider.notifier);
     return Container(
@@ -878,7 +893,7 @@ class _TimerBannerState extends ConsumerState<_TimerBanner> {
           child: Stack(alignment: Alignment.center, children: [
             SizedBox.expand(
               child: CircularProgressIndicator(
-                  value: timer.progress, strokeWidth: 4, color: color, backgroundColor: color.withValues(alpha: 0.2)),
+                  value: timer.progress(now), strokeWidth: 4, color: color, backgroundColor: color.withValues(alpha: 0.2)),
             ),
             Icon(timer.isWork ? Icons.directions_run : Icons.self_improvement, color: color, size: 22),
           ]),
@@ -886,11 +901,11 @@ class _TimerBannerState extends ConsumerState<_TimerBanner> {
         const SizedBox(width: Gap.md - 4),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text(timer.label, style: t.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(timer.phaseAt(now)?.label ?? '', style: t.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(formatClock(timer.remaining),
+              child: Text(formatClock(timer.remaining(now)),
                   style: t.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
             ),

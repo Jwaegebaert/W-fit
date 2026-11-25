@@ -1,0 +1,7 @@
+[
+  {"v": 1, "type": "log", "id": "e1", "at": 1700000200000, "sessionId": "s1", "order": 1, "exerciseId": "barbell-bench-press", "section": "main", "set": 2, "weight": 42.5, "reps": 7, "seconds": null},
+  {"v": 1, "type": "log", "id": "e2", "at": 1700000300000, "sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 1, "weight": null, "reps": null, "seconds": 25},
+  {"v": 1, "type": "unlog", "id": "e3", "at": 1700000400000, "sessionId": "s1", "order": 1, "exerciseId": "barbell-bench-press", "section": "main", "set": 2, "weight": null, "reps": null, "seconds": null},
+  {"v": 1, "type": "timer", "timer": {"kind": "rest", "owner": "watch", "changedAt": 1700000200000, "phases": [{"label": "Rest", "seconds": 120, "endsAt": 1700000320000}], "set": null}},
+  {"v": 1, "type": "timer", "timer": {"kind": "none", "owner": "watch", "changedAt": 1700000210000, "phases": [], "set": null}}
+]

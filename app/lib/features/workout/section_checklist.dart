@@ -5,10 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme.dart';
 import '../../data/db/database.dart';
-import '../../data/repositories/repository.dart';
 import '../../domain/catalog.dart';
 import '../../domain/plan.dart';
+import '../../domain/workout_countdown.dart';
 import '../../providers.dart';
+import 'set_logger.dart';
 import 'set_tick.dart';
 import 'workout_timer.dart';
 
@@ -43,51 +44,43 @@ class SectionChecklist extends ConsumerWidget {
   int _done(int order, PlanItem item) =>
       [for (var n = 1; n <= item.sets; n++) _set(order, item, n)].where((s) => s?.completed ?? false).length;
 
-  /// Looks the set up again first: it may have been logged since this list was built (a timer ran meanwhile).
-  Future<void> _log(Repository repo, int order, PlanItem item, int n, bool completed) async {
-    final existing = (await repo.setsForSession(sessionId))
-        .where((s) => s.exerciseOrder == order && s.exerciseId == item.exerciseId && s.setNumber == n)
-        .firstOrNull;
-    if ((existing?.completed ?? false) == completed) return;
-    await repo.logSet(
-      id: existing?.id,
-      sessionId: sessionId,
-      exerciseId: item.exerciseId,
-      section: section,
-      exerciseOrder: order,
-      setNumber: n,
-      reps: item.isTimed ? null : (item.repMax ?? item.repMin),
-      durationSeconds: item.isTimed ? item.durationSeconds : null,
-      completed: completed,
-    );
-  }
+  SetRef _setRef(int order, PlanItem item, int n) => SetRef(
+        sessionId: sessionId,
+        order: order,
+        exerciseId: item.exerciseId,
+        section: section.name,
+        set: n,
+        seconds: item.durationSeconds ?? 30,
+        rest: 0, // no rest in a warm-up or cool-down
+        last: n >= item.sets,
+      );
 
-  Future<void> _tick(Repository repo, int order, PlanItem item, bool completed) async {
+  Future<void> _tick(SetLogger logger, int order, PlanItem item, bool completed) async {
     if (completed) HapticFeedback.lightImpact();
     for (var n = 1; n <= item.sets; n++) {
-      await _log(repo, order, item, n, completed);
+      final ref = _setRef(order, item, n);
+      // Looked up again: it may have been logged since this list was built (a timer ran, the watch).
+      final existing = await logger.find(sessionId, order: order, exerciseId: item.exerciseId, set: n);
+      if ((existing?.completed ?? false) == completed) continue;
+      await logger.log(
+        ref,
+        reps: item.isTimed ? null : (item.repMax ?? item.repMin),
+        durationSeconds: item.isTimed ? item.durationSeconds : null,
+        completed: completed,
+      );
     }
   }
 
-  Future<void> _tickAll(Repository repo) async {
+  Future<void> _tickAll(SetLogger logger) async {
     for (final (order, item) in items) {
-      await _tick(repo, order, item, true);
+      await _tick(logger, order, item, true);
     }
   }
 
   /// Runs the timer of the next open set (one per side when needed) and logs it at the end.
   void _start(WidgetRef ref, int order, PlanItem item, String name, {required bool perSide}) {
     final n = [for (var n = 1; n <= item.sets; n++) n].firstWhere((n) => !(_set(order, item, n)?.completed ?? false));
-    final seconds = item.durationSeconds ?? 30;
-    final timer = ref.read(workoutTimerProvider.notifier);
-    final repo = ref.read(repositoryProvider);
-    void done() => _log(repo, order, item, n, true);
-    if (!perSide) {
-      timer.start(name, seconds, isWork: true, onDone: done);
-      return;
-    }
-    timer.start('Side 1 · $name', seconds,
-        isWork: true, onDone: () => timer.start('Side 2 · $name', seconds, isWork: true, onDone: done));
+    ref.read(workoutTimerProvider.notifier).startWork(name, _setRef(order, item, n), perSide: perSide);
   }
 
   @override
@@ -110,7 +103,7 @@ class SectionChecklist extends ConsumerWidget {
                 Expanded(
                   child: Text(section.label, style: t.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                 ),
-                if (open > 0) TextButton(onPressed: () => _tickAll(ref.read(repositoryProvider)), child: const Text('All done')),
+                if (open > 0) TextButton(onPressed: () => _tickAll(ref.read(setLoggerProvider)), child: const Text('All done')),
               ]),
             ),
           ),
@@ -127,7 +120,7 @@ class SectionChecklist extends ConsumerWidget {
                 leading: SetTick(
                   label: complete ? 'Undo $name' : 'Done: $name',
                   done: complete,
-                  onPressed: () => _tick(ref.read(repositoryProvider), order, item, !complete),
+                  onPressed: () => _tick(ref.read(setLoggerProvider), order, item, !complete),
                 ),
                 title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text([

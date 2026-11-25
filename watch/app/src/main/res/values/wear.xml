@@ -1,0 +1,6 @@
+<resources>
+    <!-- Lets the phone find the watch that has this app. -->
+    <string-array name="android_wear_capabilities">
+        <item>wfit_watch</item>
+    </string-array>
+</resources>

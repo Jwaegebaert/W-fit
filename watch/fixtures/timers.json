@@ -1,0 +1,96 @@
+[
+  {
+    "name": "rest runs and rounds up",
+    "timer": {"kind": "rest", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Rest", "seconds": 90, "endsAt": 1090000}], "set": null},
+    "now": 1000500,
+    "expect": {"kind": "rest", "label": "Rest", "remaining": 90, "endsAt": 1090000}
+  },
+  {
+    "name": "rest is over exactly at its end",
+    "timer": {"kind": "rest", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Rest", "seconds": 90, "endsAt": 1090000}], "set": null},
+    "now": 1090000,
+    "expect": null
+  },
+  {
+    "name": "stopped timer never runs",
+    "timer": {"kind": "none", "owner": "watch", "changedAt": 1000000, "phases": [], "set": null},
+    "now": 1000000,
+    "expect": null
+  },
+  {
+    "name": "extend moves the end",
+    "timer": {"kind": "rest", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Rest", "seconds": 90, "endsAt": 1090000}], "set": null},
+    "extend": 15,
+    "extendAt": 1030000,
+    "now": 1030000,
+    "expect": {"kind": "rest", "label": "Rest", "remaining": 75, "endsAt": 1105000}
+  },
+  {
+    "name": "shortening below zero ends it now",
+    "timer": {"kind": "rest", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Rest", "seconds": 90, "endsAt": 1090000}], "set": null},
+    "extend": -15,
+    "extendAt": 1080000,
+    "now": 1080000,
+    "expect": null
+  },
+  {
+    "name": "extending a finished timer does nothing",
+    "timer": {"kind": "rest", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Rest", "seconds": 90, "endsAt": 1090000}], "set": null},
+    "extend": 60,
+    "extendAt": 1095000,
+    "now": 1095000,
+    "expect": null
+  },
+  {
+    "name": "one-sided hold: side 1",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "now": 1010000,
+    "expect": {"kind": "work", "label": "Side 1 · Side plank", "remaining": 20, "endsAt": 1060000}
+  },
+  {
+    "name": "one-sided hold: side 2 starts when side 1 ends",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "now": 1030000,
+    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 30, "endsAt": 1060000}
+  },
+  {
+    "name": "extending side 1 moves side 2 along",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "extend": 15,
+    "extendAt": 1020000,
+    "now": 1046000,
+    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 29, "endsAt": 1075000}
+  },
+  {
+    "name": "extending side 2 leaves side 1 alone",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "extend": 15,
+    "extendAt": 1040000,
+    "now": 1040000,
+    "expect": {"kind": "work", "label": "Side 2 · Side plank", "remaining": 35, "endsAt": 1075000}
+  },
+  {
+    "name": "rest follows the work, counted from the end of the work",
+    "timer": {"kind": "work", "owner": "watch", "changedAt": 1000000, "phases": [{"label": "Side 1 · Side plank", "seconds": 30, "endsAt": 1030000}, {"label": "Side 2 · Side plank", "seconds": 30, "endsAt": 1060000}], "set": {"sessionId": "s1", "order": 4, "exerciseId": "side-plank", "section": "core", "set": 2, "seconds": 30, "rest": 45, "last": false}},
+    "now": 1065000,
+    "expect": {"kind": "rest", "label": "Rest", "remaining": 40, "endsAt": 1105000}
+  },
+  {
+    "name": "rest after the last set leads to the next exercise",
+    "timer": {"kind": "work", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Plank", "seconds": 45, "endsAt": 1045000}], "set": {"sessionId": "s1", "order": 3, "exerciseId": "plank", "section": "core", "set": 3, "seconds": 45, "rest": 60, "last": true}},
+    "now": 1045000,
+    "expect": {"kind": "rest", "label": "Rest · next exercise", "remaining": 60, "endsAt": 1105000}
+  },
+  {
+    "name": "no rest configured: nothing runs after the work",
+    "timer": {"kind": "work", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Arm circles", "seconds": 30, "endsAt": 1030000}], "set": {"sessionId": "s1", "order": 0, "exerciseId": "arm-circles", "section": "warmup", "set": 1, "seconds": 30, "rest": 0, "last": true}},
+    "now": 1030000,
+    "expect": null
+  },
+  {
+    "name": "work and rest both long past",
+    "timer": {"kind": "work", "owner": "phone", "changedAt": 1000000, "phases": [{"label": "Plank", "seconds": 45, "endsAt": 1045000}], "set": {"sessionId": "s1", "order": 3, "exerciseId": "plank", "section": "core", "set": 3, "seconds": 45, "rest": 60, "last": true}},
+    "now": 1105000,
+    "expect": null
+  }
+]
